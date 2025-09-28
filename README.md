@@ -7,6 +7,16 @@ This project is made in collaboration with **Youth for Animals (YFA)**, a campus
 
 ---
 
+## 🐶 About PAWS Philippines & YFA
+
+The **Philippine Animal Welfare Society (PAWS)** is a non-profit organization dedicated to the protection and humane treatment of animals in the Philippines.
+
+* 🐕 They promote adoption, spay/neuter programs, and animal rights awareness.
+* 🐈 Their student arm, **Youth for Animals (YFA)**, empowers young advocates across schools and universities to participate in campaigns, adoption drives, and education efforts on animal welfare.
+* 🐾 PawPal is designed to be YFA’s **digital partner** in Cavite State University to streamline pet care initiatives and member engagement.
+
+---
+
 ## 🎯 Target Users
 
 * **Youth for Animals (YFA – CvSU Main Campus)**
@@ -34,6 +44,12 @@ This project is made in collaboration with **Youth for Animals (YFA)**, a campus
 * **Community Access** to YFA tips, events, and announcements
 * **Gamification & Rewards** (badges for active participation)
 
+### 💬 Messaging & Community Engagement
+
+* **Direct Messaging** between YFA and members
+* **Group Announcements** for adoption drives, campaigns, and events
+* **Support & Feedback Channel** where pet owners can reach YFA directly
+
 ---
 
 ## 🛠 Tech Stack
@@ -55,7 +71,7 @@ This project is made in collaboration with **Youth for Animals (YFA)**, a campus
 * Vercel / Netlify for deployment
 * Supabase (database + auth)
 * Cloudinary / AWS S3 (media uploads)
-* Firebase Cloud Messaging (push notifications)
+* Firebase Cloud Messaging (push notifications & messaging)
 * QR Code Generator (qrcode.js / QRCode.react)
 * Progressive Web App (PWA) for mobile-like experience
 
@@ -80,4 +96,4 @@ This project is for educational and community purposes.
 
 ---
 
-Do you want me to also **add installation & usage instructions** (like how to clone, install dependencies, run dev server) so it’s ready for GitHub users who might test it?
+👉 Do you also want me to include a **“How to Run the Project” section** (clone, install dependencies, run dev server) so other developers can test it easily?
