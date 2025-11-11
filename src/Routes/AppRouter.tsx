@@ -1,8 +1,10 @@
 import { createBrowserRouter, RouterProvider} from "react-router-dom"
+
 // Import your pages
 import Welcome from "../pages/Authentication/Welcome"
 import SignIn from "../pages/Authentication/SignIn"
 import SignUp from "../pages/Authentication/SignUp"
+import UserDashboard from "../pages/UsersD/UserDashboard"
 
 const router = createBrowserRouter([
   {
@@ -17,6 +19,11 @@ const router = createBrowserRouter([
     path: "/SignUp",
     element: <SignUp />,
   },
+  {
+    path: "/UserDashboard",
+    element: <UserDashboard />,
+  },
+
 ])
 
 export default function AppRouter() {
