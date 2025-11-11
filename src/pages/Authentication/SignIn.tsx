@@ -4,15 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "../../lib/supabaseClient";
+import { Link } from  "react-router-dom";
 
 export default function SignIn() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('')
-  const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
 
   return (
@@ -33,8 +27,6 @@ export default function SignIn() {
               type="email"
               placeholder="Email"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
               className="rounded-2xl bg-gray-200 focus-visible:ring-gray-400"
             />
           </div>
@@ -49,8 +41,6 @@ export default function SignIn() {
               type={showPassword ? "text" : "password"}
               placeholder="Password"
               required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
               className="rounded-2xl bg-gray-700 text-white placeholder-gray-300 focus-visible:ring-gray-500 pr-10"
             />
             <button
@@ -87,15 +77,14 @@ export default function SignIn() {
           >
             Sign In
           </Button>
+          {/* Footer */}
+          <p className="text-center text-sm text-gray-500 mt-6">
+            Don’t have an account?{" "}
+            <Link to="/SignUp" className="font-medium text-gray-700 hover:underline">
+              Sign Up
+            </Link>
+          </p>
         </form>
-
-        {/* Footer */}
-        <p className="text-center text-sm text-gray-500 mt-6">
-          Don’t have an account?{" "}
-          <a href="/SignUp" className="font-medium text-gray-700 hover:underline">
-            Sign Up
-          </a>
-        </p>
       </div>
     </div>
   );
