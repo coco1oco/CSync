@@ -1,7 +1,5 @@
 import { createBrowserRouter, RouterProvider } from "react-router-dom"
 import { AuthProvider } from "../context/authContext"
-import { useAuth } from "@/context/authContext";
-import { Navigate } from "react-router-dom";
 
 // Import your pages
 import Welcome from "../pages/Authentication/Welcome"

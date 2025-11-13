@@ -1,27 +1,15 @@
-// routes/ProtectedRoute.tsx
+// src/components/ProtectedRoute.tsx
+import { useAuth } from "@/context/authContext";  // Import your auth context
 import { Navigate } from "react-router-dom";
-import { useAuth } from "../context/authContext";
-import type { JSX } from "react";
 
-interface Props {
-  children: JSX.Element;
-  role?: "admin" | "user";
+// This component wraps pages that require login
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();  // Get user from AuthContext
+  
+  if (loading) return <div className="flex items-center justify-center h-screen">Loading...</div>;  // Check 1: Is data still loading?
+  if (!user) return <Navigate to="/SignIn" />;  // Check 2: Is user logged in?
+  
+  return <>{children}</>;  // Check 3: Yes? Show the page!
 }
 
-export const ProtectedRoute = ({ children, role }: Props) => {
-  const { user, role: userRole } = useAuth(); // ✅ destructure both user & role
-
-  // If not logged in → go to login page
-  if (!user) return <Navigate to="/SignIn" replace />;
-
-  // If role mismatch → redirect
-  if (role && userRole !== role) {
-    return userRole === "admin" ? (
-      <Navigate to="/admin-login-9274" replace />
-    ) : (
-      <Navigate to="/SignIn" replace />
-    );
-  }
-
-  return children;
-};
+export default ProtectedRoute;
