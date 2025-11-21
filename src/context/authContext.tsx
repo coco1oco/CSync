@@ -1,27 +1,22 @@
-// Import React hooks and Supabase
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
-// Define the shape of a user profile object
-// This tells TypeScript what fields a user can have
 type UserProfile = {
-  id: string;                    // Unique identifier from Supabase
-  email: string;                 // User's email
-  username?: string;             // Username (optional, ? means it might not exist)
-  avatar_url?: string;           // URL to user's avatar image (optional)
-  role?: "user" | "admin";       // User role - either 'user' or 'admin' (optional)
-  [key: string]: any;            // Allow any other extra fields
+  id: string;
+  email: string;
+  username?: string;
+  avatar_url?: string;
+  role?: "user" | "admin";
+  [key: string]: any;
 };
 
-// Define what the AuthContext will provide to components
 type AuthContextProps = {
-  user: UserProfile | null;                  // Current logged-in user (or null if not logged in)
-  loading: boolean;                          // True while fetching data from database
-  signOut: () => Promise<void>;              // Function to log out user
-  refreshProfile: () => Promise<void>;       // Function to manually refresh user data
+  user: UserProfile | null;
+  loading: boolean;
+  signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 };
 
-// Create the context with default/placeholder values
 const AuthContext = createContext<AuthContextProps>({
   user: null,
   loading: true,
@@ -29,118 +24,107 @@ const AuthContext = createContext<AuthContextProps>({
   refreshProfile: async () => {},
 });
 
-// Export a custom hook so components can easily use the context
-// Instead of writing: useContext(AuthContext)
-// Components can just write: useAuth()
 export const useAuth = () => useContext(AuthContext);
 
-// Create the AuthProvider component - this wraps your entire app
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // State 1: Store the current logged-in user
-  // Initially null because no one is logged in yet
   const [user, setUser] = useState<UserProfile | null>(null);
-
-  // State 2: Track if data is still loading from database
-  // Initially true because we need to check if user is already logged in on app load
   const [loading, setLoading] = useState(true);
 
-  // Effect 1: Run when component first mounts
-  // This checks if a user is already logged in and fetches their profile
-  useEffect(() => {
-    // Define an async function to fetch profile data
-    const fetchProfile = async () => {
-      setLoading(true); // Start loading
-
-      // Step 1: Get the current session from Supabase
-      // If user is already logged in, this will return their session
+useEffect(() => {
+  const loadUser = async () => {
+    try {
+      setLoading(true);
+      
       const { data: { session } } = await supabase.auth.getSession();
-
-      // Step 2: If a session exists (user is logged in)
+      console.log("Session:", session); // Debug: see if session exists
+      
       if (session?.user) {
-        // Query the 'profiles' table to get the user's profile data
-        const { data, error } = await supabase
+        console.log("Fetching profile for user:", session.user.id);
+        
+        const { data: profile, error } = await supabase
           .from("profiles")
-          .select("*")                          // Get all columns
-          .eq("id", session.user.id)            // Where id matches the logged-in user's id
-          .single();                            // Expect only one result
+          .select("*")
+          .eq("id", session.user.id)
+          .single();
 
-        // If we got profile data successfully
-        if (data) {
-          // Combine Supabase auth user data with profile data and store it
-          // This gives us email + password from auth, plus username + role from profiles table
-          setUser({ ...session.user, ...data });
+        console.log("Profile error:", error); // Debug: see if there's an error
+        console.log("Profile data:", profile); // Debug: see the profile
+
+        if (error) {
+          console.error("Error fetching profile:", error);
+          setUser(null);
+        } else if (profile) {
+          console.log("Setting user with profile:", { ...session.user, ...profile });
+          setUser({ ...session.user, ...profile });
         }
       } else {
-        // No session = no user logged in
+        console.log("No session found");
         setUser(null);
       }
+    } catch (error) {
+      console.error("Error loading user:", error);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      setLoading(false); // Done loading
-    };
+  loadUser();
 
-    // Call the function when component mounts
-    fetchProfile();
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    async (event, session) => {
+      console.log("Auth state changed:", event, session);
+      
+      if (session?.user) {
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", session.user.id)
+          .single();
 
-    // Subscribe to auth state changes (when user logs in or out)
-    // This listener will detect any authentication changes
-    const { data: listener } = supabase.auth.onAuthStateChange(() => {
-      // When auth changes, re-fetch the profile
-      fetchProfile();
-    });
+        console.log("onAuthStateChange - Profile:", profile, "Error:", error);
 
-    // Cleanup: unsubscribe from the listener when component unmounts
-    // This prevents memory leaks
-    return () => {
-      listener?.subscription.unsubscribe();
-    };
-  }, []); // Empty dependency array = run only once on mount
+        if (profile) {
+          setUser({ ...session.user, ...profile });
+        }
+      } else {
+        setUser(null);
+      }
+      
+      setLoading(false);
+    }
+  );
 
-  // Function 1: Sign out the user
+  return () => subscription?.unsubscribe();
+}, []);
+
+
   const signOut = async () => {
-    // Call Supabase's signOut method to end the session
     await supabase.auth.signOut();
-    // Clear the user state
     setUser(null);
   };
 
-  // Function 2: Manually refresh user profile
-  // Useful when user updates their profile (avatar, username, etc.)
   const refreshProfile = async () => {
-    setLoading(true); // Start loading
-
-    // Get current session
+    setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
 
-    // If user is logged in
     if (session?.user) {
-      // Fetch their latest profile data
-      const { data } = await supabase
+      const { data: profile } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", session.user.id)
         .single();
 
-      // If data exists, update the user state
-      if (data) {
-        setUser({ ...session.user, ...data });
+      if (profile) {
+        setUser({ ...session.user, ...profile });
       }
     }
-
-    setLoading(false); // Done loading
+    setLoading(false);
   };
 
-  // Return the context provider to wrap components
-  // Pass all the state and functions to any component that uses useAuth()
   return (
-    <AuthContext.Provider 
-      value={{ 
-        user,              // Current user data
-        loading,           // Loading state
-        signOut,           // Sign out function
-        refreshProfile     // Refresh profile function
-      }}
-    >
-      {children}  {/* Render all child components */}
+    <AuthContext.Provider value={{ user, loading, signOut, refreshProfile }}>
+      {children}
     </AuthContext.Provider>
   );
 };
