@@ -6,7 +6,10 @@ import Welcome from "../pages/Authentication/Welcome"
 import SignIn from "../pages/Authentication/SignIn"
 import SignUp from "../pages/Authentication/SignUp"
 import UserDashboard from "../pages/UsersD/UserDashboard"
-import ProtectedRoute from "../Routes/ProtectedRoute"
+import ProtectedRoute from "../Routes/ProtectedRoute" //Loadining
+import AdminDashboard from "../pages/AdminD/AdminDashboard"
+import ForgotPassword from "../pages/Authentication/ForgotPassword"
+
 
 const router = createBrowserRouter([
   {
@@ -27,6 +30,20 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <UserDashboard />
       </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/AdminDashboard",
+    element: (
+      <ProtectedRoute>
+        <AdminDashboard />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/ForgotPassword",
+    element: (
+        <ForgotPassword />
     ),
   },
 ])

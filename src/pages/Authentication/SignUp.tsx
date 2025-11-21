@@ -57,7 +57,7 @@ export default function SignUp() {
       if (user) {
       const { error: profileError } = await supabase
         .from("profiles")          // Table name
-        .insert([                  // Insert a new row
+        .upsert([                  // Insert a new row
           {
             id: user.id,           // Link to the auth user by id
             email,                 // Store email
@@ -85,8 +85,6 @@ export default function SignUp() {
   };
 
   // Render the sign up form
-
-  
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100 px-4">
       <div className="w-full max-w-sm p-8">
