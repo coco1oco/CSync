@@ -5,9 +5,10 @@ import { AuthProvider } from "../context/authContext"
 import Welcome from "../pages/Authentication/Welcome"
 import SignIn from "../pages/Authentication/SignIn"
 import SignUp from "../pages/Authentication/SignUp"
-import UserDashboard from "../pages/UsersD/UserDashboard"
+import { UserHomePage } from "../pages/UsersD/UserHomePage"
+import { AdminHomePage } from "../pages/AdminD/AdminHomePage"
+import ProfilePage from "../pages/SharedPages/ProfilePage"
 import ProtectedRoute from "../Routes/ProtectedRoute" //Loadining
-import AdminDashboard from "../pages/AdminD/AdminDashboard"
 import ForgotPassword from "../pages/Authentication/ForgotPassword"
 
 
@@ -28,7 +29,15 @@ const router = createBrowserRouter([
     path: "/UserDashboard",
     element: (
       <ProtectedRoute>
-        <UserDashboard />
+        <UserHomePage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/ProfilePage",
+    element: (
+      <ProtectedRoute>
+        <ProfilePage />
       </ProtectedRoute>
     ),
   },
@@ -36,7 +45,7 @@ const router = createBrowserRouter([
     path: "/AdminDashboard",
     element: (
       <ProtectedRoute>
-        <AdminDashboard />
+        <AdminHomePage />
       </ProtectedRoute>
     ),
   },
