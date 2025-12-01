@@ -107,8 +107,8 @@ export default function ProfilePage() {
             <p className="font-semibold">
               {profile.first_name} {profile.last_name}
             </p>
-             <p className="text-black-700 text-xl"> {profile.pronouns}</p>
-            <p className="text-black-700 text-xl"> {profile.username}</p>
+             <p className="text-black-100 text-sm"> {profile.pronouns}</p>
+            <p className="text-black-100 text-sm"> {profile.username}</p>
             <p className="text-black-500 text-sm">{profile.email}</p>
             <p className="text-black-500 text-sm">{profile.bio}</p>
           </div>

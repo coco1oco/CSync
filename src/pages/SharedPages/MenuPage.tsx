@@ -33,7 +33,7 @@ export default function MenuPage() {
       </header>
         <Button
           onClick={handleSignOut}
-          className="w-60 mt-6 bg-red-600 hover:bg-red-700 text-white rounded-lg py-2"
+          className="w-60 mt-6 bg-red-600 hover:bg-red-700  text-white rounded-lg py-2"
         >
           Sign Out
         </Button>

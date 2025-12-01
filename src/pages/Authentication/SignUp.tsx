@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,9 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/authContext";
 import { supabase } from "@/lib/supabaseClient";
 import React from "react";
+
+import logo from "@/assets/images/Pawpal.svg";
+import heroBg from "@/assets/images/hero_2.jpg";
 
 export default function SignUp() {
   const navigate = useNavigate();
@@ -16,10 +19,22 @@ export default function SignUp() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [error, setError] = useState<string>("");
   const [signingUp, setSigningUp] = useState<boolean>(false);
+
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [usernameTouched, setUsernameTouched] = useState(false);
+  const [passwordTouched, setPasswordTouched] = useState(false);
+  const [confirmTouched, setConfirmTouched] = useState(false);
 
   React.useEffect(() => {
     if (user && !loading) {
@@ -27,58 +42,73 @@ export default function SignUp() {
     }
   }, [user, loading, navigate]);
 
-  // Username: starts with letter, 3–16 chars, letters/numbers/underscore
   const usernameRegex = /^[a-zA-Z][a-zA-Z0-9_]{2,15}$/;
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  // Password: 8+ chars, upper, lower, digit, special
-  const passwordRegex =
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/;
+  // empty = no visual error; invalid text = error
+  const validateEmail = (value: string) => {
+    if (!value) return null;
+    if (!emailRegex.test(value)) return "Invalid";
+    return null;
+  };
 
-  const [usernameError, setUsernameError] = useState<string | null>(null);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const validateUsername = (value: string) => {
+    if (!value) return null;
+    if (!usernameRegex.test(value)) return "Invalid";
+    return null;
+  };
+
+  const validatePassword = (value: string) => {
+    if (!value) return null;
+    if (!passwordRegex.test(value)) return "Invalid";
+    return null;
+  };
+
+  const validateConfirmPassword = (value: string, pwd: string) => {
+    if (!value) return null;
+    if (value !== pwd) return "Mismatch";
+    return null;
+  };
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setEmail(value);
+    if (emailTouched) setEmailError(validateEmail(value));
+  };
+
+  const handleEmailBlur = () => {
+    setEmailTouched(true);
+    setEmailError(validateEmail(email));
+  };
 
   const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setUsername(value);
+    if (usernameTouched) setUsernameError(validateUsername(value));
+  };
 
-    if (!value) {
-      setUsernameError(null);
-      return;
-    }
-
-    if (!usernameRegex.test(value)) {
-      setUsernameError(
-        "Username must start with a letter and use 3–16 letters, numbers, or _."
-      );
-    } else {
-      setUsernameError(null);
-    }
+  const handleUsernameBlur = () => {
+    setUsernameTouched(true);
+    setUsernameError(validateUsername(username));
   };
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setPassword(value);
+    if (passwordTouched) setPasswordError(validatePassword(value));
 
-    if (!value) {
-      setPasswordError(null);
-      setConfirmError(null);
-      return;
+    if (confirmTouched) {
+      setConfirmError(validateConfirmPassword(confirmPassword, value));
     }
+  };
 
-    if (!passwordRegex.test(value)) {
-      setPasswordError(
-        "Password must be 8+ chars and include upper, lower, number, and special."
-      );
-    } else {
-      setPasswordError(null);
-    }
+  const handlePasswordBlur = () => {
+    setPasswordTouched(true);
+    setPasswordError(validatePassword(password));
 
-    // re-check confirm password when main password changes
-    if (confirmPassword && confirmPassword !== value) {
-      setConfirmError("Passwords do not match.");
-    } else {
-      setConfirmError(null);
+    if (confirmTouched) {
+      setConfirmError(validateConfirmPassword(confirmPassword, password));
     }
   };
 
@@ -87,54 +117,43 @@ export default function SignUp() {
   ) => {
     const value = e.target.value;
     setConfirmPassword(value);
-
-    if (!value) {
-      setConfirmError(null);
-      return;
-    }
-
-    if (value !== password) {
-      setConfirmError("Passwords do not match.");
-    } else {
-      setConfirmError(null);
+    if (confirmTouched) {
+      setConfirmError(validateConfirmPassword(value, password));
     }
   };
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // common simple pattern [web:92][web:88]
 
-  const [emailError, setEmailError] = useState<string | null>(null);
-
-  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setEmail(value);
-
-    if (!value) {
-      setEmailError(null);
-      return;
-    }
-
-    if (!emailRegex.test(value)) {
-      setEmailError("Enter a valid email address.");
-    } else {
-      setEmailError(null);
-    }
+  const handleConfirmPasswordBlur = () => {
+    setConfirmTouched(true);
+    setConfirmError(validateConfirmPassword(confirmPassword, password));
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
+    setEmailTouched(true);
+    setUsernameTouched(true);
+    setPasswordTouched(true);
+    setConfirmTouched(true);
+
+    // block if any required field is empty
     if (!email || !username || !password || !confirmPassword) {
-      setError("All fields are required");
+      setError("All fields are required.");
       return;
     }
 
-    if (usernameError || passwordError || confirmError) {
-      setError("Please fix the errors before signing up");
-      return;
-    }
+    const emailErr = validateEmail(email);
+    const usernameErr = validateUsername(username);
+    const passwordErr = validatePassword(password);
+    const confirmErr = validateConfirmPassword(confirmPassword, password);
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
+    setEmailError(emailErr);
+    setUsernameError(usernameErr);
+    setPasswordError(passwordErr);
+    setConfirmError(confirmErr);
+
+    if (emailErr || usernameErr || passwordErr || confirmErr) {
+      setError("Please fix highlighted fields.");
       return;
     }
 
@@ -172,139 +191,199 @@ export default function SignUp() {
     }
   };
 
+  const emailHasError = emailTouched && !!emailError;
+  const usernameHasError = usernameTouched && !!usernameError;
+  const passwordHasError = passwordTouched && !!passwordError;
+  const confirmHasError = confirmTouched && !!confirmError;
+
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100 px-4">
-      <div className="w-full max-w-sm p-8">
-        <h1 className="text-5xl font-Inter text-center mb-10">Sign Up</h1>
-
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded mb-4">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSignUp}>
-          <div className="mb-4">
-            <Label htmlFor="email" className="block text-sm mb-1 text-gray-600">
-              Email Address
-            </Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={handleEmailChange}
-              placeholder="Email Address"
-              required
-              maxLength={30}
-              minLength={10}
-              className="rounded-2xl bg-gray-200 focus-visible:ring-gray-400"
-            />
-            {emailError && (
-              <p className="mt-1 text-xs text-red-500">{emailError}</p>
-            )}
-          </div>
-
-          <div className="mb-4">
-            <Label
-              htmlFor="username"
-              className="block text-sm mb-1 text-gray-600"
-            >
-              Username
-            </Label>
-            <Input
-              id="username"
-              type="text"
-              value={username}
-              onChange={handleUsernameChange}
-              placeholder="Username"
-              required
-              className="rounded-2xl bg-gray-500 text-white placeholder-gray-200 focus-visible:ring-gray-500"
-            />
-            {usernameError && (
-              <p className="mt-1 text-xs text-red-500">{usernameError}</p>
-            )}
-          </div>
-
-          <div className="mb-4 relative">
-            <Label
-              htmlFor="password"
-              className="block text-sm mb-1 text-gray-600"
-            >
-              Enter Password
-            </Label>
-            <Input
-              id="password"
-              type={showPassword ? "text" : "password"}
-              value={password}
-              onChange={handlePasswordChange}
-              placeholder="Enter Password"
-              required
-              maxLength={30}
-              minLength={8}
-              className="rounded-2xl bg-gray-200 focus-visible:ring-gray-400 pr-10"
-            />
-            {passwordError && (
-              <p className="mt-1 text-xs text-red-500">{passwordError}</p>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-8 text-gray-500 hover:text-gray-700"
-            >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </div>
-
-          <div className="mb-6 relative">
-            <Label
-              htmlFor="confirm-password"
-              className="block text-sm mb-1 text-gray-600"
-            >
-              Confirm Password
-            </Label>
-            <Input
-              id="confirm-password"
-              type={showConfirmPassword ? "text" : "password"}
-              value={confirmPassword}
-              onChange={handleConfirmPasswordChange}
-              placeholder="Confirm Password"
-              required
-              className="rounded-2xl bg-gray-500 text-white placeholder-gray-200 focus-visible:ring-gray-500 pr-10"
-            />
-            {confirmError && (
-              <p className="mt-1 text-xs text-red-500">{confirmError}</p>
-            )}
-
-            <button
-              type="button"
-              onClick={() =>
-                setShowConfirmPassword(!showConfirmPassword)
-              }
-              className="absolute right-3 top-8 text-gray-300 hover:text-white"
-            >
-              {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </div>
-
-          <Button
-            type="submit"
-            disabled={signingUp}
-            className="w-full bg-gray-300 text-black hover:bg-gray-400 rounded-2xl"
-          >
-            {signingUp ? "Signing up..." : "Sign Up"}
-          </Button>
-
-          <p className="text-center text-sm text-gray-500 mt-6">
-            Already have an account?{" "}
-            <Link
-              to="/SignIn"
-              className="font-medium text-gray-700 hover:underline"
-            >
-              Sign In
-            </Link>
+    <div className="flex h-screen w-full bg-white overflow-hidden">
+      <div className="hidden lg:flex w-1/2 bg-blue-50 relative overflow-hidden">
+        <img
+          src={heroBg}
+          alt="Signup Dog"
+          className="absolute inset-0 w-full h-full object-cover opacity-90"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-blue-900/50 to-transparent" />
+        <div className="absolute bottom-12 left-12 text-white p-8 max-w-lg">
+          <h1 className="text-4xl font-bold mb-4">Join the pack.</h1>
+          <p className="text-lg opacity-90">
+            Create a profile for your pets and start tracking their health today.
           </p>
-        </form>
+        </div>
+      </div>
+
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 overflow-y-auto">
+        <div className="w-full max-w-sm space-y-8">
+          <div className="text-center lg:text-left">
+            <img
+              src={logo}
+              alt="PawPal"
+              className="h-16 w-auto mx-auto lg:mx-0 mb-6"
+            />
+            <h2 className="text-3xl font-bold tracking-tight text-gray-900">
+              Create account
+            </h2>
+            <p className="mt-2 text-sm text-gray-500">
+              Already a member?{" "}
+              <Link
+                to="/SignIn"
+                className="font-semibold text-blue-600 hover:text-blue-500"
+              >
+                Sign in
+              </Link>
+            </p>
+          </div>
+
+          {error && (
+            <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSignUp} className="space-y-5">
+            {/* Email */}
+            <div className="space-y-1">
+              <Label htmlFor="email">Email Address</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={handleEmailChange}
+                onBlur={handleEmailBlur}
+                placeholder="Email Address"
+                required
+                maxLength={30}
+                minLength={5}
+                className={`h-12 rounded-xl bg-white focus-visible:ring-blue-600 border ${
+                  emailHasError ? "border-red-300 bg-red-50" : "border-gray-200"
+                }`}
+              />
+              <p
+                className={`mt-1 text-xs ${
+                  emailHasError ? "text-red-500" : "text-gray-500"
+                }`}
+              >
+                Use a valid email you can access.
+              </p>
+            </div>
+
+            {/* Username */}
+            <div className="space-y-1">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                type="text"
+                value={username}
+                onChange={handleUsernameChange}
+                onBlur={handleUsernameBlur}
+                placeholder="Username"
+                required
+                maxLength={30}
+                minLength={3}
+                className={`h-12 rounded-xl bg-white focus-visible:ring-blue-600 border ${
+                  usernameHasError
+                    ? "border-red-300 bg-red-50"
+                    : "border-gray-200"
+                }`}
+              />
+              <p
+                className={`mt-1 text-xs ${
+                  usernameHasError ? "text-red-500" : "text-gray-500"
+                }`}
+              >
+                3–16 characters, start with a letter; letters, numbers, and _ only.
+              </p>
+            </div>
+
+            {/* Password */}
+            <div className="space-y-1">
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={handlePasswordChange}
+                  onBlur={handlePasswordBlur}
+                  placeholder="Enter Password"
+                  required
+                  maxLength={30}
+                  minLength={8}
+                  className={`h-12 rounded-xl bg-white focus-visible:ring-blue-600 pr-10 border ${
+                    passwordHasError
+                      ? "border-red-300 bg-red-50"
+                      : "border-gray-200"
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+              <p
+                className={`mt-1 text-xs ${
+                  passwordHasError ? "text-red-500" : "text-gray-500"
+                }`}
+              >
+                At least 8 characters with upper, lower, number, and special symbol.
+              </p>
+            </div>
+
+            {/* Confirm Password */}
+            <div className="space-y-1">
+              <Label htmlFor="confirmpassword">Confirm Password</Label>
+              <div className="relative">
+                <Input
+                  id="confirmpassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={handleConfirmPasswordChange}
+                  onBlur={handleConfirmPasswordBlur}
+                  placeholder="Confirm Password"
+                  required
+                  minLength={8}
+                  className={`h-12 rounded-xl bg-white focus-visible:ring-blue-600 pr-10 border ${
+                    confirmHasError
+                      ? "border-red-300 bg-red-50"
+                      : "border-gray-200"
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowConfirmPassword((prev) => !prev)
+                  }
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+              <p
+                className={`mt-1 text-xs ${
+                  confirmHasError ? "text-red-500" : "text-gray-500"
+                }`}
+              >
+                Must match the password above.
+              </p>
+            </div>
+
+            <Button
+              type="submit"
+              disabled={signingUp}
+              className="w-full h-12 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-md mt-4"
+            >
+              {signingUp ? <Loader2 className="animate-spin" /> : "Sign Up"}
+            </Button>
+
+            <p className="text-xs text-center text-gray-500">
+              By joining, you agree to our Terms and Privacy Policy.
+            </p>
+          </form>
+        </div>
       </div>
     </div>
   );
