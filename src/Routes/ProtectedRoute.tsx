@@ -1,15 +1,48 @@
-// src/components/ProtectedRoute.tsx
-import { useAuth } from "@/context/authContext";  // Import your auth context
+// routes/ProtectedRoute.tsx
+
 import { Navigate } from "react-router-dom";
+import { useAuth } from "@/context/authContext";
 
-// This component wraps pages that require login
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();  // Get user from AuthContext
-  
-  if (loading) return <div className="flex items-center justify-center h-screen">Nigga</div>;  // Check 1: Is data still loading?
-  if (!user) return <Navigate to="/SignIn" />;  // Check 2: Is user logged in?
-  
-  return <>{children}</>;  // Check 3: Yes? Show the page!
-}
+// Reusable wrapper for any route that should only be accessible
+// when the user is authenticated (and optionally has a specific role).
+export const ProtectedRoute = ({ 
+  children, 
+  requiredRole 
+}: { 
+  children: React.ReactNode; 
+  // If provided, only users with this role can access the route.
+  // If omitted, any logged‑in user is allowed.
+  requiredRole?: "user" | "admin"; 
+}) => {
+  // Get current auth state from your AuthContext
+  const { user, loading } = useAuth();
 
-export default ProtectedRoute;
+  // While auth state is still being resolved (e.g., checking Supabase session),
+  // render a full‑screen loading UI instead of the protected content.
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  // If there is no authenticated user after loading finishes,
+  // redirect to the Sign In page.
+  if (!user) {
+    return <Navigate to="/SignIn" replace />;
+  }
+
+  // If this route requires a specific role and the logged‑in user
+  // does not have that role, redirect to an Unauthorized page.
+  if (requiredRole && user.role !== requiredRole) {
+    return <Navigate to="/Unauthorized" replace />;
+  }
+
+  // If we reach this point:
+  // - loading is false
+  // - user exists
+  // - and either no requiredRole was specified, or the user has that role
+  // → render the protected children.
+  return <>{children}</>;
+};

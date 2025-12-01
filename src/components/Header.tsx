@@ -3,7 +3,7 @@
 // Contains logo, app name, and profile button
 
 // Import useNavigate hook for navigation
-import { useNavigate } from 'react-router-dom';
+import {Link} from 'react-router-dom';
 // Import User icon from lucide-react
 import type { JSX } from 'react';
 
@@ -23,7 +23,6 @@ export function Header({
   showProfile = true, 
 }: Readonly<HeaderProps>): JSX.Element {
   // Hook to navigate to different pages
-  const navigate = useNavigate();
 
   return (
     // Sticky header at top of page with border
@@ -43,15 +42,14 @@ export function Header({
       {/* Right: Profile button OR Back button (depends on showBack prop) */}
       {showProfile && (
         // Profile button - navigate to profile page
-        <button
+        <Link to="/ProfilePage"
           // Navigate to profile page when clicked
-          onClick={() => navigate('/ProfilePage')}
           // Hover effect: light background on hover
           className="rounded-full p-2 hover:bg-gray-100 transition-colors"
         >
           {/* Profile SVG icon */}
           <img src={ProfileIcon} alt="Profile" className="h-6 w-6" />
-        </button>
+        </Link>
       )}
     </header>
   );
