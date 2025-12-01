@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/button"
-import { useNavigate } from "react-router-dom"
+
+import { Link, useNavigate } from "react-router-dom"
 
 export default function Welcome() {
   const navigate = useNavigate()
@@ -14,19 +14,17 @@ export default function Welcome() {
       </div>
 
       <div className="flex flex-col gap-4 w-full max-w-xs top-40 relative text-center">
-        <Button
-          className="rounded-3xl py-6 bg-gray-400 hover:bg-gray-500 text-white text-lg"
-          onClick={() => navigate("/SignUp")}
+        <Link to='/SignUp'
+          className="rounded-3xl py-2 bg-gray-400 hover:bg-gray-500 text-white text-lg"
         >
           Sign Up
-        </Button>
+        </Link>
 
-        <Button
-          className="rounded-3xl py-6 bg-gray-800 hover:bg-gray-900 text-white text-lg"
-          onClick={() => navigate("/SignIn")}
+        <Link to="/SignIn"
+          className="rounded-3xl py-2 bg-gray-800 hover:bg-gray-900 text-white text-lg"
         >
           Sign In
-        </Button>
+        </Link>
       </div>
     </div>
   )

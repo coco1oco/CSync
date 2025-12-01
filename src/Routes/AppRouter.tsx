@@ -8,9 +8,11 @@ import SignUp from "../pages/Authentication/SignUp"
 import { UserHomePage } from "../pages/UsersD/UserHomePage"
 import { AdminHomePage } from "../pages/AdminD/AdminHomePage"
 import ProfilePage from "../pages/SharedPages/ProfilePage"
-import ProtectedRoute from "../Routes/ProtectedRoute" //Loadining
+import { ProtectedRoute } from "../Routes/ProtectedRoute"
 import ForgotPassword from "../pages/Authentication/ForgotPassword"
-
+import MenuPage from "@/pages/SharedPages/MenuPage"
+import EditProfilePage from "../pages/SharedPages/EditProfilePage"
+import Unauthorized from "../pages/Authentication/Unauthorized";
 
 const router = createBrowserRouter([
   {
@@ -28,7 +30,7 @@ const router = createBrowserRouter([
   {
     path: "/UserDashboard",
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRole="user">
         <UserHomePage />
       </ProtectedRoute>
     ),
@@ -44,7 +46,7 @@ const router = createBrowserRouter([
   {
     path: "/AdminDashboard",
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRole="admin">
         <AdminHomePage />
       </ProtectedRoute>
     ),
@@ -53,6 +55,28 @@ const router = createBrowserRouter([
     path: "/ForgotPassword",
     element: (
         <ForgotPassword />
+    ),
+  },
+  {
+    path: "/Menu",
+    element: (
+      <ProtectedRoute>
+        <MenuPage /> 
+      </ProtectedRoute>
+    ),
+  },
+   {
+    path: "/ProfilePage/Edit",
+    element: (
+      <ProtectedRoute >
+        <EditProfilePage /> 
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/unauthorized",
+    element: (
+        <Unauthorized />
     ),
   },
 ])

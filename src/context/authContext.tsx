@@ -30,74 +30,115 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-useEffect(() => {
-  const loadUser = async () => {
-    try {
-      setLoading(true);
-      
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log("Session:", session); // Debug: see if session exists
-      
-      if (session?.user) {
-        console.log("Fetching profile for user:", session.user.id);
-        
-        const { data: profile, error } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", session.user.id)
-          .single();
+  useEffect(() => {
+    let mounted = true;
 
-        console.log("Profile error:", error); // Debug: see if there's an error
-        console.log("Profile data:", profile); // Debug: see the profile
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log("⚠️ Auth state changed:", event);
 
-        if (error) {
-          console.error("Error fetching profile:", error);
+        if (!mounted) return;
+
+        if (event === "SIGNED_IN" && session?.user) {
+          console.log("✅ User signed in, fetching profile...");
+          
+          let profile = null;
+          
+          try {
+            // ✅ Add timeout - if profile takes too long, just use session user
+            const profilePromise = supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", session.user.id)
+              .maybeSingle();
+
+            const timeoutPromise = new Promise((resolve) =>
+              setTimeout(() => resolve({ data: null, error: "timeout" }), 3000)
+            );
+
+            const result: any = await Promise.race([profilePromise, timeoutPromise]);
+            
+            if (result.error && result.error !== "timeout") {
+              console.error("❌ Profile fetch error:", result.error);
+            }
+            
+            profile = result.data;
+            
+            if (result.error === "timeout") {
+              console.warn("⏱️ Profile fetch timed out, using session user only");
+            } else {
+              console.log("📦 Profile data:", profile);
+            }
+          } catch (error) {
+            console.error("💥 Exception fetching profile:", error);
+          }
+
+          // ✅ ALWAYS set user - this is critical
+          const userData: UserProfile = {
+            ...session.user,
+            ...(profile || {}),
+          };
+          
+          console.log("✨ Setting user:", userData);
+          setUser(userData);
+          setLoading(false);
+        } else if (event === "SIGNED_OUT") {
+          console.log("👋 User signed out");
           setUser(null);
-        } else if (profile) {
-          console.log("Setting user with profile:", { ...session.user, ...profile });
-          setUser({ ...session.user, ...profile });
+          setLoading(false);
         }
-      } else {
-        console.log("No session found");
-        setUser(null);
       }
-    } catch (error) {
-      console.error("Error loading user:", error);
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  };
+    );
 
-  loadUser();
+    const checkSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user && mounted) {
+          console.log("🔍 Initial session found");
+          
+          let profile = null;
+          
+          try {
+            const { data, error } = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", session.user.id)
+              .maybeSingle();
 
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(
-    async (event, session) => {
-      console.log("Auth state changed:", event, session);
-      
-      if (session?.user) {
-        const { data: profile, error } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", session.user.id)
-          .single();
+            if (error) {
+              console.error("❌ Initial profile fetch error:", error);
+            }
+            
+            profile = data;
+          } catch (error) {
+            console.error("💥 Exception in initial profile fetch:", error);
+          }
 
-        console.log("onAuthStateChange - Profile:", profile, "Error:", error);
+          const userData: UserProfile = {
+            ...session.user,
+            ...(profile || {}),
+          };
 
-        if (profile) {
-          setUser({ ...session.user, ...profile });
+          console.log("✨ Setting initial user:", userData);
+          setUser(userData);
         }
-      } else {
-        setUser(null);
+      } catch (error) {
+        console.error("💥 Initial session check error:", error);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
-      
-      setLoading(false);
-    }
-  );
+    };
 
-  return () => subscription?.unsubscribe();
-}, []);
+    checkSession();
 
+    return () => {
+      mounted = false;
+      subscription?.unsubscribe();
+    };
+  }, []);
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -105,22 +146,30 @@ useEffect(() => {
   };
 
   const refreshProfile = async () => {
-    setLoading(true);
-    const { data: { session } } = await supabase.auth.getSession();
+    try {
+      setLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
 
-    if (session?.user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", session.user.id)
-        .single();
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", session.user.id)
+          .maybeSingle();
 
-      if (profile) {
-        setUser({ ...session.user, ...profile });
+        setUser({
+          ...session.user,
+          ...(profile || {}),
+        });
       }
+    } catch (error) {
+      console.error("Error in refreshProfile:", error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
+
+  console.log("🎨 Context render - user:", user, "loading:", loading);
 
   return (
     <AuthContext.Provider value={{ user, loading, signOut, refreshProfile }}>

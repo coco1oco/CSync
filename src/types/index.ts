@@ -6,10 +6,13 @@ export type UserRole = 'user' | 'admin';
 export interface UserProfile {
   id: string;
   username: string;
+  email: string;
   role: UserRole;
   avatar_url: string | null;
-  is_banned: boolean;
-  created_at: string;
+  first_name: string | null;
+  last_name: string | null;
+  bio: string | null;
+  pronouns: string | null;
 }
 
 export interface OutreachEvent {
