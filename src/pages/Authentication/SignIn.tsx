@@ -7,6 +7,9 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/authContext";
 import { supabase } from "@/lib/supabaseClient";
 
+import logo from "@/assets/images/Pawpal.svg";
+import heroBg from "@/assets/images/hero_3.jpg";
+
 export default function SignIn() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
@@ -18,43 +21,95 @@ export default function SignIn() {
   const [error, setError] = useState<string>("");
   const [signingIn, setSigningIn] = useState<boolean>(false);
 
-  // ✅ Redirect after login
+  // validation state
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [passwordTouched, setPasswordTouched] = useState(false);
+
   useEffect(() => {
-    console.log("SignIn useEffect - user:", user, "loading:", loading);
-    
     if (!loading && user) {
-      console.log("🎯 REDIRECTING to dashboard");
-      navigate(user.role === "admin" ? "/AdminDashboard" : "/UserDashboard", { replace: true });
+      navigate(
+        // adjust if you store role differently
+        (user as any).role === "admin" ? "/AdminDashboard" : "/UserDashboard",
+        { replace: true }
+      );
     }
   }, [user, loading, navigate]);
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  // empty = no visual error, only validate non‑empty
+  const validateEmail = (value: string) => {
+    if (!value) return null;
+    if (!emailRegex.test(value)) return "Invalid";
+    return null;
+  };
+
+  const validatePassword = (value: string) => {
+    if (!value) return null;
+    // optional: add strength rule if you want
+    if (value.length < 8) return "Invalid";
+    return null;
+  };
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setEmail(value);
+    if (emailTouched) setEmailError(validateEmail(value));
+  };
+
+  const handleEmailBlur = () => {
+    setEmailTouched(true);
+    setEmailError(validateEmail(email));
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setPassword(value);
+    if (passwordTouched) setPasswordError(validatePassword(value));
+  };
+
+  const handlePasswordBlur = () => {
+    setPasswordTouched(true);
+    setPasswordError(validatePassword(password));
+  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    setEmailTouched(true);
+    setPasswordTouched(true);
 
     if (!email || !password) {
       setError("Email and password are required");
       return;
     }
 
+    const emailErr = validateEmail(email);
+    const pwdErr = validatePassword(password);
+    setEmailError(emailErr);
+    setPasswordError(pwdErr);
+
+    if (emailErr || pwdErr) {
+      setError("Please fix highlighted fields.");
+      return;
+    }
+
     setSigningIn(true);
 
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data, error: signInError } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
 
       if (signInError) {
         setError(signInError.message);
         setSigningIn(false);
         return;
-      }
-
-      if (rememberMe) {
-        localStorage.setItem("rememberMeEmail", email);
-      } else {
-        localStorage.removeItem("rememberMeEmail");
       }
 
       if (data.user) {
@@ -64,122 +119,158 @@ export default function SignIn() {
           .eq("id", data.user.id);
       }
 
-      console.log("SignIn successful, waiting for context to update...");
-      // ✅ Let the useEffect handle redirect - don't call setSigningIn(false) yet
-
+      // let auth context + useEffect handle redirect
     } catch (err: any) {
       console.error("Error:", err);
       setError(err.message || "An error occurred");
       setSigningIn(false);
     }
   };
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // common simple pattern [web:92][web:88]
-  
-    const [emailError, setEmailError] = useState<string | null>(null);
-  
-    const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
-      setEmail(value);
-  
-      if (!value) {
-        setEmailError(null);
-        return;
-      }
-  
-      if (!emailRegex.test(value)) {
-        setEmailError("Enter a valid email address.");
-      } else {
-        setEmailError(null);
-      }
-    };
+
+  const emailHasError = emailTouched && !!emailError;
+  const passwordHasError = passwordTouched && !!passwordError;
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100 px-4">
-      <div className="w-full max-w-sm p-8">
-        <h1 className="text-4xl font-Inter text-center mb-10">Sign In</h1>
-
-        <form onSubmit={handleSignIn}>
-          <div className="mb-4">
-            <Label htmlFor="email" className="sr-only">
-              Email
-            </Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={handleEmailChange}
-              placeholder="Email Address"
-              required
-              maxLength={30}
-              minLength={10}
-              className="rounded-2xl bg-gray-200 focus-visible:ring-gray-400"
-            />
-            {emailError && (
-              <p className="mt-1 text-xs text-red-500">{emailError}</p>
-            )}
-          </div>
-
-          <div className="mb-2 relative">
-            <Label htmlFor="password" className="sr-only">
-              Password
-            </Label>
-            <Input
-              id="password"
-              type={showPassword ? "text" : "password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
-              required
-              className="rounded-2xl bg-gray-700 text-white placeholder-gray-300 focus-visible:ring-gray-500 pr-10"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-2.5 text-gray-300 hover:text-white"
-            >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </div>
-
-          <div className="text-right mb-4">
-            <Link
-              to="/ForgotPassword"
-              className="text-sm text-gray-500 hover:text-gray-700 transition"
-            >
-              Forgot Password?
-            </Link>
-          </div>
-
-          <div className="flex items-center justify-center space-x-2 mb-6">
-            <input
-              type="checkbox"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              id="rememberMe"
-              className="w-4 h-4"
-            />
-            <Label htmlFor="rememberMe" className="text-sm text-gray-500">
-              Remember Me
-            </Label>
-          </div>
-
-          {error && <div className="text-red-600 mb-4 text-sm">{error}</div>}
-
-          <Button
-            type="submit"
-            disabled={signingIn}
-            className="w-48 mx-auto block bg-gray-300 text-black hover:bg-gray-400 rounded-2xl"
-          >
-            {signingIn ? "Signing in..." : "Sign In"}
-          </Button>
-
-          <p className="text-center text-sm text-gray-500 mt-6">
-            Don't have an account?{" "}
-            <Link to="/SignUp" className="font-medium text-gray-700 hover:underline">
-              Sign Up
-            </Link>
+    <div className="flex h-screen w-full bg-white overflow-hidden">
+      <div className="hidden lg:flex w-1/2 bg-blue-50 relative overflow-hidden">
+        <img
+          src={heroBg}
+          alt="Login Dog"
+          className="absolute inset-0 w-full h-full object-cover opacity-90"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-blue-900/50 to-transparent" />
+        <div className="absolute bottom-12 left-12 text-white p-8 max-w-lg">
+          <h1 className="text-4xl font-bold mb-4">Welcome back.</h1>
+          <p className="text-lg opacity-90">
+            Your pet&apos;s health records are just a click away.
           </p>
-        </form>
+        </div>
+      </div>
+
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 overflow-y-auto">
+        <div className="w-full max-w-sm space-y-8">
+          <div className="text-center lg:text-left">
+            <img
+              src={logo}
+              alt="PawPal"
+              className="h-16 w-auto mx-auto lg:mx-0 mb-6"
+            />
+            <h2 className="text-3xl font-bold tracking-tight text-gray-900">
+              Sign in
+            </h2>
+            <p className="mt-2 text-sm text-gray-500">
+              New to PawPal?{" "}
+              <Link
+                to="/SignUp"
+                className="font-semibold text-blue-600 hover:text-blue-500"
+              >
+                Create an account
+              </Link>
+            </p>
+          </div>
+
+          {error && (
+            <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSignIn} className="space-y-6">
+            {/* Email */}
+            <div className="space-y-1">
+              <Label htmlFor="email" className="sr-only">
+                Email
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={handleEmailChange}
+                onBlur={handleEmailBlur}
+                placeholder="name@example.com"
+                required
+                maxLength={30}
+                minLength={5}
+                className={`h-12 rounded-xl bg-white focus-visible:ring-blue-600 border ${
+                  emailHasError ? "border-red-300 bg-red-50" : "border-gray-200"
+                }`}
+              />
+              <p
+                className={`mt-1 text-xs ${
+                  emailHasError ? "text-red-500" : "text-gray-500"
+                }`}
+              >
+                Use the email you registered with.
+              </p>
+            </div>
+
+            {/* Password */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password" className="sr-only">
+                  Password
+                </Label>
+                <Link
+                  to="/ForgotPassword"
+                  className="text-sm font-medium text-blue-600 hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={handlePasswordChange}
+                  onBlur={handlePasswordBlur}
+                  placeholder="Enter your password"
+                  required
+                  className={`h-12 rounded-xl bg-white focus-visible:ring-blue-600 pr-10 border ${
+                    passwordHasError
+                      ? "border-red-300 bg-red-50"
+                      : "border-gray-200"
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+              <p
+                className={`mt-1 text-xs ${
+                  passwordHasError ? "text-red-500" : "text-gray-500"
+                }`}
+              >
+                At least 8 characters.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between text-sm text-gray-500">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                Remember me
+              </label>
+            </div>
+
+            <Button
+              type="submit"
+              disabled={signingIn}
+              className="w-full h-12 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-md"
+            >
+              {signingIn ? "Signing in..." : "Sign In"}
+            </Button>
+          </form>
+        </div>
       </div>
     </div>
   );

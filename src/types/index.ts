@@ -26,3 +26,15 @@ export interface OutreachEvent {
   updated_at: string;
   admin?: UserProfile;
 }
+
+export type UpdateProfilePayload = {
+  username?: string;
+  email?: string;
+  bio?: string;
+  avatar_url?: string;
+  pronouns?: string;
+  first_name?:string;
+  last_name?:  string;
+
+};
+
