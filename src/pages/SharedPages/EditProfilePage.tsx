@@ -1,24 +1,30 @@
 import { useAuth } from "@/context/authContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import BackIcon from "@/assets/BackButton.svg";
-import FailedImageIcon from "@/assets/FailedImage.svg";
+import { ArrowLeft, Camera, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
-import { updateProfile } from "@/lib/profileApi"; // Fixed casing import
+import { updateProfile } from "@/lib/profileApi";
+import FailedImageIcon from "@/assets/FailedImage.svg";
 
 export default function EditProfilePage() {
   const navigate = useNavigate();
-  // 1. Get refreshProfile from useAuth
   const { user, refreshProfile } = useAuth();
 
-  const [firstName, setFirstName] = useState(user?.first_name ?? "");
-  const [lastName, setLastName] = useState(user?.last_name ?? "");
-  const [username, setUsername] = useState(user?.username ?? "");
-  const [bio, setBio] = useState(user?.bio ?? "");
-  const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url ?? "");
+  // Initialize state
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [username, setUsername] = useState("");
+  const [bio, setBio] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [pronouns, setPronouns] = useState("");
+
+  const [pronounsError, setPronounsError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const allowedPronouns = [
     "she/her",
@@ -28,13 +34,21 @@ export default function EditProfilePage() {
     "he/they",
   ];
 
-  const [pronouns, setPronouns] = useState(user?.pronouns ?? "");
-  const [pronounsError, setPronounsError] = useState<string | null>(null);
-
-  const [isLoading, setIsLoading] = useState(false);
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  // ✅ FIX: Prevent disappearing content
+  // We use functional updates: (prev) => ...
+  // logic: "If the new user data has a name, use it.
+  //         If NOT (it's undefined/null), keep the 'prev' text currently in the box.
+  //         Only use '' as a last resort."
+  useEffect(() => {
+    if (user) {
+      setFirstName((prev) => user.first_name || prev || "");
+      setLastName((prev) => user.last_name || prev || "");
+      setUsername((prev) => user.username || prev || "");
+      setBio((prev) => user.bio || prev || "");
+      setAvatarUrl((prev) => user.avatar_url || prev || "");
+      setPronouns((prev) => user.pronouns || prev || "");
+    }
+  }, [user]);
 
   const handlePronounsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.trim();
@@ -44,9 +58,7 @@ export default function EditProfilePage() {
       return;
     }
     if (!allowedPronouns.includes(value)) {
-      setPronounsError(
-        "Use pronouns like she/her, he/him, they/them, she/they, he/they."
-      );
+      setPronounsError("Invalid format");
     } else {
       setPronounsError(null);
     }
@@ -65,32 +77,25 @@ export default function EditProfilePage() {
       const cloudinaryUrl = await uploadImageToCloudinary(file);
       setAvatarUrl(cloudinaryUrl);
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to upload image";
+      const errorMessage = err instanceof Error ? err.message : "Upload failed";
       setError(errorMessage);
-      setAvatarUrl(user?.avatar_url ?? "");
+      // Revert if failed
+      setAvatarUrl(user?.avatar_url || "");
     } finally {
       setIsUploadingImage(false);
     }
   };
 
   const handleSave = async () => {
-    if (pronounsError) {
-      setError("Please fix the pronouns error before saving.");
-      return;
-    }
-
-    if (!firstName.trim()) {
-      setError("First name is required.");
+    if (pronounsError || !firstName.trim()) {
+      setError("Please check your inputs.");
       return;
     }
 
     setIsLoading(true);
     setError(null);
-    setSuccess(false);
 
     try {
-      // 2. Update Supabase
       await updateProfile({
         first_name: firstName.trim(),
         last_name: lastName.trim(),
@@ -100,160 +105,161 @@ export default function EditProfilePage() {
         pronouns,
       });
 
-      // 3. CRITICAL: Force the app to re-fetch user data so the Header updates
       await refreshProfile();
-
-      setSuccess(true);
-      setTimeout(() => navigate(-1), 1500);
+      navigate(-1);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to save profile";
+      const message = err instanceof Error ? err.message : "Failed to save";
       setError(message);
-    } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
-      <header className="sticky top-0 z-10 grid grid-cols-3 items-center border-b border-border bg-background px-4 py-3">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-gray-100"
+    <div className="-mt-4 -mx-4 lg:-mt-8 lg:-mx-8 min-h-screen bg-white flex flex-col relative pb-20">
+      {/* === HEADER === */}
+      <header className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 bg-white/90 backdrop-blur-md border-b border-gray-100">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 -ml-2 rounded-full hover:bg-gray-100 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 text-gray-900" />
+          </button>
+          <h2 className="text-lg font-bold text-gray-900">Edit Profile</h2>
+        </div>
+
+        <Button
+          onClick={handleSave}
+          disabled={isLoading || isUploadingImage}
+          size="sm"
+          className="rounded-full bg-black text-white hover:bg-gray-800 font-bold px-6"
         >
-          <img src={BackIcon} alt="Back" className="h-6 w-6" />
-        </button>
-        <h2 className="text-base font-semibold text-center">Edit profile</h2>
-        <div className="h-8 w-8" />
+          {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+        </Button>
       </header>
 
-      <main className="flex-1 overflow-y-auto px-4 py-6">
-        <div className="max-w-md mx-auto space-y-6">
+      {/* === BANNER (Blue Area) === */}
+      <div className="h-32 bg-blue-100 w-full shrink-0" />
+
+      {/* === CONTENT CONTAINER === */}
+      <div className="px-4 -mt-10 relative z-10">
+        {/* === AVATAR === */}
+        <div className="relative inline-block group mb-6">
+          <div className="w-24 h-24 rounded-full border-4 border-white bg-white overflow-hidden shadow-sm">
+            <img
+              src={avatarUrl || FailedImageIcon}
+              alt="Avatar"
+              className="w-full h-full object-cover"
+            />
+            {/* Upload Overlay */}
+            <div
+              className="absolute inset-0 bg-black/30 flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={() => document.getElementById("avatarInput")?.click()}
+            >
+              <Camera className="w-8 h-8 text-white" />
+            </div>
+          </div>
+
+          {/* Change Photo Input */}
+          <input
+            id="avatarInput"
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleAvatarChange}
+            disabled={isLoading || isUploadingImage}
+          />
+        </div>
+
+        {/* === FORM FIELDS === */}
+        <div className="space-y-6 max-w-2xl">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded-lg text-sm animate-in fade-in">
+            <div className="p-3 text-sm text-red-600 bg-red-50 rounded-lg border border-red-100">
               {error}
             </div>
           )}
 
-          {success && (
-            <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-2 rounded-lg text-sm animate-in fade-in">
-              Profile updated successfully!
-            </div>
-          )}
-
-          <div className="flex flex-col items-center gap-3">
-            {avatarUrl ? (
-              <img
-                src={avatarUrl}
-                alt="Avatar"
-                className="h-24 w-24 rounded-full object-cover border-2 border-gray-100 shadow-sm"
-              />
-            ) : (
-              <div className="h-24 w-24 rounded-full bg-gray-100 flex items-center justify-center">
-                <img
-                  src={FailedImageIcon}
-                  alt="Avatar"
-                  className="h-8 w-8 opacity-50"
-                />
-              </div>
-            )}
-
-            <input
-              id="avatarInput"
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleAvatarChange}
-              disabled={isLoading || isUploadingImage}
-            />
-
-            <button
-              type="button"
-              onClick={() => document.getElementById("avatarInput")?.click()}
-              className="text-sm font-medium text-blue-600 hover:text-blue-700 disabled:opacity-50 transition-colors"
-              disabled={isLoading || isUploadingImage}
-            >
-              {isUploadingImage ? "Uploading..." : "Change profile picture"}
-            </button>
-          </div>
-
-          <div className="space-y-4">
+          {/* Row 1: Names */}
+          <div className="grid grid-cols-2 gap-6">
             <div className="space-y-1">
-              <Label className="text-xs text-gray-500">First Name</Label>
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                First Name
+              </Label>
               <Input
-                type="text"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="h-11"
-                maxLength={30}
-                disabled={isLoading || isUploadingImage}
+                className="h-10 border-x-0 border-t-0 border-b border-gray-200 rounded-none px-0 focus-visible:ring-0 focus-visible:border-blue-500 transition-colors bg-transparent font-medium text-base"
+                placeholder="First Name"
               />
             </div>
-
             <div className="space-y-1">
-              <Label className="text-xs text-gray-500">Last Name</Label>
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                Last Name
+              </Label>
               <Input
-                type="text"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className="h-11"
-                maxLength={30}
-                disabled={isLoading || isUploadingImage}
+                className="h-10 border-x-0 border-t-0 border-b border-gray-200 rounded-none px-0 focus-visible:ring-0 focus-visible:border-blue-500 transition-colors bg-transparent font-medium text-base"
+                placeholder="Last Name"
               />
             </div>
+          </div>
 
+          {/* Row 2: Username & Pronouns */}
+          <div className="grid grid-cols-2 gap-6">
             <div className="space-y-1">
-              <Label className="text-xs text-gray-500">Username</Label>
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                Username
+              </Label>
               <Input
-                type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="h-11"
-                maxLength={30}
-                disabled={isLoading || isUploadingImage}
+                className="h-10 border-x-0 border-t-0 border-b border-gray-200 rounded-none px-0 focus-visible:ring-0 focus-visible:border-blue-500 transition-colors bg-transparent font-medium text-base"
+                placeholder="@username"
               />
             </div>
-
             <div className="space-y-1">
-              <Label className="text-xs text-gray-500">Pronouns</Label>
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                Pronouns
+              </Label>
               <Input
-                type="text"
                 value={pronouns}
                 onChange={handlePronounsChange}
-                className="h-11"
-                maxLength={30}
-                placeholder="e.g. she/her"
-                disabled={isLoading || isUploadingImage}
-              />
-              {pronounsError && (
-                <p className="text-xs text-red-500 mt-1">{pronounsError}</p>
-              )}
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs text-gray-500">Bio</Label>
-              <textarea
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                rows={3}
-                maxLength={120}
-                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={isLoading || isUploadingImage}
+                className={`h-10 border-x-0 border-t-0 border-b rounded-none px-0 focus-visible:ring-0 transition-colors bg-transparent font-medium text-base ${
+                  pronounsError
+                    ? "border-red-500 focus-visible:border-red-500 text-red-600"
+                    : "border-gray-200 focus-visible:border-blue-500"
+                }`}
+                placeholder="e.g. he/him"
               />
             </div>
+          </div>
 
-            <Button
-              className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-bold"
-              type="button"
-              onClick={handleSave}
-              disabled={isLoading || isUploadingImage}
-            >
-              {isLoading ? "Saving..." : "Save Changes"}
-            </Button>
+          {/* Row 3: Bio */}
+          <div className="space-y-1">
+            <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+              Bio
+            </Label>
+            <textarea
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              rows={3}
+              maxLength={120}
+              className="w-full text-base border-0 border-b border-gray-200 focus:border-blue-500 focus:ring-0 bg-transparent resize-none py-2 placeholder:text-gray-300 outline-none leading-relaxed"
+              placeholder="Tell us about yourself..."
+            />
+            <div className="text-right pt-1">
+              <span
+                className={`text-[10px] ${
+                  bio?.length > 100 ? "text-orange-500" : "text-gray-400"
+                }`}
+              >
+                {bio?.length || 0}/120
+              </span>
+            </div>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
