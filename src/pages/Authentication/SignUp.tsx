@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect } from "react"; // Combined React imports
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,19 +35,26 @@ export default function SignUp() {
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [confirmTouched, setConfirmTouched] = useState(false);
 
-  // --- FIX: REDIRECT TO FEED ---
+  // 🟢 UPDATED REDIRECT LOGIC
   useEffect(() => {
     if (user && !loading) {
-      // Changed from "/ProfilePage" to "/"
-      navigate("/", { replace: true });
+      // Check if the user profile is incomplete (missing name)
+      // The authContext merges profile data into the 'user' object
+      if (!user.first_name || !user.last_name) {
+        // Redirect to Edit Page to complete onboarding
+        navigate("/ProfilePage/Edit", { replace: true });
+      } else {
+        // If they somehow already have data, go to the main profile
+        navigate("/ProfilePage", { replace: true });
+      }
     }
   }, [user, loading, navigate]);
-  // -----------------------------
 
   const usernameRegex = /^[a-zA-Z][a-zA-Z0-9_]{2,15}$/;
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/;
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+  // ... (Rest of your validation logic stays exactly the same) ...
   // empty = no visual error; invalid text = error
   const validateEmail = (value: string) => {
     if (!value) return null;
@@ -138,7 +145,6 @@ export default function SignUp() {
     setPasswordTouched(true);
     setConfirmTouched(true);
 
-    // block if any required field is empty
     if (!email || !username || !password || !confirmPassword) {
       setError("All fields are required.");
       return;
@@ -172,6 +178,8 @@ export default function SignUp() {
       const createdUser = data?.user;
 
       if (createdUser) {
+        // We only insert email and username here.
+        // First/Last name will be null, triggering the redirect above.
         const { error: profileError } = await supabase.from("profiles").upsert([
           {
             id: createdUser.id,
@@ -245,7 +253,6 @@ export default function SignUp() {
           )}
 
           <form onSubmit={handleSignUp} className="space-y-3">
-            {/* Email */}
             <div className="space-y-1">
               <Label htmlFor="email">Email Address</Label>
               <Input
@@ -271,7 +278,6 @@ export default function SignUp() {
               </p>
             </div>
 
-            {/* Username */}
             <div className="space-y-1">
               <Label htmlFor="username">Username</Label>
               <Input
@@ -299,7 +305,6 @@ export default function SignUp() {
               </p>
             </div>
 
-            {/* Password */}
             <div className="space-y-1">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
@@ -336,7 +341,6 @@ export default function SignUp() {
               </p>
             </div>
 
-            {/* Confirm Password */}
             <div className="space-y-1">
               <Label htmlFor="confirmpassword">Confirm Password</Label>
               <div className="relative">
