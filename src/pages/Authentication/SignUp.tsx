@@ -39,7 +39,7 @@ export default function SignUp() {
   useEffect(() => {
     if (user && !loading) {
       // Changed from "/ProfilePage" to "/"
-      navigate("/", { replace: true });
+      navigate("/ProfilePage", { replace: true });
     }
   }, [user, loading, navigate]);
   // -----------------------------
