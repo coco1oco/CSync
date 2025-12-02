@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"; // Combined React imports
+import { useState, useEffect } from "react";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,11 +35,14 @@ export default function SignUp() {
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [confirmTouched, setConfirmTouched] = useState(false);
 
+  // --- FIX: REDIRECT TO FEED ---
   useEffect(() => {
     if (user && !loading) {
-      navigate("/ProfilePage", { replace: true });
+      // Changed from "/ProfilePage" to "/"
+      navigate("/", { replace: true });
     }
   }, [user, loading, navigate]);
+  // -----------------------------
 
   const usernameRegex = /^[a-zA-Z][a-zA-Z0-9_]{2,15}$/;
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/;
@@ -194,7 +197,6 @@ export default function SignUp() {
   const confirmHasError = confirmTouched && !!confirmError;
 
   return (
-    // FIX 1: Use h-[100dvh] to lock screen on mobile browsers
     <div className="flex h-[100dvh] w-full bg-white overflow-hidden">
       {/* LEFT SIDE: Hero Image */}
       <div className="hidden lg:flex w-1/2 bg-blue-50 relative overflow-hidden">
@@ -214,16 +216,13 @@ export default function SignUp() {
       </div>
 
       {/* RIGHT SIDE: Form */}
-      {/* FIX 2: Changed overflow-y-auto to overflow-hidden to stop scrolling */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 overflow-hidden">
         <div className="w-full max-w-sm space-y-6">
-          {" "}
-          {/* Reduced space-y-8 to space-y-6 */}
           <div className="text-center lg:text-left">
             <img
               src={logo}
               alt="PawPal"
-              className="h-16 w-auto mx-auto lg:mx-0 mb-4" // Reduced mb-6 to mb-4
+              className="h-16 w-auto mx-auto lg:mx-0 mb-4"
             />
             <h2 className="text-3xl font-bold tracking-tight text-gray-900">
               Create account
@@ -238,12 +237,13 @@ export default function SignUp() {
               </Link>
             </p>
           </div>
+
           {error && (
             <div className="p-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl">
               {error}
             </div>
           )}
-          {/* Reduced space-y-5 to space-y-3 so it fits without scrolling */}
+
           <form onSubmit={handleSignUp} className="space-y-3">
             {/* Email */}
             <div className="space-y-1">
