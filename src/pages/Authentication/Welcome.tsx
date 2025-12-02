@@ -1,8 +1,20 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { useAuth } from "@/context/authContext";
 import logo from "@/assets/images/Pawpal.svg";
 import heroBg from "@/assets/images/hero_1.jpg";
 
 export default function Welcome() {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  // Safety Check: If user is already logged in, send them to the Feed
+  useEffect(() => {
+    if (!loading && user) {
+      navigate("/", { replace: true });
+    }
+  }, [user, loading, navigate]);
+
   return (
     <div className="flex flex-col lg:flex-row h-screen w-full bg-white overflow-hidden">
       {/* LEFT SECTION (Desktop Only - Hero Image) */}

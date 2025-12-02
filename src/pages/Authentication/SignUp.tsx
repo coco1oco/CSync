@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/authContext";
 import { supabase } from "@/lib/supabaseClient";
-import React from "react";
 
 import logo from "@/assets/images/Pawpal.svg";
 import heroBg from "@/assets/images/hero_2.jpg";
@@ -36,11 +35,14 @@ export default function SignUp() {
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [confirmTouched, setConfirmTouched] = useState(false);
 
-  React.useEffect(() => {
+  // --- FIX: REDIRECT TO FEED ---
+  useEffect(() => {
     if (user && !loading) {
-      navigate("/ProfilePage", { replace: true });
+      // Changed from "/ProfilePage" to "/"
+      navigate("/", { replace: true });
     }
   }, [user, loading, navigate]);
+  // -----------------------------
 
   const usernameRegex = /^[a-zA-Z][a-zA-Z0-9_]{2,15}$/;
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/;
@@ -170,15 +172,13 @@ export default function SignUp() {
       const createdUser = data?.user;
 
       if (createdUser) {
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .upsert([
-            {
-              id: createdUser.id,
-              email,
-              username,
-            },
-          ]);
+        const { error: profileError } = await supabase.from("profiles").upsert([
+          {
+            id: createdUser.id,
+            email,
+            username,
+          },
+        ]);
 
         if (profileError) throw profileError;
       }
@@ -197,7 +197,8 @@ export default function SignUp() {
   const confirmHasError = confirmTouched && !!confirmError;
 
   return (
-    <div className="flex h-screen w-full bg-white overflow-hidden">
+    <div className="flex h-[100dvh] w-full bg-white overflow-hidden">
+      {/* LEFT SIDE: Hero Image */}
       <div className="hidden lg:flex w-1/2 bg-blue-50 relative overflow-hidden">
         <img
           src={heroBg}
@@ -208,23 +209,25 @@ export default function SignUp() {
         <div className="absolute bottom-12 left-12 text-white p-8 max-w-lg">
           <h1 className="text-4xl font-bold mb-4">Join the pack.</h1>
           <p className="text-lg opacity-90">
-            Create a profile for your pets and start tracking their health today.
+            Create a profile for your pets and start tracking their health
+            today.
           </p>
         </div>
       </div>
 
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 overflow-y-auto">
-        <div className="w-full max-w-sm space-y-8">
+      {/* RIGHT SIDE: Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 overflow-hidden">
+        <div className="w-full max-w-sm space-y-6">
           <div className="text-center lg:text-left">
             <img
               src={logo}
               alt="PawPal"
-              className="h-16 w-auto mx-auto lg:mx-0 mb-6"
+              className="h-16 w-auto mx-auto lg:mx-0 mb-4"
             />
             <h2 className="text-3xl font-bold tracking-tight text-gray-900">
               Create account
             </h2>
-            <p className="mt-2 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-gray-500">
               Already a member?{" "}
               <Link
                 to="/SignIn"
@@ -236,12 +239,12 @@ export default function SignUp() {
           </div>
 
           {error && (
-            <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl">
+            <div className="p-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl">
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSignUp} className="space-y-5">
+          <form onSubmit={handleSignUp} className="space-y-3">
             {/* Email */}
             <div className="space-y-1">
               <Label htmlFor="email">Email Address</Label>
@@ -251,17 +254,17 @@ export default function SignUp() {
                 value={email}
                 onChange={handleEmailChange}
                 onBlur={handleEmailBlur}
-                placeholder="Email Address"
+                placeholder="name@example.com"
                 required
                 maxLength={30}
                 minLength={5}
-                className={`h-12 rounded-xl bg-white focus-visible:ring-blue-600 border ${
+                className={`h-11 rounded-xl bg-white focus-visible:ring-blue-600 border ${
                   emailHasError ? "border-red-300 bg-red-50" : "border-gray-200"
                 }`}
               />
               <p
-                className={`mt-1 text-xs ${
-                  emailHasError ? "text-red-500" : "text-gray-500"
+                className={`text-[10px] ${
+                  emailHasError ? "text-red-500" : "text-gray-400"
                 }`}
               >
                 Use a valid email you can access.
@@ -281,18 +284,18 @@ export default function SignUp() {
                 required
                 maxLength={30}
                 minLength={3}
-                className={`h-12 rounded-xl bg-white focus-visible:ring-blue-600 border ${
+                className={`h-11 rounded-xl bg-white focus-visible:ring-blue-600 border ${
                   usernameHasError
                     ? "border-red-300 bg-red-50"
                     : "border-gray-200"
                 }`}
               />
               <p
-                className={`mt-1 text-xs ${
-                  usernameHasError ? "text-red-500" : "text-gray-500"
+                className={`text-[10px] ${
+                  usernameHasError ? "text-red-500" : "text-gray-400"
                 }`}
               >
-                3–16 characters, start with a letter; letters, numbers, and _ only.
+                3–16 chars, letters, numbers, and _ only.
               </p>
             </div>
 
@@ -310,7 +313,7 @@ export default function SignUp() {
                   required
                   maxLength={30}
                   minLength={8}
-                  className={`h-12 rounded-xl bg-white focus-visible:ring-blue-600 pr-10 border ${
+                  className={`h-11 rounded-xl bg-white focus-visible:ring-blue-600 pr-10 border ${
                     passwordHasError
                       ? "border-red-300 bg-red-50"
                       : "border-gray-200"
@@ -321,15 +324,15 @@ export default function SignUp() {
                   onClick={() => setShowPassword((prev) => !prev)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
               <p
-                className={`mt-1 text-xs ${
-                  passwordHasError ? "text-red-500" : "text-gray-500"
+                className={`text-[10px] ${
+                  passwordHasError ? "text-red-500" : "text-gray-400"
                 }`}
               >
-                At least 8 characters with upper, lower, number, and special symbol.
+                Min 8 chars: Upper, lower, number, special symbol.
               </p>
             </div>
 
@@ -346,7 +349,7 @@ export default function SignUp() {
                   placeholder="Confirm Password"
                   required
                   minLength={8}
-                  className={`h-12 rounded-xl bg-white focus-visible:ring-blue-600 pr-10 border ${
+                  className={`h-11 rounded-xl bg-white focus-visible:ring-blue-600 pr-10 border ${
                     confirmHasError
                       ? "border-red-300 bg-red-50"
                       : "border-gray-200"
@@ -354,17 +357,19 @@ export default function SignUp() {
                 />
                 <button
                   type="button"
-                  onClick={() =>
-                    setShowConfirmPassword((prev) => !prev)
-                  }
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
-                  {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  {showConfirmPassword ? (
+                    <EyeOff size={18} />
+                  ) : (
+                    <Eye size={18} />
+                  )}
                 </button>
               </div>
               <p
-                className={`mt-1 text-xs ${
-                  confirmHasError ? "text-red-500" : "text-gray-500"
+                className={`text-[10px] ${
+                  confirmHasError ? "text-red-500" : "text-gray-400"
                 }`}
               >
                 Must match the password above.
@@ -374,12 +379,12 @@ export default function SignUp() {
             <Button
               type="submit"
               disabled={signingUp}
-              className="w-full h-12 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-md mt-4"
+              className="w-full h-11 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-md mt-2"
             >
               {signingUp ? <Loader2 className="animate-spin" /> : "Sign Up"}
             </Button>
 
-            <p className="text-xs text-center text-gray-500">
+            <p className="text-[10px] text-center text-gray-500 pb-2">
               By joining, you agree to our Terms and Privacy Policy.
             </p>
           </form>
