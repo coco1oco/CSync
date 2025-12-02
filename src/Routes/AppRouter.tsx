@@ -1,22 +1,29 @@
-import { createBrowserRouter, RouterProvider } from "react-router-dom"
-import { AuthProvider } from "../context/authContext"
+import {
+  createBrowserRouter,
+  RouterProvider,
+  Navigate,
+} from "react-router-dom";
+import { AuthProvider } from "@/context/authContext";
+import { ProtectedRoute } from "./ProtectedRoute";
+import AppLayout from "@/components/AppLayout";
 
-// Import your pages
-import Welcome from "../pages/Authentication/Welcome"
-import SignIn from "../pages/Authentication/SignIn"
-import SignUp from "../pages/Authentication/SignUp"
-import { UserHomePage } from "../pages/UsersD/UserHomePage"
-import { AdminHomePage } from "../pages/AdminD/AdminHomePage"
-import ProfilePage from "../pages/SharedPages/ProfilePage"
-import { ProtectedRoute } from "../Routes/ProtectedRoute"
-import ForgotPassword from "../pages/Authentication/ForgotPassword"
-import MenuPage from "@/pages/SharedPages/MenuPage"
-import EditProfilePage from "../pages/SharedPages/EditProfilePage"
-import Unauthorized from "../pages/Authentication/Unauthorized";
+// Pages
+import Welcome from "@/pages/Authentication/Welcome";
+import SignIn from "@/pages/Authentication/SignIn";
+import SignUp from "@/pages/Authentication/SignUp";
+import ForgotPassword from "@/pages/Authentication/ForgotPassword";
+import Unauthorized from "@/pages/Authentication/Unauthorized";
+
+import { UserHomePage } from "@/pages/UsersD/UserHomePage";
+import { AdminHomePage } from "@/pages/AdminD/AdminHomePage";
+import ProfilePage from "@/pages/SharedPages/ProfilePage";
+import MenuPage from "@/pages/SharedPages/MenuPage";
+import EditProfilePage from "@/pages/SharedPages/EditProfilePage";
 
 const router = createBrowserRouter([
+  // --- PUBLIC ROUTES ---
   {
-    path: "/",
+    path: "/welcome",
     element: <Welcome />,
   },
   {
@@ -28,63 +35,68 @@ const router = createBrowserRouter([
     element: <SignUp />,
   },
   {
-    path: "/UserDashboard",
-    element: (
-      <ProtectedRoute requiredRole="user">
-        <UserHomePage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/ProfilePage",
-    element: (
-      <ProtectedRoute>
-        <ProfilePage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/AdminDashboard",
-    element: (
-      <ProtectedRoute requiredRole="admin">
-        <AdminHomePage />
-      </ProtectedRoute>
-    ),
-  },
-  {
     path: "/ForgotPassword",
-    element: (
-        <ForgotPassword />
-    ),
-  },
-  {
-    path: "/Menu",
-    element: (
-      <ProtectedRoute>
-        <MenuPage /> 
-      </ProtectedRoute>
-    ),
-  },
-   {
-    path: "/ProfilePage/Edit",
-    element: (
-      <ProtectedRoute >
-        <EditProfilePage /> 
-      </ProtectedRoute>
-    ),
+    element: <ForgotPassword />,
   },
   {
     path: "/unauthorized",
-    element: (
-        <Unauthorized />
-    ),
+    element: <Unauthorized />,
   },
-])
+
+  // --- PROTECTED ROUTES (Wrapped in AppLayout) ---
+  // This wrapper ensures all these pages get the Sidebar/BottomNav
+  {
+    element: (
+      <ProtectedRoute>
+        <AppLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      // ROOT PATH: The Feed (Home)
+      {
+        path: "/",
+        element: <UserHomePage />,
+      },
+      // Aliases for dashboards
+      {
+        path: "/UserDashboard",
+        element: <UserHomePage />,
+      },
+      {
+        path: "/AdminDashboard",
+        element: (
+          <ProtectedRoute requiredRole="admin">
+            <AdminHomePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/ProfilePage",
+        element: <ProfilePage />,
+      },
+      {
+        path: "/ProfilePage/Edit",
+        element: <EditProfilePage />,
+      },
+      {
+        path: "/Menu",
+        element: <MenuPage />,
+      },
+    ],
+  },
+
+  // --- FALLBACK ---
+  // If the route doesn't exist, send them to Welcome
+  {
+    path: "*",
+    element: <Navigate to="/welcome" replace />,
+  },
+]);
 
 export default function AppRouter() {
   return (
     <AuthProvider>
       <RouterProvider router={router} />
     </AuthProvider>
-  )
+  );
 }

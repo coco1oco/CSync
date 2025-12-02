@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -27,19 +27,17 @@ export default function SignIn() {
   const [emailTouched, setEmailTouched] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
 
+  // --- FIX: REDIRECT TO FEED ---
   useEffect(() => {
     if (!loading && user) {
-      navigate(
-        // adjust if you store role differently
-        (user as any).role === "admin" ? "/AdminDashboard" : "/UserDashboard",
-        { replace: true }
-      );
+      // Send everyone to Home/Feed to avoid "Unauthorized" errors
+      navigate("/", { replace: true });
     }
   }, [user, loading, navigate]);
+  // -----------------------------
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  // empty = no visual error, only validate non‑empty
   const validateEmail = (value: string) => {
     if (!value) return null;
     if (!emailRegex.test(value)) return "Invalid";
@@ -48,7 +46,6 @@ export default function SignIn() {
 
   const validatePassword = (value: string) => {
     if (!value) return null;
-    // optional: add strength rule if you want
     if (value.length < 8) return "Invalid";
     return null;
   };
@@ -118,8 +115,7 @@ export default function SignIn() {
           .update({ last_sign_in_at: new Date().toISOString() })
           .eq("id", data.user.id);
       }
-
-      // let auth context + useEffect handle redirect
+      // Auth Context will trigger the useEffect above to redirect
     } catch (err: any) {
       console.error("Error:", err);
       setError(err.message || "An error occurred");
@@ -131,7 +127,7 @@ export default function SignIn() {
   const passwordHasError = passwordTouched && !!passwordError;
 
   return (
-    <div className="flex h-screen w-full bg-white overflow-hidden">
+    <div className="flex h-[100dvh] w-full bg-white overflow-hidden">
       <div className="hidden lg:flex w-1/2 bg-blue-50 relative overflow-hidden">
         <img
           src={heroBg}
@@ -147,18 +143,18 @@ export default function SignIn() {
         </div>
       </div>
 
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 overflow-y-auto">
-        <div className="w-full max-w-sm space-y-8">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 overflow-hidden">
+        <div className="w-full max-w-sm space-y-6">
           <div className="text-center lg:text-left">
             <img
               src={logo}
               alt="PawPal"
-              className="h-16 w-auto mx-auto lg:mx-0 mb-6"
+              className="h-16 w-auto mx-auto lg:mx-0 mb-4"
             />
             <h2 className="text-3xl font-bold tracking-tight text-gray-900">
               Sign in
             </h2>
-            <p className="mt-2 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-gray-500">
               New to PawPal?{" "}
               <Link
                 to="/SignUp"
@@ -170,12 +166,12 @@ export default function SignIn() {
           </div>
 
           {error && (
-            <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl">
+            <div className="p-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl">
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSignIn} className="space-y-6">
+          <form onSubmit={handleSignIn} className="space-y-4">
             {/* Email */}
             <div className="space-y-1">
               <Label htmlFor="email" className="sr-only">
@@ -196,8 +192,8 @@ export default function SignIn() {
                 }`}
               />
               <p
-                className={`mt-1 text-xs ${
-                  emailHasError ? "text-red-500" : "text-gray-500"
+                className={`text-[10px] ${
+                  emailHasError ? "text-red-500" : "text-gray-400"
                 }`}
               >
                 Use the email you registered with.
@@ -242,8 +238,8 @@ export default function SignIn() {
                 </button>
               </div>
               <p
-                className={`mt-1 text-xs ${
-                  passwordHasError ? "text-red-500" : "text-gray-500"
+                className={`text-[10px] ${
+                  passwordHasError ? "text-red-500" : "text-gray-400"
                 }`}
               >
                 At least 8 characters.
@@ -265,9 +261,9 @@ export default function SignIn() {
             <Button
               type="submit"
               disabled={signingIn}
-              className="w-full h-12 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-md"
+              className="w-full h-12 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-md mt-2"
             >
-              {signingIn ? "Signing in..." : "Sign In"}
+              {signingIn ? <Loader2 className="animate-spin" /> : "Sign In"}
             </Button>
           </form>
         </div>
