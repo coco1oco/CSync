@@ -5,14 +5,14 @@ import { useAuth } from "@/context/authContext";
 
 // Reusable wrapper for any route that should only be accessible
 // when the user is authenticated (and optionally has a specific role).
-export const ProtectedRoute = ({ 
-  children, 
-  requiredRole 
-}: { 
-  children: React.ReactNode; 
+export const ProtectedRoute = ({
+  children,
+  requiredRole,
+}: {
+  children: React.ReactNode;
   // If provided, only users with this role can access the route.
   // If omitted, any logged‑in user is allowed.
-  requiredRole?: "user" | "admin"; 
+  requiredRole?: "user" | "admin";
 }) => {
   // Get current auth state from your AuthContext
   const { user, loading } = useAuth();
@@ -28,9 +28,9 @@ export const ProtectedRoute = ({
   }
 
   // If there is no authenticated user after loading finishes,
-  // redirect to the Sign In page.
+  // redirect to the Welcome page instead of SignIn.
   if (!user) {
-    return <Navigate to="/SignIn" replace />;
+    return <Navigate to="/welcome" replace />;
   }
 
   // If this route requires a specific role and the logged‑in user
