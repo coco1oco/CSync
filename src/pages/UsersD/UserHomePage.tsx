@@ -1,11 +1,16 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/context/authContext"; // Import Auth to check role
 import type { OutreachEvent } from "@/types";
 import { EventCard } from "@/components/EventCard";
-import { Heart, MessageCircle } from "lucide-react";
+import { Button } from "@/components/ui/button"; // Import Button
+import { Heart, MessageCircle, Plus } from "lucide-react"; // Import Plus icon
 
 export function UserHomePage() {
+  const { user } = useAuth(); // Get current user
+  const navigate = useNavigate();
+
   const [events, setEvents] = useState<OutreachEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [likedEvents, setLikedEvents] = useState<{ [key: string]: boolean }>(
@@ -15,8 +20,11 @@ export function UserHomePage() {
   const [commentCounts, setCommentCounts] = useState<{ [key: string]: number }>(
     {}
   );
-  const navigate = useNavigate();
 
+  // Check if user is admin
+  const isAdmin = (user as any)?.role === "admin";
+
+  // Fetch Events
   useEffect(() => {
     async function fetchEvents() {
       try {
@@ -28,7 +36,7 @@ export function UserHomePage() {
         if (!error && data) {
           setEvents(data as OutreachEvent[]);
 
-          // Initialize counts (Mock data for demo)
+          // Initialize Mock Counts
           const counts: { [key: string]: number } = {};
           const comments: { [key: string]: number } = {};
           data.forEach((event) => {
@@ -47,6 +55,24 @@ export function UserHomePage() {
     fetchEvents();
   }, []);
 
+  // Delete Function (Only works if Admin)
+  const handleDelete = async (eventId: string) => {
+    if (!confirm("Are you sure you want to delete this post?")) return;
+
+    try {
+      const { error } = await supabase
+        .from("outreach_events")
+        .delete()
+        .eq("id", eventId);
+
+      if (!error) {
+        setEvents(events.filter((e) => e.id !== eventId));
+      }
+    } catch (err) {
+      alert("Failed to delete post");
+    }
+  };
+
   const handleLike = (eventId: string) => {
     const isLiked = likedEvents[eventId];
     setLikedEvents({ ...likedEvents, [eventId]: !isLiked });
@@ -58,30 +84,58 @@ export function UserHomePage() {
     });
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center py-12 text-gray-400">
-        Loading...
-      </div>
-    );
-  }
+  if (loading)
+    return <div className="p-8 text-center text-gray-400">Loading feed...</div>;
 
   return (
-    <div className="space-y-4">
-      {/* Removed <Header /> - AppLayout handles it */}
-
-      {events.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-gray-500 text-sm">No posts yet</p>
-          <p className="text-gray-400 text-xs mt-1">Check back soon!</p>
+    <div className="space-y-6 p-4 pb-24">
+      {/* 1. ADMIN SECTION: Create Post Button */}
+      {/* Only shows if you are an admin */}
+      {isAdmin && (
+        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex items-center justify-between shadow-sm">
+          <div>
+            <h3 className="font-bold text-blue-900">Admin Actions</h3>
+            <p className="text-xs text-blue-600">Manage community updates</p>
+          </div>
+          <Button
+            onClick={() => navigate("/admin/events/create")}
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md"
+          >
+            <Plus className="mr-2 h-4 w-4" /> Create Post
+          </Button>
         </div>
       )}
 
+      {/* 2. EMPTY STATE */}
+      {events.length === 0 && (
+        <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-3xl">
+          <p className="text-gray-500 text-sm mb-2">No posts yet</p>
+          {isAdmin ? (
+            <Button
+              onClick={() => navigate("/admin/events/create")}
+              variant="outline"
+            >
+              Create the first post
+            </Button>
+          ) : (
+            <p className="text-gray-400 text-xs">Check back soon!</p>
+          )}
+        </div>
+      )}
+
+      {/* 3. FEED LIST */}
       {events.map((event) => (
         <div key={event.id} className="space-y-2">
-          <EventCard key={event.id} event={event} isAdmin={false} />
+          {/* Event Card */}
+          <EventCard
+            key={event.id}
+            event={event}
+            isAdmin={isAdmin} // Pass the admin status to show Edit/Delete dots
+            onEdit={() => navigate(`/admin/events/edit/${event.id}`)}
+            onDelete={() => handleDelete(event.id)}
+          />
 
-          {/* Engagement */}
+          {/* Engagement Buttons */}
           <div className="px-4 space-y-2">
             <div className="flex items-center gap-4">
               <button
@@ -112,8 +166,6 @@ export function UserHomePage() {
           </div>
         </div>
       ))}
-
-      {/* Removed <BottomNavigation /> - AppLayout handles it */}
     </div>
   );
 }
