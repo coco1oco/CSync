@@ -30,15 +30,9 @@ export function BottomNavigation({
   // Navigation items configuration
   // Each has: path (where to go), icon (which lucide icon), label (for accessibility)
   const navItems = [
-<<<<<<< HEAD
-    { path: userRole === 'admin' ? '/UserDashboard' : '/rewards ' , icon: HomeIcon, label: 'Home' },
+    { path: '/rewards ' , icon: HomeIcon, label: 'Home' },
     { path: '/messages', icon: MessageIcon, label: 'Messages' },
     { path: '/notifications', icon: NotificationIcon, label: 'Notifications' },
-=======
-    { path: "/", icon: HomeIcon, label: "Home" },
-    { path: "/messages", icon: MessageIcon, label: "Messages" },
-    { path: "/notifications", icon: NotificationIcon, label: "Notifications" },
->>>>>>> mirafelix
     // 4th item changes based on role
     {
       path: userRole === "admin" ? "/admin" : "/rewards",
