@@ -2,20 +2,20 @@
 // User feed - read-only, see all events with engagement features
 
 // Import React hooks
-import { useEffect, useState, type JSX } from 'react';
+import { useEffect, useState, type JSX } from "react";
 // Import useNavigate for page navigation
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
 // Import Supabase client
-import { supabase } from '@/lib/supabaseClient';
+import { supabase } from "@/lib/supabaseClient";
 // Import event type
 // Import event type
-import type { OutreachEvent } from '@/types';
+import type { OutreachEvent } from "@/types";
 // Import shared components
-import { EventCard } from '@/components/EventCard';
-import { BottomNavigation } from '@/components/BottomNavigation';
-import { Header } from '@/components/Header';  // NEW: Import Header component
+import { EventCard } from "@/components/EventCard";
+import { BottomNavigation } from "@/components/BottomNavigation";
+import { Header } from "@/components/Header"; // NEW: Import Header component
 // Import icons from lucide-react
-import { Heart, MessageCircle } from 'lucide-react';
+import { Heart, MessageCircle } from "lucide-react";
 
 // Component function - user home page
 export function UserHomePage(): JSX.Element {
@@ -24,11 +24,15 @@ export function UserHomePage(): JSX.Element {
   // State: whether data is still loading
   const [loading, setLoading] = useState(true);
   // State: track which events user has liked (event id -> true/false)
-  const [likedEvents, setLikedEvents] = useState<{ [key: string]: boolean }>({});
+  const [likedEvents, setLikedEvents] = useState<{ [key: string]: boolean }>(
+    {}
+  );
   // State: track like counts for each event
   const [likeCounts, setLikeCounts] = useState<{ [key: string]: number }>({});
   // State: track comment counts for each event
-  const [commentCounts, setCommentCounts] = useState<{ [key: string]: number }>({});
+  const [commentCounts, setCommentCounts] = useState<{ [key: string]: number }>(
+    {}
+  );
   // Hook to navigate to different pages
   const navigate = useNavigate();
 
@@ -39,28 +43,28 @@ export function UserHomePage(): JSX.Element {
       try {
         // Query all outreach_events from Supabase
         const { data, error } = await supabase
-          .from('outreach_events')
+          .from("outreach_events")
           // Join with profiles table to get admin info (username, avatar)
-          .select('*, admin:profiles(id, username, avatar_url)')
+          .select("*, admin:profiles(id, username, avatar_url)")
           // Sort: newest events first
-          .order('created_at', { ascending: false });
+          .order("created_at", { ascending: false });
 
         // If no error and data exists, store it in state
         if (!error && data) {
           // Cast data to OutreachEvent[] type
           setEvents(data as OutreachEvent[]);
-          
+
           // Initialize like counts (in real app, fetch from database)
           const counts: { [key: string]: number } = {};
-          data.forEach(event => {
+          data.forEach((event) => {
             // Set random like count for demo (1-50)
             counts[event.id] = Math.floor(Math.random() * 50) + 1;
           });
           setLikeCounts(counts);
-          
+
           // Initialize comment counts (in real app, fetch from database)
           const comments: { [key: string]: number } = {};
-          data.forEach(event => {
+          data.forEach((event) => {
             // Set random comment count for demo (0-10)
             comments[event.id] = Math.floor(Math.random() * 10);
           });
@@ -68,7 +72,7 @@ export function UserHomePage(): JSX.Element {
         }
       } catch (err) {
         // Log any errors to console for debugging
-        console.error('Error fetching events:', err);
+        console.error("Error fetching events:", err);
       } finally {
         // Stop loading whether successful or not
         setLoading(false);
@@ -83,19 +87,19 @@ export function UserHomePage(): JSX.Element {
   const handleLike = (eventId: string) => {
     // Check if user already liked this event
     const isLiked = likedEvents[eventId];
-    
+
     // Toggle like state
     setLikedEvents({
       ...likedEvents,
       [eventId]: !isLiked,
     });
-    
+
     // Update like count
     setLikeCounts({
       ...likeCounts,
-      [eventId]: isLiked 
-        ? (likeCounts[eventId] || 0) - 1  // Decrease if already liked
-        : (likeCounts[eventId] || 0) + 1,  // Increase if not liked
+      [eventId]: isLiked
+        ? (likeCounts[eventId] || 0) - 1 // Decrease if already liked
+        : (likeCounts[eventId] || 0) + 1, // Increase if not liked
     });
   };
 
@@ -128,7 +132,9 @@ export function UserHomePage(): JSX.Element {
             {/* Empty state text */}
             <p className="text-gray-500 text-sm">No posts yet</p>
             {/* Subtext */}
-            <p className="text-gray-400 text-xs mt-1">Check back soon for updates!</p>
+            <p className="text-gray-400 text-xs mt-1">
+              Check back soon for updates!
+            </p>
           </div>
         )}
 
@@ -158,16 +164,16 @@ export function UserHomePage(): JSX.Element {
                   className={`flex items-center gap-1 transition-colors ${
                     // If user liked, show red color
                     likedEvents[event.id]
-                      ? 'text-red-500'
-                      // If not liked, show gray
-                      : 'text-gray-600 hover:text-gray-900'
+                      ? "text-red-500"
+                      : // If not liked, show gray
+                        "text-gray-600 hover:text-gray-900"
                   }`}
                 >
                   {/* Heart icon - filled if liked */}
                   <Heart
                     className="h-5 w-5"
                     // Fill the heart if liked
-                    fill={likedEvents[event.id] ? 'currentColor' : 'none'}
+                    fill={likedEvents[event.id] ? "currentColor" : "none"}
                   />
                   {/* Like count */}
                   <span className="text-sm font-medium">
@@ -178,7 +184,7 @@ export function UserHomePage(): JSX.Element {
                 {/* Comment button */}
                 <button
                   // Navigate to comments page (not implemented yet)
-                  onClick={() => alert('Comments coming soon!')}
+                  onClick={() => alert("Comments coming soon!")}
                   // Styling: gray text with hover
                   className="flex items-center gap-1 text-gray-600 hover:text-gray-900 transition-colors"
                 >
