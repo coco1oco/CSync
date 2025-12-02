@@ -28,7 +28,7 @@ export function BottomNavigation({ userRole }: Readonly<BottomNavigationProps>):
   // Navigation items configuration
   // Each has: path (where to go), icon (which lucide icon), label (for accessibility)
   const navItems = [
-    { path: '/', icon: HomeIcon, label: 'Home' },
+    { path: userRole === 'admin' ? '/UserDashboard' : '/rewards ' , icon: HomeIcon, label: 'Home' },
     { path: '/messages', icon: MessageIcon, label: 'Messages' },
     { path: '/notifications', icon: NotificationIcon, label: 'Notifications' },
     // 4th item changes based on role
