@@ -52,16 +52,17 @@ export default function SignUp() {
 
   const usernameRegex = /^[a-zA-Z][a-zA-Z0-9_]{2,15}$/;
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/;
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
 
-  // ... (Rest of your validation logic stays exactly the same) ...
-  // empty = no visual error; invalid text = error
+  // 2. Update the validation function
   const validateEmail = (value: string) => {
     if (!value) return null;
-    if (!emailRegex.test(value)) return "Invalid";
+    // Check if it matches the Gmail pattern
+    if (!gmailRegex.test(value)) {
+      return "Only @gmail.com addresses are allowed.";
+    }
     return null;
   };
-
   const validateUsername = (value: string) => {
     if (!value) return null;
     if (!usernameRegex.test(value)) return "Invalid";

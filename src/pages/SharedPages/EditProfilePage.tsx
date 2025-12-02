@@ -7,13 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
-import { updateProfile } from "@/lib/ProfileApi";
+import { updateProfile } from "@/lib/profileApi"; // Fixed casing import
 
 export default function EditProfilePage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  // 1. Get refreshProfile from useAuth
+  const { user, refreshProfile } = useAuth();
 
-  // Split name into first and last
   const [firstName, setFirstName] = useState(user?.first_name ?? "");
   const [lastName, setLastName] = useState(user?.last_name ?? "");
   const [username, setUsername] = useState(user?.username ?? "");
@@ -31,7 +31,6 @@ export default function EditProfilePage() {
   const [pronouns, setPronouns] = useState(user?.pronouns ?? "");
   const [pronounsError, setPronounsError] = useState<string | null>(null);
 
-  // Loading and error states
   const [isLoading, setIsLoading] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,14 +38,11 @@ export default function EditProfilePage() {
 
   const handlePronounsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.trim();
-
     setPronouns(value);
-
     if (!value) {
       setPronounsError(null);
       return;
     }
-
     if (!allowedPronouns.includes(value)) {
       setPronounsError(
         "Use pronouns like she/her, he/him, they/them, she/they, he/they."
@@ -56,36 +52,28 @@ export default function EditProfilePage() {
     }
   };
 
-  // Handle avatar file selection and upload
-  const handleAvatarChange = async (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     try {
       setError(null);
       setIsUploadingImage(true);
-
-      // Show local preview while uploading
       const localPreview = URL.createObjectURL(file);
       setAvatarUrl(localPreview);
 
-      // Upload to Cloudinary
       const cloudinaryUrl = await uploadImageToCloudinary(file);
-      setAvatarUrl(cloudinaryUrl); // Set the actual Cloudinary URL
+      setAvatarUrl(cloudinaryUrl);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to upload image";
       setError(errorMessage);
-      // Revert to previous avatar on error
       setAvatarUrl(user?.avatar_url ?? "");
     } finally {
       setIsUploadingImage(false);
     }
   };
 
-  // Save all profile changes
   const handleSave = async () => {
     if (pronounsError) {
       setError("Please fix the pronouns error before saving.");
@@ -102,6 +90,7 @@ export default function EditProfilePage() {
     setSuccess(false);
 
     try {
+      // 2. Update Supabase
       await updateProfile({
         first_name: firstName.trim(),
         last_name: lastName.trim(),
@@ -111,8 +100,11 @@ export default function EditProfilePage() {
         pronouns,
       });
 
+      // 3. CRITICAL: Force the app to re-fetch user data so the Header updates
+      await refreshProfile();
+
       setSuccess(true);
-      setTimeout(() => navigate(-1), 1500); // Go back after brief success message
+      setTimeout(() => navigate(-1), 1500);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to save profile";
@@ -124,12 +116,11 @@ export default function EditProfilePage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
-      {/* header */}
       <header className="sticky top-0 z-10 grid grid-cols-3 items-center border-b border-border bg-background px-4 py-3">
         <button
           type="button"
           onClick={() => navigate(-1)}
-          className="h-8 w-8 flex items-center justify-center"
+          className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-gray-100"
         >
           <img src={BackIcon} alt="Back" className="h-6 w-6" />
         </button>
@@ -137,38 +128,37 @@ export default function EditProfilePage() {
         <div className="h-8 w-8" />
       </header>
 
-      {/* main content */}
       <main className="flex-1 overflow-y-auto px-4 py-6">
         <div className="max-w-md mx-auto space-y-6">
-          {/* error banner */}
           {error && (
-            <div className="bg-red-500/10 border border-red-500 text-red-600 px-4 py-2 rounded-lg text-sm">
+            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded-lg text-sm animate-in fade-in">
               {error}
             </div>
           )}
 
-          {/* success banner */}
           {success && (
-            <div className="bg-green-500/10 border border-green-500 text-green-600 px-4 py-2 rounded-lg text-sm">
+            <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-2 rounded-lg text-sm animate-in fade-in">
               Profile updated successfully!
             </div>
           )}
 
-          {/* avatar + change picture */}
           <div className="flex flex-col items-center gap-3">
             {avatarUrl ? (
               <img
                 src={avatarUrl}
                 alt="Avatar"
-                className="h-20 w-20 rounded-full object-cover sm:h-24 sm:w-24"
+                className="h-24 w-24 rounded-full object-cover border-2 border-gray-100 shadow-sm"
               />
             ) : (
-              <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center sm:h-24 sm:w-24">
-                <img src={FailedImageIcon} alt="Avatar" className="h-8 w-8" />
+              <div className="h-24 w-24 rounded-full bg-gray-100 flex items-center justify-center">
+                <img
+                  src={FailedImageIcon}
+                  alt="Avatar"
+                  className="h-8 w-8 opacity-50"
+                />
               </div>
             )}
 
-            {/* Hidden file input */}
             <input
               id="avatarInput"
               type="file"
@@ -181,61 +171,59 @@ export default function EditProfilePage() {
             <button
               type="button"
               onClick={() => document.getElementById("avatarInput")?.click()}
-              className="text-xs font-medium text-primary disabled:opacity-50"
+              className="text-sm font-medium text-blue-600 hover:text-blue-700 disabled:opacity-50 transition-colors"
               disabled={isLoading || isUploadingImage}
             >
               {isUploadingImage ? "Uploading..." : "Change profile picture"}
             </button>
           </div>
 
-          {/* form fields */}
           <div className="space-y-4">
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">
-                First Name
-              </Label>
+              <Label className="text-xs text-gray-500">First Name</Label>
               <Input
                 type="text"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm"
+                className="h-11"
                 maxLength={30}
                 disabled={isLoading || isUploadingImage}
               />
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Last Name</Label>
+              <Label className="text-xs text-gray-500">Last Name</Label>
               <Input
                 type="text"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm"
+                className="h-11"
                 maxLength={30}
                 disabled={isLoading || isUploadingImage}
               />
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Username</Label>
+              <Label className="text-xs text-gray-500">Username</Label>
               <Input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm"
+                className="h-11"
                 maxLength={30}
                 disabled={isLoading || isUploadingImage}
               />
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Pronouns</Label>
+              <Label className="text-xs text-gray-500">Pronouns</Label>
               <Input
                 type="text"
                 value={pronouns}
                 onChange={handlePronounsChange}
-                className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm"
+                className="h-11"
                 maxLength={30}
+                placeholder="e.g. she/her"
                 disabled={isLoading || isUploadingImage}
               />
               {pronounsError && (
@@ -244,24 +232,24 @@ export default function EditProfilePage() {
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Bio</Label>
+              <Label className="text-xs text-gray-500">Bio</Label>
               <textarea
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
                 rows={3}
                 maxLength={120}
-                className="w-full rounded-xl border border-border bg-card p-3 text-sm resize-none disabled:opacity-50"
+                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={isLoading || isUploadingImage}
               />
             </div>
 
             <Button
-              className="w-full rounded-xl bg-primary text-primary-foreground text-sm font-medium py-2 disabled:opacity-50"
+              className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-bold"
               type="button"
               onClick={handleSave}
               disabled={isLoading || isUploadingImage}
             >
-              {isLoading ? "Saving..." : "Save changes"}
+              {isLoading ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         </div>
