@@ -22,7 +22,6 @@ import ProfilePage from "@/pages/SharedPages/ProfilePage";
 import MenuPage from "@/pages/SharedPages/MenuPage";
 import EditProfilePage from "@/pages/SharedPages/EditProfilePage";
 
-<<<<<<< HEAD
 
 import MainPetProfilePage from "@/pages/PetProfile/MainPetProfilePage";
 import AddPetPage from "@/pages/PetProfile/AddPetPage";
@@ -30,9 +29,6 @@ import PetProfilePage from "@/pages/PetProfile/PetProfilePage";
 import PetEditProfile from "@/pages/PetProfile/PetEditProfile";
 
 
-=======
-import AddPet from "@/pages/PetProfile/AddPet"; // Import the page
->>>>>>> mirafelix
 
 const router = createBrowserRouter([
   // --- PUBLIC ROUTES ---
@@ -109,7 +105,6 @@ const router = createBrowserRouter([
         element: <MenuPage />,
       },
       {
-<<<<<<< HEAD
         path: "/PetDashboard",
         element: <MainPetProfilePage />, 
       },
@@ -126,12 +121,6 @@ const router = createBrowserRouter([
         element:<PetEditProfile />,
       },
     ]
-=======
-        path: "/add-pet",
-        element: <AddPet />,
-      },
-    ],
->>>>>>> mirafelix
   },
 
   // --- FALLBACK ---

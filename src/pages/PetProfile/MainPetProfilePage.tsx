@@ -51,7 +51,7 @@ export default function MainPetProfilePage() {
               <h3 className="text-xl font-semibold text-gray-900">{pet.name}</h3>
               <p className="text-sm text-gray-500 flex items-center gap-2 mt-1">
                 <Calendar className="w-4 h-4" />
-                {new Date(pet.dob).toLocaleDateString()}
+                {pet.dob ? new Date(pet.dob).toLocaleDateString() : 'N/A'}
               </p>
               <p className="text-xs text-gray-400 mt-1">Tap to view details →</p>
             </div>
@@ -82,7 +82,7 @@ export default function MainPetProfilePage() {
   {/* Floating button */}
   <button
     onClick={() => navigate("/PetDashboard/new")}
-    className="fixed bottom-10 right-10 w-16 h-16 rounded-full bg-blue-600 text-white shadow-2xl hover:scale-105 active:scale-95 flex items-center justify-center"
+    className="fixed bottom-25 right-10 w-16 h-16 rounded-full bg-blue-600 text-white shadow-2xl hover:scale-105 active:scale-95 flex items-center justify-center"
   >
     <Plus className="w-8 h-8" />
   </button>

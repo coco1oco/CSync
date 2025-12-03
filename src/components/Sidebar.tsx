@@ -27,12 +27,7 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
     { path: "/messages", icon: MessageCircle, label: "Messages" },
     { path: "/notifications", icon: Bell, label: "Notifications" },
     {
-<<<<<<< HEAD
       path: userRole === "admin" ? "/PetDashboard" : "/PetDashboard",
-=======
-      // ✅ FIX: Match the paths defined in AppRouter.tsx
-      path: userRole === "admin" ? "/AdminDashboard" : "/UserDashboard",
->>>>>>> mirafelix
       icon: PawPrint,
       label: userRole === "admin" ? "Pet Dashboard" : "Pet Dashboard",
     },
