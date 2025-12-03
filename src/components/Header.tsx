@@ -1,54 +1,66 @@
-// src/components/shared/Header.tsx
-// Reusable header component for all pages
-// Contains logo, app name, and profile button
+import { Link } from "react-router-dom";
+import type { JSX } from "react";
+import { useAuth } from "@/context/authContext";
+import { User, ShieldCheck } from "lucide-react";
 
-// Import useNavigate hook for navigation
-import {Link} from 'react-router-dom';
-// Import User icon from lucide-react
-import type { JSX } from 'react';
+// Import your Logo from the public folder (referenced as string path in Vite)
+// Note: In Vite, files in 'public' are served at the root '/'
+const LOGO_PATH = "/Logo.svg";
 
-import ProfileIcon from '@/assets/Profile.svg';
-
-// Define props for this component
 interface HeaderProps {
-  // Optional title to display (defaults to "PawPal")
   title?: string;
-  // Whether to show the profile button (defaults to true)
   showProfile?: boolean;
 }
 
-// Component function - reusable header
-export function Header({ 
-  title = 'PawPal', 
-  showProfile = true, 
+export function Header({
+  title = "PawPal",
+  showProfile = true,
 }: Readonly<HeaderProps>): JSX.Element {
-  // Hook to navigate to different pages
+  const { user } = useAuth();
+
+  // Helper to determine what to show on the RIGHT side
+  const renderProfileIcon = () => {
+    // 1. If user has an uploaded avatar, show it
+    if (user?.avatar_url) {
+      return (
+        <img
+          src={user.avatar_url}
+          alt={user.username || "Profile"}
+          className={`h-8 w-8 rounded-full object-cover border-2 ${
+            user.role === "admin" ? "border-blue-600" : "border-gray-200"
+          }`}
+        />
+      );
+    }
+
+    // 2. Fallback: If Admin, show Shield icon (Blue)
+    if (user?.role === "admin") {
+      return <ShieldCheck className="h-6 w-6 text-blue-600" />;
+    }
+
+    // 3. Fallback: Default User icon (Gray)
+    return <User className="h-6 w-6 text-gray-700" />;
+  };
 
   return (
-    // Sticky header at top of page with border
     <header className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white p-4">
-      {/* Left: Logo and app name */}
+      {/* LEFT: Real Logo + App Name */}
       <div className="flex items-center gap-2">
-        {/* Logo placeholder with paw emoji */}
-        <div className="h-8 w-8 rounded bg-blue-100 flex items-center justify-center">
-          🐾
-        </div>
-        {/* App name or custom title */}
-        <h1 className="text-xl font-bold text-gray-900">
-          {title}
-        </h1>
+        <img
+          src={LOGO_PATH}
+          alt="PawPal Logo"
+          className="h-8 w-8 object-contain"
+        />
+        <h1 className="text-xl font-bold text-gray-900">{title}</h1>
       </div>
 
-      {/* Right: Profile button OR Back button (depends on showBack prop) */}
+      {/* RIGHT: Profile Button */}
       {showProfile && (
-        // Profile button - navigate to profile page
-        <Link to="/ProfilePage"
-          // Navigate to profile page when clicked
-          // Hover effect: light background on hover
-          className="rounded-full p-2 hover:bg-gray-100 transition-colors"
+        <Link
+          to="/ProfilePage"
+          className="rounded-full p-1 hover:bg-gray-100 transition-colors flex items-center justify-center"
         >
-          {/* Profile SVG icon */}
-          <img src={ProfileIcon} alt="Profile" className="h-6 w-6" />
+          {renderProfileIcon()}
         </Link>
       )}
     </header>

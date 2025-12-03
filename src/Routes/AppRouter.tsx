@@ -13,13 +13,16 @@ import SignIn from "@/pages/Authentication/SignIn";
 import SignUp from "@/pages/Authentication/SignUp";
 import ForgotPassword from "@/pages/Authentication/ForgotPassword";
 import Unauthorized from "@/pages/Authentication/Unauthorized";
+import UpdatePassword from "@/pages/Authentication/UpdatePassword";
 
 import { UserHomePage } from "@/pages/UsersD/UserHomePage";
 import { AdminHomePage } from "@/pages/AdminD/AdminHomePage";
+import CreateEvent from "@/pages/AdminD/CreateEvent";
 import ProfilePage from "@/pages/SharedPages/ProfilePage";
 import MenuPage from "@/pages/SharedPages/MenuPage";
 import EditProfilePage from "@/pages/SharedPages/EditProfilePage";
 
+<<<<<<< HEAD
 
 import MainPetProfilePage from "@/pages/PetProfile/MainPetProfilePage";
 import AddPetPage from "@/pages/PetProfile/AddPetPage";
@@ -27,6 +30,9 @@ import PetProfilePage from "@/pages/PetProfile/PetProfilePage";
 import PetEditProfile from "@/pages/PetProfile/PetEditProfile";
 
 
+=======
+import AddPet from "@/pages/PetProfile/AddPet"; // Import the page
+>>>>>>> mirafelix
 
 const router = createBrowserRouter([
   // --- PUBLIC ROUTES ---
@@ -45,6 +51,10 @@ const router = createBrowserRouter([
   {
     path: "/ForgotPassword",
     element: <ForgotPassword />,
+  },
+  {
+    path: "/reset-password",
+    element: <UpdatePassword />,
   },
   {
     path: "/unauthorized",
@@ -79,6 +89,14 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: "/admin/events/create",
+        element: (
+          <ProtectedRoute requiredRole="admin">
+            <CreateEvent />
+          </ProtectedRoute>
+        ),
+      },
+      {
         path: "/ProfilePage",
         element: <ProfilePage />,
       },
@@ -91,6 +109,7 @@ const router = createBrowserRouter([
         element: <MenuPage />,
       },
       {
+<<<<<<< HEAD
         path: "/PetDashboard",
         element: <MainPetProfilePage />, 
       },
@@ -107,6 +126,12 @@ const router = createBrowserRouter([
         element:<PetEditProfile />,
       },
     ]
+=======
+        path: "/add-pet",
+        element: <AddPet />,
+      },
+    ],
+>>>>>>> mirafelix
   },
 
   // --- FALLBACK ---
