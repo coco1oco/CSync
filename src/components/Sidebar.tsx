@@ -30,7 +30,7 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
       // ✅ FIX: Match the paths defined in AppRouter.tsx
       path: userRole === "admin" ? "/AdminDashboard" : "/UserDashboard",
       icon: PawPrint,
-      label: userRole === "admin" ? "Pet Dashboard" : "Dashboard",
+      label: userRole === "admin" ? "Pet Dashboard" : "Pet Dashboard",
     },
   ];
 
