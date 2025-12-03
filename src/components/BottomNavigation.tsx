@@ -21,7 +21,7 @@ export function BottomNavigation({
     {
       // ✅ Restore Pet Dashboard Logic
       // If admin -> /admin, If user -> /UserDashboard (matches your AppRouter)
-      path: userRole === "admin" ? "/admin" : "/UserDashboard",
+      path: userRole === "admin" ? "/AdminDashboard" : "/UserDashboard",
       icon: PawPrint,
       label: userRole === "admin" ? "Pet Dashboard" : "Dashboard",
     },
