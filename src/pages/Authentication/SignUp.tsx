@@ -38,10 +38,6 @@ export default function SignUp() {
   // 🟢 UPDATED REDIRECT LOGIC
   useEffect(() => {
     if (user && !loading) {
-<<<<<<< HEAD
-      // Changed from "/ProfilePage" to "/"
-      navigate("/ProfilePage", { replace: true });
-=======
       // Check if the user profile is incomplete (missing name)
       // The authContext merges profile data into the 'user' object
       if (!user.first_name || !user.last_name) {
@@ -51,7 +47,6 @@ export default function SignUp() {
         // If they somehow already have data, go to the main profile
         navigate("/ProfilePage", { replace: true });
       }
->>>>>>> mirafelix
     }
   }, [user, loading, navigate]);
 
@@ -332,7 +327,7 @@ export default function SignUp() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 no-eye"
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -358,7 +353,7 @@ export default function SignUp() {
                   placeholder="Confirm Password"
                   required
                   minLength={8}
-                  className={`h-11 rounded-xl bg-white focus-visible:ring-blue-600 pr-10 border ${
+                  className={`h-11 rounded-xl bg-white focus-visible:ring-blue-600 pr-10 border no-eye ${
                     confirmHasError
                       ? "border-red-300 bg-red-50"
                       : "border-gray-200"

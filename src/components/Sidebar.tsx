@@ -27,9 +27,9 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
     { path: "/messages", icon: MessageCircle, label: "Messages" },
     { path: "/notifications", icon: Bell, label: "Notifications" },
     {
-      path: userRole === "admin" ? "/admin" : "/Dashboard",
+      path: userRole === "admin" ? "/PetDashboard" : "/PetDashboard",
       icon: PawPrint,
-      label: userRole === "admin" ? "Pet Dashboard" : "Dashboard",
+      label: userRole === "admin" ? "Pet Dashboard" : "Pet Dashboard",
     },
   ];
 

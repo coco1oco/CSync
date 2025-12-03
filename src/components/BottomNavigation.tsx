@@ -30,14 +30,14 @@ export function BottomNavigation({
   // Navigation items configuration
   // Each has: path (where to go), icon (which lucide icon), label (for accessibility)
   const navItems = [
-    { path: '/rewards ' , icon: HomeIcon, label: 'Home' },
+    { path: '/' , icon: HomeIcon, label: 'Home' },
     { path: '/messages', icon: MessageIcon, label: 'Messages' },
     { path: '/notifications', icon: NotificationIcon, label: 'Notifications' },
     // 4th item changes based on role
     {
-      path: userRole === "admin" ? "/admin" : "/rewards",
+      path: userRole === "admin" ? "/PetDashboard" : "/PetDashboard",
       icon: userRole === "admin" ? PetIcon : PetIcon,
-      label: userRole === "admin" ? "PetDashboard" : "Rewards",
+      label: userRole === "admin" ? "PetDashboard" : "PetDashboard",
     },
   ];
 
