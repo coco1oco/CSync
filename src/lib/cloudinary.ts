@@ -14,10 +14,15 @@ export async function uploadImageToCloudinary(file: File): Promise<string> {
     "upload_preset",
     import.meta.env.VITE_CLOUDINARY_AVATARURL
   );
+   formData.append(
+    "upload_preset",
+    import.meta.env.VITE_CLOUDINARY_PETIMAGEURL 
+  );
 
   const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 
 console.log("Uploading to Cloudinary with preset:", import.meta.env.VITE_CLOUDINARY_AVATARURL);
+console.log("Uploading to Cloudinary with preset:", import.meta.env.VITE_CLOUDINARY_PETPIMAGEURL);
   console.log("Cloud name:", cloudName);
 
   const response = await fetch(
