@@ -22,7 +22,10 @@ import ProfilePage from "@/pages/SharedPages/ProfilePage";
 import MenuPage from "@/pages/SharedPages/MenuPage";
 import EditProfilePage from "@/pages/SharedPages/EditProfilePage";
 
-import AddPet from "@/pages/PetProfile/AddPet"; // Import the page
+import MainPetProfilePage from "@/pages/PetProfile/MainPetProfilePage";
+import AddPetPage from "@/pages/PetProfile/AddPetPage";
+import PetProfilePage from "@/pages/PetProfile/PetProfilePage";
+import PetEditProfile from "@/pages/PetProfile/PetEditProfile";
 
 const router = createBrowserRouter([
   // --- PUBLIC ROUTES ---
@@ -99,8 +102,20 @@ const router = createBrowserRouter([
         element: <MenuPage />,
       },
       {
-        path: "/add-pet",
-        element: <AddPet />,
+        path: "/PetDashboard",
+        element: <MainPetProfilePage />,
+      },
+      {
+        path: "/PetDashboard/new",
+        element: <AddPetPage />,
+      },
+      {
+        path: "/PetDashboard/:petId",
+        element: <PetProfilePage />,
+      },
+      {
+        path: "/PetDashboard/:petId/edit",
+        element: <PetEditProfile />,
       },
     ],
   },

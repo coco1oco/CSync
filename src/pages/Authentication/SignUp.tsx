@@ -328,7 +328,7 @@ export default function SignUp() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 no-eye"
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -354,7 +354,7 @@ export default function SignUp() {
                   placeholder="Confirm Password"
                   required
                   minLength={8}
-                  className={`h-11 rounded-xl bg-white focus-visible:ring-blue-600 pr-10 border ${
+                  className={`h-11 rounded-xl bg-white focus-visible:ring-blue-600 pr-10 border no-eye ${
                     confirmHasError
                       ? "border-red-300 bg-red-50"
                       : "border-gray-200"

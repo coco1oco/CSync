@@ -15,6 +15,7 @@ export function BottomNavigation({
   const isActive = (path: string): boolean => location.pathname === path;
 
   const navItems = [
+<<<<<<< HEAD
     { path: "/", icon: Home, label: "Home" },
     { path: "/messages", icon: MessageCircle, label: "Messages" },
     { path: "/notifications", icon: Bell, label: "Notifications" },
@@ -24,6 +25,16 @@ export function BottomNavigation({
       path: userRole === "admin" ? "/AdminDashboard" : "/UserDashboard",
       icon: PawPrint,
       label: userRole === "admin" ? "Pet Dashboard" : "Dashboard",
+=======
+    { path: '/' , icon: HomeIcon, label: 'Home' },
+    { path: '/messages', icon: MessageIcon, label: 'Messages' },
+    { path: '/notifications', icon: NotificationIcon, label: 'Notifications' },
+    // 4th item changes based on role
+    {
+      path: userRole === "admin" ? "/PetDashboard" : "/PetDashboard",
+      icon: userRole === "admin" ? PetIcon : PetIcon,
+      label: userRole === "admin" ? "PetDashboard" : "PetDashboard",
+>>>>>>> LOGIN80%
     },
   ];
 
