@@ -1,5 +1,5 @@
 import { useAuth } from "@/context/authContext";
-import { useState, useEffect } from "react";
+import { useState, useEffect } from "react"; // Added useEffect
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Camera, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,19 +34,15 @@ export default function EditProfilePage() {
     "he/they",
   ];
 
-  // ✅ FIX: Prevent disappearing content
-  // We use functional updates: (prev) => ...
-  // logic: "If the new user data has a name, use it.
-  //         If NOT (it's undefined/null), keep the 'prev' text currently in the box.
-  //         Only use '' as a last resort."
+  // ✅ FIX: This effect runs when 'user' loads to populate the form
   useEffect(() => {
     if (user) {
-      setFirstName((prev) => user.first_name || prev || "");
-      setLastName((prev) => user.last_name || prev || "");
-      setUsername((prev) => user.username || prev || "");
-      setBio((prev) => user.bio || prev || "");
-      setAvatarUrl((prev) => user.avatar_url || prev || "");
-      setPronouns((prev) => user.pronouns || prev || "");
+      setFirstName(user.first_name || "");
+      setLastName(user.last_name || "");
+      setUsername(user.username || "");
+      setBio(user.bio || "");
+      setAvatarUrl(user.avatar_url || "");
+      setPronouns(user.pronouns || "");
     }
   }, [user]);
 

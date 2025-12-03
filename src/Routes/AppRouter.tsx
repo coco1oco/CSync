@@ -17,6 +17,7 @@ import UpdatePassword from "@/pages/Authentication/UpdatePassword";
 
 import { UserHomePage } from "@/pages/UsersD/UserHomePage";
 import { AdminHomePage } from "@/pages/AdminD/AdminHomePage";
+import CreateEvent from "@/pages/AdminD/CreateEvent";
 import ProfilePage from "@/pages/SharedPages/ProfilePage";
 import MenuPage from "@/pages/SharedPages/MenuPage";
 import EditProfilePage from "@/pages/SharedPages/EditProfilePage";
@@ -74,6 +75,14 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute requiredRole="admin">
             <AdminHomePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/admin/events/create",
+        element: (
+          <ProtectedRoute requiredRole="admin">
+            <CreateEvent />
           </ProtectedRoute>
         ),
       },
