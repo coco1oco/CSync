@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/authContext";
 import type { OutreachEvent } from "@/types";
-import { FeedPost } from "@/components/FeedPost"; // ✅ Import the new component
+import { FeedPost } from "@/components/FeedPost";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, AlertCircle, RefreshCw } from "lucide-react"; // Added icons
 
 export function UserHomePage() {
   const { user } = useAuth();
@@ -13,6 +13,7 @@ export function UserHomePage() {
 
   const [events, setEvents] = useState<OutreachEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null); // New Error State
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
 
   const isAdmin = (user as any)?.role === "admin";
@@ -23,16 +24,22 @@ export function UserHomePage() {
 
   const fetchEvents = async () => {
     try {
+      setLoading(true);
+      setError(null); // Reset error on refetch
+
       const { data, error } = await supabase
         .from("outreach_events")
         .select("*, admin:profiles(id, username, avatar_url)")
         .order("created_at", { ascending: false });
 
-      if (!error && data) {
+      if (error) throw error; // Explicitly throw to catch block
+
+      if (data) {
         setEvents(data as OutreachEvent[]);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching events:", err);
+      setError("Unable to load the feed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -59,14 +66,6 @@ export function UserHomePage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center pt-20">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       {/* Desktop Title */}
@@ -82,34 +81,73 @@ export function UserHomePage() {
         )}
       </div>
 
-      {/* Empty State */}
-      {events.length === 0 && (
-        <div className="text-center py-20 bg-white lg:rounded-2xl border-2 border-dashed border-gray-100 mx-4 lg:mx-0">
-          <p className="text-gray-500 font-medium">No posts yet</p>
-          {isAdmin && (
-            <Button
-              onClick={() => navigate("/admin/events/create")}
-              variant="link"
-              className="mt-2 text-blue-600"
-            >
-              Create the first post
-            </Button>
-          )}
+      {/* ERROR STATE */}
+      {error && (
+        <div className="p-6 text-center bg-red-50 rounded-2xl border border-red-100 flex flex-col items-center gap-2">
+          <AlertCircle className="w-8 h-8 text-red-500" />
+          <p className="text-red-700 font-medium">{error}</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchEvents}
+            className="mt-2 border-red-200 text-red-700 hover:bg-red-100 hover:text-red-800"
+          >
+            <RefreshCw className="w-3 h-3 mr-2" /> Retry
+          </Button>
         </div>
       )}
 
-      {/* Feed List - Now using FeedPost */}
-      <div className="flex flex-col">
-        {events.map((event) => (
-          <FeedPost
-            key={event.id}
-            event={event}
-            isAdmin={isAdmin}
-            onEdit={() => navigate(`/admin/events/edit/${event.id}`)}
-            onDelete={() => setDeleteEventId(event.id)}
-          />
-        ))}
-      </div>
+      {/* SKELETON LOADING STATE */}
+      {loading ? (
+        <div className="space-y-6">
+          {[1, 2].map((i) => (
+            <div
+              key={i}
+              className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3 animate-pulse"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gray-200 rounded-full" />
+                <div className="space-y-2">
+                  <div className="w-32 h-4 bg-gray-200 rounded" />
+                  <div className="w-20 h-3 bg-gray-200 rounded" />
+                </div>
+              </div>
+              <div className="w-full h-48 bg-gray-200 rounded-xl" />
+              <div className="w-3/4 h-4 bg-gray-200 rounded" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        /* ACTUAL CONTENT */
+        <>
+          {events.length === 0 && !error && (
+            <div className="text-center py-20 bg-white lg:rounded-2xl border-2 border-dashed border-gray-100 mx-4 lg:mx-0">
+              <p className="text-gray-500 font-medium">No posts yet</p>
+              {isAdmin && (
+                <Button
+                  onClick={() => navigate("/admin/events/create")}
+                  variant="link"
+                  className="mt-2 text-blue-600"
+                >
+                  Create the first post
+                </Button>
+              )}
+            </div>
+          )}
+
+          <div className="flex flex-col">
+            {events.map((event) => (
+              <FeedPost
+                key={event.id}
+                event={event}
+                isAdmin={isAdmin}
+                onEdit={() => navigate(`/admin/events/edit/${event.id}`)}
+                onDelete={() => setDeleteEventId(event.id)}
+              />
+            ))}
+          </div>
+        </>
+      )}
 
       {/* FAB (Mobile Only - Admin) */}
       {isAdmin && (

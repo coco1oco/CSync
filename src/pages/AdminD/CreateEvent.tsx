@@ -80,7 +80,8 @@ export default function CreateEvent() {
       if (insertError) throw insertError;
 
       setTimeout(() => {
-        navigate("/AdminDashboard");
+        // change "/AdminDashboard" to "/"
+        navigate("/");
       }, 800);
     } catch (err: any) {
       console.error("Error creating post:", err);
