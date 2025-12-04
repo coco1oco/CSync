@@ -18,20 +18,18 @@ import UpdatePassword from "@/pages/Authentication/UpdatePassword";
 import { UserHomePage } from "@/pages/UsersD/UserHomePage";
 import { AdminHomePage } from "@/pages/AdminD/AdminHomePage";
 import CreateEvent from "@/pages/AdminD/CreateEvent";
+import EditEvent from "@/pages/AdminD/EditEvent"; // ✅ IMPORT THIS
 import ProfilePage from "@/pages/SharedPages/ProfilePage";
 import MenuPage from "@/pages/SharedPages/MenuPage";
 import EditProfilePage from "@/pages/SharedPages/EditProfilePage";
-
 
 import MainPetProfilePage from "@/pages/PetProfile/MainPetProfilePage";
 import AddPetPage from "@/pages/PetProfile/AddPetPage";
 import PetProfilePage from "@/pages/PetProfile/PetProfilePage";
 import PetEditProfile from "@/pages/PetProfile/PetEditProfile";
 
-
-
 const router = createBrowserRouter([
-  // --- PUBLIC ROUTES ---
+  // ... (Public Routes remain unchanged)
   {
     path: "/welcome",
     element: <Welcome />,
@@ -57,8 +55,7 @@ const router = createBrowserRouter([
     element: <Unauthorized />,
   },
 
-  // --- PROTECTED ROUTES (Wrapped in AppLayout) ---
-  // This wrapper ensures all these pages get the Sidebar/BottomNav
+  // --- PROTECTED ROUTES ---
   {
     element: (
       <ProtectedRoute>
@@ -66,12 +63,10 @@ const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      // ROOT PATH: The Feed (Home)
       {
         path: "/",
         element: <UserHomePage />,
       },
-      // Aliases for dashboards
       {
         path: "/UserDashboard",
         element: <UserHomePage />,
@@ -92,6 +87,15 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
+      // ✅ NEW EDIT ROUTE
+      {
+        path: "/admin/events/edit/:id",
+        element: (
+          <ProtectedRoute requiredRole="admin">
+            <EditEvent />
+          </ProtectedRoute>
+        ),
+      },
       {
         path: "/ProfilePage",
         element: <ProfilePage />,
@@ -106,7 +110,7 @@ const router = createBrowserRouter([
       },
       {
         path: "/PetDashboard",
-        element: <MainPetProfilePage />, 
+        element: <MainPetProfilePage />,
       },
       {
         path: "/PetDashboard/new",
@@ -118,13 +122,11 @@ const router = createBrowserRouter([
       },
       {
         path: "/PetDashboard/:petId/edit",
-        element:<PetEditProfile />,
+        element: <PetEditProfile />,
       },
-    ]
+    ],
   },
 
-  // --- FALLBACK ---
-  // If the route doesn't exist, send them to Welcome
   {
     path: "*",
     element: <Navigate to="/welcome" replace />,
