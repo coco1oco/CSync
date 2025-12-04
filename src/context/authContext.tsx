@@ -54,7 +54,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   // Helper: Fetch authoritative data from DB
-  const fetchProfileSafe = async (userId: string, sessionUser: any) => {
+  // Helper: Fetch authoritative data from DB
+  // Added 'retries' parameter for robustness
+  // Helper: Fetch authoritative data from DB
+  // Added 'retries' parameter for robustness against Free Tier "Cold Starts"
+  const fetchProfileSafe = async (
+    userId: string,
+    sessionUser: any,
+    retries = 1
+  ) => {
     try {
       const fetchPromise = supabase
         .from("profiles")
@@ -62,9 +70,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         .eq("id", userId)
         .maybeSingle();
 
-      // 10s timeout to prevent infinite loading
+      // INCREASED TIMEOUT: Changed 10000 (10s) to 20000 (20s)
+      // This gives the Free Tier database time to "wake up" from inactivity.
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Profile fetch timeout")), 10000)
+        setTimeout(() => reject(new Error("Profile fetch timeout")), 20000)
       );
 
       const result: any = await Promise.race([fetchPromise, timeoutPromise]);
@@ -72,9 +81,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (result.error) throw result.error;
       return result.data || null;
     } catch (err) {
+      // NEW: Simple Retry Logic
+      // If the DB was sleeping, the first request might fail/timeout.
+      // We immediately try one more time, which usually succeeds.
+      if (retries > 0) {
+        console.log(
+          `Profile fetch failed, retrying... (${retries} attempts left)`
+        );
+        return fetchProfileSafe(userId, sessionUser, retries - 1);
+      }
+
       console.warn("⚠️ Profile fetch issue:", err);
 
-      // Fallback: If DB fails, check Admin allowlist
+      // Fallback: If DB fails, check Admin allowlist so they aren't locked out
       if (sessionUser?.email && ADMIN_EMAILS.includes(sessionUser.email)) {
         return { role: "admin" };
       }

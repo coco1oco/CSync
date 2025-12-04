@@ -2,6 +2,7 @@
 
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/context/authContext";
+import { Loader2 } from "lucide-react";
 
 // Reusable wrapper for any route that should only be accessible
 // when the user is authenticated (and optionally has a specific role).
@@ -17,12 +18,11 @@ export const ProtectedRoute = ({
   // Get current auth state from your AuthContext
   const { user, loading } = useAuth();
 
-  // While auth state is still being resolved (e.g., checking Supabase session),
-  // render a full‑screen loading UI instead of the protected content.
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p>Loading...</p>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 gap-3">
+        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+        <p className="text-sm font-medium text-gray-500">Loading PawPal...</p>
       </div>
     );
   }
