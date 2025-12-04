@@ -38,25 +38,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const ADMIN_EMAILS = ["kmirafelix@gmail.com", "admin@pawpal.com"];
 
   // Helper: Extract usable profile data directly from Session Metadata
-  // This allows the UI to render instantly without waiting for the DB
   const getUserFromSession = (sessionUser: any): UserProfile => {
     const meta = sessionUser.user_metadata || {};
     return {
       ...sessionUser,
       id: sessionUser.id,
       email: sessionUser.email,
-      // Metadata is the "fast" source of truth
       avatar_url: meta.avatar_url || null,
       username: meta.username || sessionUser.email?.split("@")[0],
       first_name: meta.full_name?.split(" ")[0] || meta.first_name,
       last_name: meta.full_name?.split(" ")[1] || meta.last_name,
       pronouns: meta.pronouns,
-      // Default role to 'user', DB will override if 'admin'
       role: meta.role || "user",
     };
   };
 
-  // Helper: Fetch authoritative data from DB (slower but accurate for roles)
+  // Helper: Fetch authoritative data from DB
   const fetchProfileSafe = async (userId: string, sessionUser: any) => {
     try {
       const fetchPromise = supabase
@@ -65,7 +62,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         .eq("id", userId)
         .maybeSingle();
 
-      // 10s timeout
+      // 10s timeout to prevent infinite loading
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("Profile fetch timeout")), 10000)
       );
@@ -75,7 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (result.error) throw result.error;
       return result.data || null;
     } catch (err) {
-      console.warn("⚠️ Profile fetch issue (background):", err);
+      console.warn("⚠️ Profile fetch issue:", err);
 
       // Fallback: If DB fails, check Admin allowlist
       if (sessionUser?.email && ADMIN_EMAILS.includes(sessionUser.email)) {
@@ -88,31 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     let mounted = true;
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
-
-      if (event === "SIGNED_IN" && session?.user) {
-        // 1. INSTANT: Set user from session metadata
-        const instantUser = getUserFromSession(session.user);
-        setUser(instantUser);
-        setLoading(false); // Unblock the UI immediately
-
-        // 2. BACKGROUND: Fetch DB profile to update roles/details
-        const dbProfile = await fetchProfileSafe(session.user.id, session.user);
-
-        if (mounted && dbProfile) {
-          // Merge DB data on top of session data
-          setUser((prev) => ({ ...prev, ...instantUser, ...dbProfile }));
-        }
-      } else if (event === "SIGNED_OUT") {
-        setUser(null);
-        setLoading(false);
-      }
-    });
-
-    // Initial Load Logic
+    // 1. Initial Session Load (Blocking)
     const initSession = async () => {
       try {
         const {
@@ -120,31 +93,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         } = await supabase.auth.getSession();
 
         if (session?.user) {
-          // 1. INSTANT
           const instantUser = getUserFromSession(session.user);
-          if (mounted) {
-            setUser(instantUser);
-            setLoading(false);
-          }
 
-          // 2. BACKGROUND
+          // Wait for DB profile before setting loading=false
+          // This prevents the "user" -> "admin" flash/bug
           const dbProfile = await fetchProfileSafe(
             session.user.id,
             session.user
           );
-          if (mounted && dbProfile) {
-            setUser((prev) => ({ ...prev, ...instantUser, ...dbProfile }));
+
+          if (mounted) {
+            setUser({ ...instantUser, ...(dbProfile || {}) });
           }
-        } else {
-          if (mounted) setLoading(false);
         }
       } catch (error) {
         console.error("Session check error:", error);
+      } finally {
         if (mounted) setLoading(false);
       }
     };
 
     initSession();
+
+    // 2. Auth State Listener (Real-time updates)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+
+      if (event === "SIGNED_IN" && session?.user) {
+        // On explicit sign-in, we can show the UI faster but still fetch profile
+        const instantUser = getUserFromSession(session.user);
+        setUser(instantUser); // Show something immediately
+
+        const dbProfile = await fetchProfileSafe(session.user.id, session.user);
+        if (mounted && dbProfile) {
+          setUser((prev) => ({ ...prev, ...instantUser, ...dbProfile }));
+        }
+        setLoading(false);
+      } else if (event === "SIGNED_OUT") {
+        setUser(null);
+        setLoading(false);
+      }
+    });
 
     return () => {
       mounted = false;
@@ -162,13 +153,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       data: { session },
     } = await supabase.auth.getSession();
     if (session?.user) {
-      // Re-run the instant + background sync
       const instantUser = getUserFromSession(session.user);
-      setUser(instantUser);
-
       const dbProfile = await fetchProfileSafe(session.user.id, session.user);
       if (dbProfile) {
         setUser({ ...instantUser, ...dbProfile });
+      } else {
+        setUser(instantUser);
       }
     }
   };
