@@ -54,9 +54,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   // Helper: Fetch authoritative data from DB
-  // Helper: Fetch authoritative data from DB
-  // Added 'retries' parameter for robustness
-  // Helper: Fetch authoritative data from DB
   // Added 'retries' parameter for robustness against Free Tier "Cold Starts"
   const fetchProfileSafe = async (
     userId: string,
@@ -71,7 +68,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         .maybeSingle();
 
       // INCREASED TIMEOUT: Changed 10000 (10s) to 20000 (20s)
-      // This gives the Free Tier database time to "wake up" from inactivity.
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("Profile fetch timeout")), 20000)
       );
@@ -79,6 +75,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       const result: any = await Promise.race([fetchPromise, timeoutPromise]);
 
       if (result.error) throw result.error;
+
+      // ✅ EXPANDED FIX: Sync FULL Profile to Session Metadata
+      // This ensures Avatar, Name, and Username persist during DB "Cold Starts"
+      const db = result.data;
+      const meta = sessionUser.user_metadata || {};
+
+      // Check if key fields differ between DB and Session
+      if (db) {
+        const needsSync =
+          db.role !== meta.role ||
+          db.avatar_url !== meta.avatar_url ||
+          db.username !== meta.username ||
+          db.first_name !== meta.first_name;
+
+        if (needsSync) {
+          console.log("♻️ Syncing full profile to session cache...", {
+            role: db.role,
+            username: db.username,
+          });
+
+          supabase.auth.updateUser({
+            data: {
+              role: db.role,
+              avatar_url: db.avatar_url,
+              username: db.username,
+              first_name: db.first_name,
+              last_name: db.last_name,
+              pronouns: db.pronouns,
+              bio: db.bio,
+            },
+          });
+        }
+      }
+
       return result.data || null;
     } catch (err) {
       // NEW: Simple Retry Logic
@@ -100,7 +130,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       return null;
     }
   };
-
   useEffect(() => {
     let mounted = true;
 

@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { OutreachEvent } from "@/types";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion"; // ✅ Import AnimatePresence
 
 interface EventCardProps {
   event: OutreachEvent;
@@ -26,13 +26,37 @@ interface EventCardProps {
   onDelete?: () => void;
 }
 
+// ✅ Animation Variants for the slide effect
+const slideVariants = {
+  enter: (direction: number) => ({
+    x: direction > 0 ? 1000 : -1000,
+    opacity: 0,
+  }),
+  center: {
+    zIndex: 1,
+    x: 0,
+    opacity: 1,
+  },
+  exit: (direction: number) => ({
+    zIndex: 0,
+    x: direction < 0 ? 1000 : -1000,
+    opacity: 0,
+  }),
+};
+
+// ✅ Swipe configuration
+const swipeConfidenceThreshold = 10000;
+const swipePower = (offset: number, velocity: number) => {
+  return Math.abs(offset) * velocity;
+};
+
 export function EventCard({
   event,
   isAdmin,
   onEdit,
   onDelete,
 }: Readonly<EventCardProps>) {
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [[page, direction], setPage] = useState([0, 0]); // ✅ Track page and direction tuple
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
@@ -45,10 +69,12 @@ export function EventCard({
     created_at,
   } = event;
 
-  const nextImage = () =>
-    setCurrentImageIndex((prev) => (prev + 1) % images.length);
-  const prevImage = () =>
-    setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length);
+  // Derived index from the page state to handle infinite wrapping safely
+  const imageIndex = Math.abs(page % images.length);
+
+  const paginate = (newDirection: number) => {
+    setPage([page + newDirection, newDirection]);
+  };
 
   const dateStr = new Date(created_at).toLocaleDateString(undefined, {
     month: "short",
@@ -58,7 +84,6 @@ export function EventCard({
   const MAX_LENGTH = 150;
   const shouldTruncate = description && description.length > MAX_LENGTH;
 
-  // Lock body scroll when lightbox is open
   useEffect(() => {
     if (isLightboxOpen) {
       document.body.style.overflow = "hidden";
@@ -98,10 +123,19 @@ export function EventCard({
               {location && (
                 <>
                   <span>•</span>
-                  <div className="flex items-center gap-0.5 text-blue-600">
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                      location
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-0.5 text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
+                    onClick={(e) => e.stopPropagation()}
+                    title="View on Google Maps"
+                  >
                     <MapPin size={10} />
                     <span className="truncate max-w-[150px]">{location}</span>
-                  </div>
+                  </a>
                 </>
               )}
             </div>
@@ -162,18 +196,48 @@ export function EventCard({
           className="mt-2 relative w-full aspect-[4/3] bg-gray-50 overflow-hidden group cursor-pointer"
           onClick={() => setIsLightboxOpen(true)}
         >
-          {/* Ambient Background */}
-          <div
-            className="absolute inset-0 bg-cover bg-center blur-2xl scale-110 opacity-60"
-            style={{ backgroundImage: `url(${images[currentImageIndex]})` }}
+          {/* Ambient Background (Smooth Fade) */}
+          <motion.div
+            key={images[imageIndex]} // Change key to trigger fade
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.6 }}
+            transition={{ duration: 0.5 }}
+            className="absolute inset-0 bg-cover bg-center blur-2xl scale-110"
+            style={{ backgroundImage: `url(${images[imageIndex]})` }}
           />
 
-          {/* Main Image */}
-          <img
-            src={images[currentImageIndex]}
-            alt="Event content"
-            className="relative w-full h-full object-contain z-10"
-          />
+          {/* ✅ ANIMATED IMAGE CAROUSEL */}
+          <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+            <AnimatePresence initial={false} custom={direction}>
+              <motion.img
+                key={page} // Key change triggers the animation
+                src={images[imageIndex]}
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{
+                  x: { type: "spring", stiffness: 300, damping: 30 },
+                  opacity: { duration: 0.2 },
+                }}
+                // Swipe Logic
+                drag="x"
+                dragConstraints={{ left: 0, right: 0 }}
+                dragElastic={1}
+                onDragEnd={(e, { offset, velocity }) => {
+                  const swipe = swipePower(offset.x, velocity.x);
+                  if (swipe < -swipeConfidenceThreshold) {
+                    paginate(1); // Next
+                  } else if (swipe > swipeConfidenceThreshold) {
+                    paginate(-1); // Prev
+                  }
+                }}
+                alt="Event content"
+                className="absolute w-full h-full object-contain z-10"
+              />
+            </AnimatePresence>
+          </div>
 
           {/* Arrows */}
           {images.length > 1 && (
@@ -181,7 +245,7 @@ export function EventCard({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  prevImage();
+                  paginate(-1);
                 }}
                 className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm hover:bg-black/60 z-20"
               >
@@ -190,7 +254,7 @@ export function EventCard({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  nextImage();
+                  paginate(1);
                 }}
                 className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm hover:bg-black/60 z-20"
               >
@@ -202,9 +266,7 @@ export function EventCard({
                   <div
                     key={i}
                     className={`h-1.5 rounded-full transition-all shadow-sm ${
-                      i === currentImageIndex
-                        ? "w-4 bg-white"
-                        : "w-1.5 bg-white/60"
+                      i === imageIndex ? "w-4 bg-white" : "w-1.5 bg-white/60"
                     }`}
                   />
                 ))}
@@ -214,54 +276,74 @@ export function EventCard({
         </div>
       )}
 
-      {/* LIGHTBOX PORTAL - WITHOUT ANIMATEPRESENCE FOR STABILITY */}
+      {/* LIGHTBOX PORTAL */}
       {isLightboxOpen &&
         createPortal(
           <div
             className="fixed inset-0 bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm"
-            style={{ zIndex: 9999 }} // Force highest Z-Index
+            style={{ zIndex: 9999 }}
             onClick={() => setIsLightboxOpen(false)}
           >
             <button className="absolute top-6 right-6 p-3 bg-white/10 text-white rounded-full hover:bg-white/20 transition-colors z-50">
               <X size={28} />
             </button>
 
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.2 }}
-              className="relative max-w-5xl w-full h-full flex items-center justify-center"
+            {/* Lightbox also gets the same animation treatment */}
+            <div
+              className="relative max-w-5xl w-full h-full flex items-center justify-center overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
-              <img
-                src={images[currentImageIndex]}
-                alt="Fullscreen view"
-                className="relative max-w-full max-h-[90vh] object-contain rounded-md shadow-2xl"
-              />
+              <AnimatePresence initial={false} custom={direction}>
+                <motion.img
+                  key={page}
+                  src={images[imageIndex]}
+                  custom={direction}
+                  variants={slideVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{
+                    x: { type: "spring", stiffness: 300, damping: 30 },
+                    opacity: { duration: 0.2 },
+                  }}
+                  drag="x"
+                  dragConstraints={{ left: 0, right: 0 }}
+                  dragElastic={1}
+                  onDragEnd={(e, { offset, velocity }) => {
+                    const swipe = swipePower(offset.x, velocity.x);
+                    if (swipe < -swipeConfidenceThreshold) {
+                      paginate(1);
+                    } else if (swipe > swipeConfidenceThreshold) {
+                      paginate(-1);
+                    }
+                  }}
+                  className="absolute max-w-full max-h-[90vh] object-contain rounded-md shadow-2xl"
+                />
+              </AnimatePresence>
 
               {images.length > 1 && (
                 <>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      prevImage();
+                      paginate(-1);
                     }}
-                    className="absolute left-0 lg:-left-12 top-1/2 -translate-y-1/2 p-3 text-white/70 hover:text-white transition-colors"
+                    className="absolute left-0 lg:-left-12 top-1/2 -translate-y-1/2 p-3 text-white/70 hover:text-white transition-colors z-30"
                   >
                     <ChevronLeft size={48} />
                   </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      nextImage();
+                      paginate(1);
                     }}
-                    className="absolute right-0 lg:-right-12 top-1/2 -translate-y-1/2 p-3 text-white/70 hover:text-white transition-colors"
+                    className="absolute right-0 lg:-right-12 top-1/2 -translate-y-1/2 p-3 text-white/70 hover:text-white transition-colors z-30"
                   >
                     <ChevronRight size={48} />
                   </button>
                 </>
               )}
-            </motion.div>
+            </div>
           </div>,
           document.body
         )}

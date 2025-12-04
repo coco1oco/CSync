@@ -90,7 +90,14 @@ export function AdminHomePage() {
             Manage your posts and community updates
           </p>
         </div>
-        {/* ... button ... */}
+
+        {/* ✅ RESTORED BUTTON */}
+        <Button
+          onClick={() => navigate("/admin/events/create")}
+          className="hidden lg:flex bg-blue-600 hover:bg-blue-700 text-white rounded-full"
+        >
+          <Plus className="w-4 h-4 mr-2" /> New Post
+        </Button>
       </div>
 
       {/* 2. Empty State */}

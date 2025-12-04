@@ -1,6 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,9 @@ import {
 import { useAuth } from "@/context/authContext";
 import { motion } from "framer-motion";
 
-export default function CreateEvent() {
+export default function EditEvent() {
   const navigate = useNavigate();
+  const { id } = useParams();
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -26,40 +27,81 @@ export default function CreateEvent() {
   const [description, setDescription] = useState("");
   const [showLocation, setShowLocation] = useState(false);
 
-  // ✅ UPDATED: Multi-image state
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  // ✅ MULTI-IMAGE STATE
+  const [existingImages, setExistingImages] = useState<string[]>([]); // URLs from DB
+  const [newFiles, setNewFiles] = useState<File[]>([]); // Files waiting to upload
+  const [newPreviews, setNewPreviews] = useState<string[]>([]); // Previews for new files
 
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
   const [error, setError] = useState("");
 
   const [avatarError, setAvatarError] = useState(false);
   const avatarUrl = user?.avatar_url || user?.user_metadata?.avatar_url;
 
-  // ✅ HANDLE MULTIPLE FILES
+  // 1. Fetch Existing Data
+  useEffect(() => {
+    const fetchPost = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("outreach_events")
+          .select("*")
+          .eq("id", id)
+          .single();
+
+        if (error) throw error;
+
+        if (data) {
+          setTitle(data.title);
+          setDescription(data.description);
+          setLocation(data.location || "");
+          if (data.location) setShowLocation(true);
+
+          // Load existing images array
+          if (data.images && Array.isArray(data.images)) {
+            setExistingImages(data.images);
+          }
+        }
+      } catch (err: any) {
+        console.error("Error fetching post:", err);
+        setError("Failed to load post details.");
+      } finally {
+        setFetching(false);
+      }
+    };
+
+    if (id) fetchPost();
+  }, [id]);
+
+  // ✅ HANDLE MULTIPLE FILE SELECTION
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const selectedFiles = Array.from(e.target.files);
 
       // 1. Add to file list
-      setImageFiles((prev) => [...prev, ...selectedFiles]);
+      setNewFiles((prev) => [...prev, ...selectedFiles]);
 
       // 2. Generate previews
       const selectedPreviews = selectedFiles.map((file) =>
         URL.createObjectURL(file)
       );
-      setPreviewUrls((prev) => [...prev, ...selectedPreviews]);
+      setNewPreviews((prev) => [...prev, ...selectedPreviews]);
     }
 
-    // Reset input to allow selecting the same file again if needed
+    // Reset input so you can select the same file again if needed
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // ✅ REMOVE IMAGE FROM LIST
-  const handleRemoveImage = (indexToRemove: number) => {
-    setImageFiles((prev) => prev.filter((_, i) => i !== indexToRemove));
-    setPreviewUrls((prev) => {
-      // Optional: Free memory
+  // ✅ REMOVE AN EXISTING IMAGE (From DB)
+  const removeExisting = (indexToRemove: number) => {
+    setExistingImages((prev) => prev.filter((_, i) => i !== indexToRemove));
+  };
+
+  // ✅ REMOVE A NEW FILE (Before Upload)
+  const removeNew = (indexToRemove: number) => {
+    setNewFiles((prev) => prev.filter((_, i) => i !== indexToRemove));
+    setNewPreviews((prev) => {
+      // Optional: Revoke object URL to free memory
       URL.revokeObjectURL(prev[indexToRemove]);
       return prev.filter((_, i) => i !== indexToRemove);
     });
@@ -82,36 +124,40 @@ export default function CreateEvent() {
     try {
       if (!user) throw new Error("You must be logged in.");
 
-      // 1. Upload all images concurrently
-      const uploadPromises = imageFiles.map((file) =>
+      // 1. Upload all new files concurrently
+      // We map over the newFiles array and call uploadImageToCloudinary for each
+      const uploadPromises = newFiles.map((file) =>
         uploadImageToCloudinary(file)
       );
-      const uploadedImageUrls = await Promise.all(uploadPromises);
+      const uploadedUrls = await Promise.all(uploadPromises);
 
-      // 2. Insert into Supabase
-      const { error: insertError } = await supabase
+      // 2. Combine with existing images that weren't deleted
+      const finalImages = [...existingImages, ...uploadedUrls];
+
+      // 3. Update Supabase
+      const { error: updateError } = await supabase
         .from("outreach_events")
-        .insert([
-          {
-            admin_id: user.id,
-            title,
-            location,
-            description,
-            images: uploadedImageUrls, // Save the array of URLs
-          },
-        ]);
+        .update({
+          title,
+          location,
+          description,
+          images: finalImages, // Save array of strings
+        })
+        .eq("id", id);
 
-      if (insertError) throw insertError;
+      if (updateError) throw updateError;
 
       setTimeout(() => {
         navigate("/");
       }, 800);
     } catch (err: any) {
-      console.error("Error creating post:", err);
-      setError(err.message || "Failed to create post");
+      console.error("Error updating post:", err);
+      setError(err.message || "Failed to update post");
       setLoading(false);
     }
   };
+
+  if (fetching) return null;
 
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center lg:p-4 isolate">
@@ -145,7 +191,7 @@ export default function CreateEvent() {
             size="sm"
             className="rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-1 h-9 disabled:opacity-50"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Post"}
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
           </Button>
         </header>
 
@@ -224,21 +270,45 @@ export default function CreateEvent() {
                 </div>
               )}
 
-              {/* ✅ UPDATED: Multi-image Grid Preview */}
-              {previewUrls.length > 0 && (
+              {/* ✅ MULTI-IMAGE GRID DISPLAY */}
+              {(existingImages.length > 0 || newPreviews.length > 0) && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
-                  {previewUrls.map((url, idx) => (
+                  {/* 1. Existing Images */}
+                  {existingImages.map((url, idx) => (
                     <div
-                      key={idx}
+                      key={`existing-${idx}`}
                       className="relative aspect-[4/3] rounded-xl overflow-hidden border border-gray-100 group bg-gray-50"
                     >
                       <img
                         src={url}
-                        alt={`Preview ${idx + 1}`}
+                        alt="Existing"
                         className="w-full h-full object-cover"
                       />
                       <button
-                        onClick={() => handleRemoveImage(idx)}
+                        onClick={() => removeExisting(idx)}
+                        className="absolute top-1.5 right-1.5 p-1 bg-black/60 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all hover:bg-red-600"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* 2. New File Previews */}
+                  {newPreviews.map((url, idx) => (
+                    <div
+                      key={`new-${idx}`}
+                      className="relative aspect-[4/3] rounded-xl overflow-hidden border border-gray-100 group bg-gray-50"
+                    >
+                      <img
+                        src={url}
+                        alt="New Preview"
+                        className="w-full h-full object-cover opacity-90"
+                      />
+                      {/* Loading/New indicator overlay (Optional) */}
+                      <div className="absolute inset-0 bg-blue-500/10 pointer-events-none" />
+
+                      <button
+                        onClick={() => removeNew(idx)}
                         className="absolute top-1.5 right-1.5 p-1 bg-black/60 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all hover:bg-red-600"
                       >
                         <X size={14} />
@@ -255,7 +325,7 @@ export default function CreateEvent() {
           <button
             onClick={() => fileInputRef.current?.click()}
             className="p-2.5 text-blue-500 hover:bg-blue-50 rounded-full transition-colors"
-            title="Add Photos"
+            title="Add Photo"
           >
             <ImageIcon className="w-5 h-5" />
           </button>
@@ -272,7 +342,7 @@ export default function CreateEvent() {
             <MapPin className="w-5 h-5" />
           </button>
 
-          {/* ✅ ALLOW MULTIPLE SELECTION */}
+          {/* ✅ ALLOW MULTIPLE FILES */}
           <input
             ref={fileInputRef}
             type="file"
