@@ -1,12 +1,14 @@
 import { useState } from "react";
-import { Card } from "@/components/ui/card";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import {
   ChevronLeft,
   ChevronRight,
-  MoreVertical,
+  MoreHorizontal,
   Edit,
   Trash2,
+  MapPin,
+  X,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -15,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { OutreachEvent } from "@/types";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface EventCardProps {
   event: OutreachEvent;
@@ -30,101 +33,174 @@ export function EventCard({
   onDelete,
 }: Readonly<EventCardProps>) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const { title, location, description, images = [], admin } = event;
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // 1. New State for Lightbox
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+
+  const {
+    title,
+    location,
+    description,
+    images = [],
+    admin,
+    created_at,
+  } = event;
 
   const nextImage = () =>
     setCurrentImageIndex((prev) => (prev + 1) % images.length);
   const prevImage = () =>
     setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length);
 
+  const dateStr = new Date(created_at).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+
+  const MAX_LENGTH = 150;
+  const shouldTruncate = description && description.length > MAX_LENGTH;
+
+  // Helper to prevent body scroll when lightbox is open
+  if (typeof document !== "undefined") {
+    document.body.style.overflow = isLightboxOpen ? "hidden" : "";
+  }
+
   return (
-    <div className="overflow-hidden bg-white">
-      {/* ===== CARD HEADER ===== */}
-      <div className="relative p-3 flex items-center gap-3">
-        {/* Avatar */}
-        <div className="h-9 w-9 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
-          {admin?.avatar_url ? (
-            <img
-              src={admin.avatar_url}
-              alt={admin.username}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <span className="text-xs font-bold text-blue-700">
-              {admin?.username?.slice(0, 2).toUpperCase() || "A"}
+    <article className="bg-white lg:rounded-2xl lg:shadow-sm lg:border border-gray-100 overflow-hidden flex flex-col">
+      {/* HEADER */}
+      <div className="px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center overflow-hidden border border-blue-100">
+            {admin?.avatar_url ? (
+              <img
+                src={admin.avatar_url}
+                alt={admin.username}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <span className="text-sm font-bold text-blue-600">
+                {admin?.username?.slice(0, 2).toUpperCase() || "YFA"}
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-col">
+            <span className="text-sm font-bold text-gray-900 leading-none">
+              {admin?.username || "Youth For Animals"}
             </span>
-          )}
+            <div className="flex items-center text-xs text-gray-500 mt-1 gap-1">
+              <span>{dateStr}</span>
+              {location && (
+                <>
+                  <span>•</span>
+                  <div className="flex items-center gap-0.5 text-blue-600">
+                    <MapPin size={10} />
+                    <span className="truncate max-w-[150px]">{location}</span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Name & Loc */}
-        <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-bold text-gray-900 truncate">
-            {admin?.username || "Youth For Animals"}
-          </h3>
-          <p className="text-xs text-gray-500 truncate">{location}</p>
-        </div>
-
-        {/* Menu (Admin Only) */}
         {isAdmin && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2">
-                <MoreVertical className="h-4 w-4 text-gray-500" />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-gray-400 hover:text-gray-700"
+              >
+                <MoreHorizontal className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="w-32">
               <DropdownMenuItem onClick={onEdit}>
-                <Edit className="mr-2 h-4 w-4" /> Edit
+                <Edit className="mr-2 h-3.5 w-3.5" /> Edit
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={onDelete} className="text-red-600">
-                <Trash2 className="mr-2 h-4 w-4" /> Delete
+              <DropdownMenuItem
+                onClick={onDelete}
+                className="text-red-600 focus:text-red-600 focus:bg-red-50"
+              >
+                <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         )}
       </div>
 
-      {/* ===== DESCRIPTION ===== */}
-      {/* Moved description ABOVE image (like Facebook/Twitter) or keep below? 
-          Wireframe has it below. Let's keep it below but tighter. */}
-
-      <div className="px-3 pb-3">
-        <h2 className="text-base font-bold text-gray-900 mb-1 leading-tight">
-          {title}
-        </h2>
-        <p className="text-sm text-gray-700 leading-normal whitespace-pre-wrap">
-          {description}
-        </p>
+      {/* CONTENT */}
+      <div className="px-4 pb-2">
+        {title && (
+          <h3 className="font-bold text-gray-900 text-base mb-1">{title}</h3>
+        )}
+        <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
+          {isExpanded || !shouldTruncate ? (
+            description
+          ) : (
+            <>
+              {description.slice(0, MAX_LENGTH)}...
+              <button
+                onClick={() => setIsExpanded(true)}
+                className="text-gray-500 font-semibold hover:underline ml-1 cursor-pointer"
+              >
+                See more
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* ===== IMAGE ===== */}
+      {/* MEDIA - FACEBOOK STYLE & CLICKABLE */}
       {images.length > 0 && (
-        <div className="relative bg-gray-100 w-full aspect-[4/3] overflow-hidden">
+        <div
+          className="mt-2 relative w-full aspect-[4/3] bg-gray-50 overflow-hidden group cursor-pointer"
+          // 2. Click handler to open Lightbox
+          onClick={() => setIsLightboxOpen(true)}
+        >
+          {/* Layer 1: Blurred Background (Ambient Color) */}
+          <div
+            className="absolute inset-0 bg-cover bg-center blur-2xl scale-110 opacity-60"
+            style={{ backgroundImage: `url(${images[currentImageIndex]})` }}
+          />
+
+          {/* Layer 2: Main Image (Fully Visible) */}
           <img
             src={images[currentImageIndex]}
-            alt="Event"
-            className="h-full w-full object-cover"
+            alt="Event content"
+            className="relative w-full h-full object-contain z-10"
           />
+
+          {/* Navigation Controls */}
           {images.length > 1 && (
             <>
               <button
-                onClick={prevImage}
-                className="absolute left-2 top-1/2 -translate-y-1/2 p-1 bg-black/50 text-white rounded-full"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  prevImage();
+                }}
+                className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm hover:bg-black/60 z-20"
               >
-                <ChevronLeft size={16} />
+                <ChevronLeft size={20} />
               </button>
               <button
-                onClick={nextImage}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 bg-black/50 text-white rounded-full"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  nextImage();
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm hover:bg-black/60 z-20"
               >
-                <ChevronRight size={16} />
+                <ChevronRight size={20} />
               </button>
-              <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
+
+              <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 z-20">
                 {images.map((_, i) => (
                   <div
                     key={i}
-                    className={`h-1.5 w-1.5 rounded-full ${
-                      i === currentImageIndex ? "bg-white" : "bg-white/50"
+                    className={`h-1.5 rounded-full transition-all shadow-sm ${
+                      i === currentImageIndex
+                        ? "w-4 bg-white"
+                        : "w-1.5 bg-white/60"
                     }`}
                   />
                 ))}
@@ -133,6 +209,74 @@ export function EventCard({
           )}
         </div>
       )}
-    </div>
+
+      {/* 3. LIGHTBOX PORTAL */}
+      <AnimatePresence>
+        {isLightboxOpen &&
+          createPortal(
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4"
+              onClick={() => setIsLightboxOpen(false)}
+            >
+              {/* Close Button */}
+              <button className="absolute top-4 right-4 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors z-50">
+                <X size={24} />
+              </button>
+
+              {/* Main Image Container */}
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                className="relative max-w-5xl max-h-full w-full h-full flex items-center justify-center"
+                onClick={(e) => e.stopPropagation()} // Prevent closing when clicking the image itself
+              >
+                {/* Blurred Background for Lightbox too */}
+                <div
+                  className="absolute inset-0 bg-cover bg-center blur-3xl scale-110 opacity-30"
+                  style={{
+                    backgroundImage: `url(${images[currentImageIndex]})`,
+                  }}
+                />
+                <img
+                  src={images[currentImageIndex]}
+                  alt="Fullscreen view"
+                  className="relative w-auto h-auto max-w-full max-h-[90vh] object-contain shadow-2xl z-10 rounded-lg"
+                />
+
+                {/* Navigation Controls (Fullscreen) */}
+                {images.length > 1 && (
+                  <>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        prevImage();
+                      }}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors z-20"
+                    >
+                      <ChevronLeft size={32} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        nextImage();
+                      }}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors z-20"
+                    >
+                      <ChevronRight size={32} />
+                    </button>
+                  </>
+                )}
+              </motion.div>
+            </motion.div>,
+            document.body
+          )}
+      </AnimatePresence>
+    </article>
   );
 }

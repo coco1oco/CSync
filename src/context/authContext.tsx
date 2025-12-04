@@ -37,7 +37,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   // --- 🛡️ DEMO CONFIGURATION ---
   const ADMIN_EMAILS = ["kmirafelix@gmail.com", "admin@pawpal.com"];
 
-  // Helper to fetch profile with a hard timeout + Fallback
+  // Helper: Extract usable profile data directly from Session Metadata
+  // This allows the UI to render instantly without waiting for the DB
+  const getUserFromSession = (sessionUser: any): UserProfile => {
+    const meta = sessionUser.user_metadata || {};
+    return {
+      ...sessionUser,
+      id: sessionUser.id,
+      email: sessionUser.email,
+      // Metadata is the "fast" source of truth
+      avatar_url: meta.avatar_url || null,
+      username: meta.username || sessionUser.email?.split("@")[0],
+      first_name: meta.full_name?.split(" ")[0] || meta.first_name,
+      last_name: meta.full_name?.split(" ")[1] || meta.last_name,
+      pronouns: meta.pronouns,
+      // Default role to 'user', DB will override if 'admin'
+      role: meta.role || "user",
+    };
+  };
+
+  // Helper: Fetch authoritative data from DB (slower but accurate for roles)
   const fetchProfileSafe = async (userId: string, sessionUser: any) => {
     try {
       const fetchPromise = supabase
@@ -46,38 +65,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         .eq("id", userId)
         .maybeSingle();
 
+      // 10s timeout
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Profile fetch timeout")), 5000)
+        setTimeout(() => reject(new Error("Profile fetch timeout")), 10000)
       );
 
       const result: any = await Promise.race([fetchPromise, timeoutPromise]);
 
       if (result.error) throw result.error;
-      return result.data;
+      return result.data || null;
     } catch (err) {
-      console.warn("⚠️ Profile fetch timed out/failed:", err);
+      console.warn("⚠️ Profile fetch issue (background):", err);
 
-      // 🚀 DEMO FAIL-SAFE:
-      // If DB fails, construct a "Fake Profile" using Google data + Force Admin
-      const userEmail = sessionUser?.email;
-
-      if (userEmail && ADMIN_EMAILS.includes(userEmail)) {
-        console.log("🛡️ Applying Demo Admin Fallback for:", userEmail);
-
-        // Grab metadata from Google login (avatar, full name)
-        const meta = sessionUser?.user_metadata || {};
-
-        return {
-          id: userId,
-          role: "admin",
-          email: userEmail,
-          username: meta.name || userEmail.split("@")[0],
-          first_name: meta.full_name?.split(" ")[0] || "Admin",
-          last_name: meta.full_name?.split(" ")[1] || "User",
-          avatar_url: meta.avatar_url || meta.picture || null, // Keep the Google picture!
-        };
+      // Fallback: If DB fails, check Admin allowlist
+      if (sessionUser?.email && ADMIN_EMAILS.includes(sessionUser.email)) {
+        return { role: "admin" };
       }
-
       return null;
     }
   };
@@ -85,35 +88,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     let mounted = true;
 
-    // 1. Handle Auth State Changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
 
       if (event === "SIGNED_IN" && session?.user) {
-        const profile = await fetchProfileSafe(session.user.id, session.user);
+        // 1. INSTANT: Set user from session metadata
+        const instantUser = getUserFromSession(session.user);
+        setUser(instantUser);
+        setLoading(false); // Unblock the UI immediately
 
-        if (mounted) {
-          // Merge Session Data with Profile Data
-          const mergedUser = {
-            ...session.user,
-            // Default to metadata avatar if profile is missing one
-            avatar_url: session.user.user_metadata?.avatar_url,
-            ...(profile || {}),
-          };
-          setUser(mergedUser);
-          setLoading(false);
+        // 2. BACKGROUND: Fetch DB profile to update roles/details
+        const dbProfile = await fetchProfileSafe(session.user.id, session.user);
+
+        if (mounted && dbProfile) {
+          // Merge DB data on top of session data
+          setUser((prev) => ({ ...prev, ...instantUser, ...dbProfile }));
         }
       } else if (event === "SIGNED_OUT") {
-        if (mounted) {
-          setUser(null);
-          setLoading(false);
-        }
+        setUser(null);
+        setLoading(false);
       }
     });
 
-    // 2. Initial Load
+    // Initial Load Logic
     const initSession = async () => {
       try {
         const {
@@ -121,20 +120,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         } = await supabase.auth.getSession();
 
         if (session?.user) {
-          const profile = await fetchProfileSafe(session.user.id, session.user);
-
+          // 1. INSTANT
+          const instantUser = getUserFromSession(session.user);
           if (mounted) {
-            const mergedUser = {
-              ...session.user,
-              avatar_url: session.user.user_metadata?.avatar_url,
-              ...(profile || {}),
-            };
-            setUser(mergedUser);
+            setUser(instantUser);
+            setLoading(false);
           }
+
+          // 2. BACKGROUND
+          const dbProfile = await fetchProfileSafe(
+            session.user.id,
+            session.user
+          );
+          if (mounted && dbProfile) {
+            setUser((prev) => ({ ...prev, ...instantUser, ...dbProfile }));
+          }
+        } else {
+          if (mounted) setLoading(false);
         }
       } catch (error) {
         console.error("Session check error:", error);
-      } finally {
         if (mounted) setLoading(false);
       }
     };
@@ -157,8 +162,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       data: { session },
     } = await supabase.auth.getSession();
     if (session?.user) {
-      const profile = await fetchProfileSafe(session.user.id, session.user);
-      if (profile) setUser({ ...session.user, ...profile });
+      // Re-run the instant + background sync
+      const instantUser = getUserFromSession(session.user);
+      setUser(instantUser);
+
+      const dbProfile = await fetchProfileSafe(session.user.id, session.user);
+      if (dbProfile) {
+        setUser({ ...instantUser, ...dbProfile });
+      }
     }
   };
 

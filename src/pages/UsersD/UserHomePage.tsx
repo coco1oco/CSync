@@ -5,7 +5,7 @@ import { useAuth } from "@/context/authContext";
 import type { OutreachEvent } from "@/types";
 import { EventCard } from "@/components/EventCard";
 import { Button } from "@/components/ui/button";
-import { Heart, MessageCircle, Plus } from "lucide-react";
+import { Heart, MessageCircle, Plus, Loader2 } from "lucide-react";
 
 export function UserHomePage() {
   const { user } = useAuth();
@@ -14,45 +14,52 @@ export function UserHomePage() {
   const [events, setEvents] = useState<OutreachEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Real interaction state (Client-side only for demo)
-  // Starts empty (0 likes), toggles to true (1 like) on click
+  // Interaction states
   const [likedEvents, setLikedEvents] = useState<{ [key: string]: boolean }>(
     {}
   );
+  const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
 
   const isAdmin = (user as any)?.role === "admin";
 
   useEffect(() => {
-    async function fetchEvents() {
-      try {
-        const { data, error } = await supabase
-          .from("outreach_events")
-          .select("*, admin:profiles(id, username, avatar_url)")
-          .order("created_at", { ascending: false });
-
-        if (!error && data) {
-          setEvents(data as OutreachEvent[]);
-        }
-      } catch (err) {
-        console.error("Error fetching events:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
     fetchEvents();
   }, []);
 
-  const handleDelete = async (eventId: string) => {
-    if (!confirm("Are you sure you want to delete this post?")) return;
+  const fetchEvents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("outreach_events")
+        .select("*, admin:profiles(id, username, avatar_url)")
+        .order("created_at", { ascending: false });
+
+      if (!error && data) {
+        setEvents(data as OutreachEvent[]);
+      }
+    } catch (err) {
+      console.error("Error fetching events:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteEventId) return;
+
     try {
       const { error } = await supabase
         .from("outreach_events")
         .delete()
-        .eq("id", eventId);
+        .eq("id", deleteEventId);
+
       if (!error) {
-        setEvents(events.filter((e) => e.id !== eventId));
+        setEvents((prev) => prev.filter((e) => e.id !== deleteEventId));
+        setDeleteEventId(null);
+      } else {
+        throw error;
       }
     } catch (err) {
+      console.error("Delete failed:", err);
       alert("Failed to delete post");
     }
   };
@@ -61,29 +68,38 @@ export function UserHomePage() {
     setLikedEvents((prev) => ({ ...prev, [eventId]: !prev[eventId] }));
   };
 
-  if (loading)
-    return <div className="p-8 text-center text-gray-400">Loading feed...</div>;
+  if (loading) {
+    return (
+      <div className="flex justify-center pt-20">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-gray-50 min-h-screen pb-24">
-      {/* 1. Header (Mobile Only) - Keeps it clean */}
-      <div className="lg:hidden sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 py-3 flex items-center justify-between">
-        <h1 className="text-lg font-bold text-gray-900">Community Feed</h1>
-      </div>
-
-      {/* 2. Desktop Title */}
-      <div className="hidden lg:block px-4 pt-6 pb-4">
+    <div className="space-y-4">
+      {/* 1. Desktop Title (Hidden on mobile) */}
+      <div className="hidden lg:flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-blue-950">Community Feed</h1>
+        {isAdmin && (
+          <Button
+            onClick={() => navigate("/admin/events/create")}
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-full"
+          >
+            <Plus className="w-4 h-4 mr-2" /> New Post
+          </Button>
+        )}
       </div>
 
-      {/* 3. Empty State */}
+      {/* 2. Empty State */}
       {events.length === 0 && (
-        <div className="mx-4 mt-8 text-center py-12 border-2 border-dashed border-gray-200 rounded-3xl bg-white">
-          <p className="text-gray-500 text-sm mb-4">No posts yet</p>
+        <div className="text-center py-20 bg-white lg:rounded-2xl border-2 border-dashed border-gray-100 mx-4 lg:mx-0">
+          <p className="text-gray-500 font-medium">No posts yet</p>
           {isAdmin && (
             <Button
               onClick={() => navigate("/admin/events/create")}
-              variant="outline"
+              variant="link"
+              className="mt-2 text-blue-600"
             >
               Create the first post
             </Button>
@@ -91,23 +107,22 @@ export function UserHomePage() {
         </div>
       )}
 
-      {/* 4. Feed List */}
-      <div className="space-y-3 lg:space-y-6 px-0 lg:px-4">
+      {/* 3. Feed List */}
+      <div className="flex flex-col gap-4 lg:gap-6">
         {events.map((event) => (
           <div
             key={event.id}
-            className="bg-white border-y border-gray-100 lg:border lg:rounded-2xl shadow-sm overflow-hidden"
+            className="bg-white shadow-sm lg:rounded-2xl overflow-hidden border-y border-gray-100 lg:border"
           >
             <EventCard
               event={event}
               isAdmin={isAdmin}
               onEdit={() => navigate(`/admin/events/edit/${event.id}`)}
-              onDelete={() => handleDelete(event.id)}
+              onDelete={() => setDeleteEventId(event.id)}
             />
 
-            {/* Action Bar (Real Data) */}
+            {/* Actions Footer */}
             <div className="px-4 py-3 border-t border-gray-50 flex items-center gap-6">
-              {/* Like Button */}
               <button
                 onClick={() => handleLike(event.id)}
                 className={`flex items-center gap-2 text-sm font-medium transition-colors ${
@@ -121,29 +136,55 @@ export function UserHomePage() {
                     likedEvents[event.id] ? "fill-current" : ""
                   }`}
                 />
-                {/* Real Data: 0 or 1 */}
-                <span>{likedEvents[event.id] ? 1 : 0}</span>
+                <span>{likedEvents[event.id] ? "1" : "Like"}</span>
               </button>
 
-              {/* Comment Button (Always 0 for demo) */}
               <button className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors">
                 <MessageCircle className="w-5 h-5" />
-                <span>0</span>
+                <span>Comment</span>
               </button>
             </div>
           </div>
         ))}
       </div>
 
-      {/* 5. Floating Action Button (FAB) - The "Blue Button at the side" */}
-      {/* Shows on both Mobile (bottom right above nav) and Desktop */}
+      {/* 4. FAB (Mobile Only - Admin) */}
       {isAdmin && (
         <Button
           onClick={() => navigate("/admin/events/create")}
-          className="fixed bottom-24 right-5 lg:bottom-10 lg:right-10 h-14 w-14 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-xl flex items-center justify-center z-40 transition-transform active:scale-95"
+          className="lg:hidden fixed bottom-24 right-4 h-14 w-14 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-xl flex items-center justify-center z-50"
         >
-          <Plus className="h-7 w-7" />
+          <Plus className="h-6 w-6" />
         </Button>
+      )}
+
+      {/* 5. Delete Modal */}
+      {deleteEventId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-white rounded-2xl p-6 shadow-2xl scale-100">
+            <h2 className="text-xl font-bold text-gray-900 mb-2">
+              Delete Post?
+            </h2>
+            <p className="text-gray-600 text-sm mb-6">
+              This action cannot be undone. This post will be removed from the
+              feed.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteEventId(null)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 transition-colors shadow-sm"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

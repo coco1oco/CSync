@@ -7,157 +7,116 @@ import { Button } from "@/components/ui/button";
 import { Plus, Heart, MessageCircle, Loader2 } from "lucide-react";
 
 export function AdminHomePage() {
-  const [events, setEvents] = useState<OutreachEvent[]>([]);
-  const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-
-  // New refreshing state
-  const [refreshing, setRefreshing] = useState(false);
-
-  // Stats state
-  const [likeCounts, setLikeCounts] = useState<{ [key: string]: number }>({});
-  const [commentCounts, setCommentCounts] = useState<{ [key: string]: number }>(
-    {}
-  );
-
   const navigate = useNavigate();
+  const [events, setEvents] = useState<OutreachEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
 
-  // Reusable function to fetch events
-  const loadEvents = async () => {
-    setRefreshing(true);
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+  // Use simple counts for demo stats
+  const [stats, setStats] = useState<{
+    [key: string]: { likes: number; comments: number };
+  }>({});
 
-      if (user) {
-        setCurrentUserId(user.id);
-
-        const { data, error } = await supabase
-          .from("outreach_events")
-          .select("*, admin:profiles(id, username, avatar_url)")
-          .eq("admin_id", user.id)
-          .order("created_at", { ascending: false });
-
-        if (!error && data) {
-          setEvents(data as OutreachEvent[]);
-
-          const counts: { [key: string]: number } = {};
-          const comments: { [key: string]: number } = {};
-          data.forEach((event) => {
-            counts[event.id] = Math.floor(Math.random() * 50) + 1;
-            comments[event.id] = Math.floor(Math.random() * 10);
-          });
-          setLikeCounts(counts);
-          setCommentCounts(comments);
-        }
-      }
-    } catch (err) {
-      console.error("Error loading events:", err);
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  // Initial load
   useEffect(() => {
     loadEvents();
   }, []);
 
-  const handleDelete = async (eventId: string) => {
+  const loadEvents = async () => {
+    setLoading(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("outreach_events")
+        .select("*, admin:profiles(id, username, avatar_url)")
+        .eq("admin_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (!error && data) {
+        setEvents(data as OutreachEvent[]);
+
+        // Generate random stats
+        const newStats: any = {};
+        data.forEach((e) => {
+          newStats[e.id] = {
+            likes: Math.floor(Math.random() * 50),
+            comments: Math.floor(Math.random() * 10),
+          };
+        });
+        setStats(newStats);
+      }
+    } catch (err) {
+      console.error("Error loading events:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteEventId) return;
     try {
       const { error } = await supabase
         .from("outreach_events")
         .delete()
-        .eq("id", eventId)
-        .eq("admin_id", currentUserId);
+        .eq("id", deleteEventId);
 
       if (!error) {
-        setEvents(events.filter((e) => e.id !== eventId));
+        setEvents((prev) => prev.filter((e) => e.id !== deleteEventId));
         setDeleteEventId(null);
       }
     } catch (err) {
-      console.error("Error deleting event:", err);
-      alert("Failed to delete post");
+      alert("Failed to delete");
     }
   };
 
-  return (
-    <div className="bg-gray-50 min-h-screen pb-24 lg:pb-8 lg:space-y-6">
-      {/* 1. Page Title & Refresh Button (Desktop Only) */}
-      <div className="hidden lg:flex items-center justify-between px-2 pt-2">
-        <h1 className="text-2xl font-bold text-blue-950">Admin Dashboard</h1>
-
-        <button
-          onClick={loadEvents}
-          disabled={refreshing}
-          className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all"
-          title="Refresh Feed"
-        >
-          {refreshing ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
-          ) : (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-              <path d="M3 3v5h5" />
-              <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-              <path d="M16 21h5v-5" />
-            </svg>
-          )}
-        </button>
+  if (loading) {
+    return (
+      <div className="flex justify-center pt-20">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
       </div>
+    );
+  }
 
-      {/* 2. Admin Actions Banner (Desktop Only) */}
-      <div className="hidden lg:flex mx-2 bg-blue-50 border border-blue-100 rounded-2xl p-4 items-center justify-between shadow-sm">
+  return (
+    <div className="space-y-6">
+      {/* 1. Header Area */}
+      <div className="hidden lg:flex items-center justify-between">
         <div>
-          <h3 className="font-bold text-blue-900 text-sm">
-            Create New Content
-          </h3>
-          <p className="text-xs text-blue-600">
-            Post updates for the community
+          <h1 className="text-2xl font-bold text-blue-950">Admin Dashboard</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Manage your posts and community updates
           </p>
         </div>
         <Button
           onClick={() => navigate("/admin/events/create")}
-          size="sm"
-          className="bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md text-xs h-8"
+          className="bg-blue-600 hover:bg-blue-700 rounded-full"
         >
-          <Plus className="mr-1.5 h-3.5 w-3.5" /> Create
+          <Plus className="w-4 h-4 mr-2" /> Create Post
         </Button>
       </div>
 
-      {/* 3. Empty State */}
-      {events.length === 0 && !refreshing && (
-        <div className="mx-4 mt-8 text-center py-12 border-2 border-dashed border-gray-200 rounded-3xl bg-white lg:bg-gray-50">
-          <p className="text-gray-500 text-sm mb-4">
-            You haven't posted anything yet.
-          </p>
+      {/* 2. Empty State */}
+      {events.length === 0 && (
+        <div className="text-center py-16 bg-white lg:rounded-2xl border-2 border-dashed border-gray-200 mx-4 lg:mx-0">
+          <p className="text-gray-500 mb-4">You haven't posted anything yet.</p>
           <Button
-            onClick={() => navigate("/admin/events/create")}
             variant="outline"
-            className="rounded-full"
+            onClick={() => navigate("/admin/events/create")}
           >
-            Create Your First Post
+            Create your first post
           </Button>
         </div>
       )}
 
-      {/* 4. Events List */}
-      <div className="space-y-0 lg:space-y-4">
+      {/* 3. Post List */}
+      <div className="flex flex-col gap-4 lg:gap-6">
         {events.map((event) => (
           <div
             key={event.id}
-            className="bg-white border-b border-gray-100 lg:border lg:rounded-2xl lg:mx-2 lg:shadow-sm"
+            className="bg-white shadow-sm lg:rounded-2xl overflow-hidden border-y border-gray-100 lg:border"
           >
             <EventCard
               event={event}
@@ -165,48 +124,49 @@ export function AdminHomePage() {
               onEdit={() => navigate(`/admin/events/edit/${event.id}`)}
               onDelete={() => setDeleteEventId(event.id)}
             />
-
-            {/* Engagement Stats */}
-            <div className="px-4 pb-3 pt-2 flex gap-6 text-sm text-gray-500">
+            {/* Stats Footer */}
+            <div className="px-4 py-3 bg-gray-50/50 border-t border-gray-50 flex gap-6 text-xs font-semibold text-gray-500">
               <div className="flex items-center gap-1.5">
-                <Heart className="h-5 w-5" /> {likeCounts[event.id] || 0}
+                <Heart className="w-4 h-4 text-gray-400" />
+                {stats[event.id]?.likes || 0} Likes
               </div>
               <div className="flex items-center gap-1.5">
-                <MessageCircle className="h-5 w-5" />{" "}
-                {commentCounts[event.id] || 0}
+                <MessageCircle className="w-4 h-4 text-gray-400" />
+                {stats[event.id]?.comments || 0} Comments
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* 5. Floating Create Button (Mobile Only) */}
+      {/* 4. FAB (Mobile Only) */}
       <Button
         onClick={() => navigate("/admin/events/create")}
-        className="fixed bottom-24 right-5 h-14 w-14 rounded-full shadow-lg hover:shadow-xl bg-blue-600 hover:bg-blue-700 text-white z-40 flex items-center justify-center lg:hidden"
-        size="icon"
+        className="lg:hidden fixed bottom-24 right-4 h-14 w-14 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-xl flex items-center justify-center z-50"
       >
-        <Plus className="h-7 w-7" />
+        <Plus className="h-6 w-6" />
       </Button>
 
-      {/* Delete Confirmation Modal */}
+      {/* 5. Delete Modal */}
       {deleteEventId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl animate-in zoom-in-95">
-            <h2 className="text-lg font-bold text-gray-900">Delete Post?</h2>
-            <p className="mt-2 text-sm text-gray-600">
-              Are you sure? This action cannot be undone.
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-white rounded-2xl p-6 shadow-2xl scale-100">
+            <h2 className="text-xl font-bold text-gray-900 mb-2">
+              Delete Post?
+            </h2>
+            <p className="text-gray-600 text-sm mb-6">
+              This action cannot be undone.
             </p>
-            <div className="mt-6 flex gap-3">
+            <div className="flex gap-3">
               <button
                 onClick={() => setDeleteEventId(null)}
-                className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={() => deleteEventId && handleDelete(deleteEventId)}
-                className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
+                onClick={handleDelete}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 transition-colors shadow-sm"
               >
                 Delete
               </button>
