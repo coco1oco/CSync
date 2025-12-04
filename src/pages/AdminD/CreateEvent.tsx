@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
@@ -12,7 +13,7 @@ import {
   User,
 } from "lucide-react";
 import { useAuth } from "@/context/authContext";
-import { motion } from "framer-motion"; // ✅ Added for smooth animations
+import { motion } from "framer-motion";
 
 export default function CreateEvent() {
   const navigate = useNavigate();
@@ -28,6 +29,12 @@ export default function CreateEvent() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Track if the avatar fails to load so we can show the icon instead
+  const [avatarError, setAvatarError] = useState(false);
+
+  // Robust avatar check: Try Profile DB first, then Auth Metadata (Google), then fallback
+  const avatarUrl = user?.avatar_url || user?.user_metadata?.avatar_url;
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -72,33 +79,30 @@ export default function CreateEvent() {
 
       if (insertError) throw insertError;
 
-      // ✅ ADDED DELAY: Wait 800ms to let the slow DB catch up
       setTimeout(() => {
         navigate("/AdminDashboard");
       }, 800);
     } catch (err: any) {
       console.error("Error creating post:", err);
       setError(err.message || "Failed to create post");
-      setLoading(false); // Only stop loading on error
+      setLoading(false);
     }
   };
 
-  return (
-    // OUTER CONTAINER: Handles positioning and z-index
-    <div className="fixed inset-0 z-50 flex items-center justify-center lg:p-4">
-      {/* 1. BACKDROP (Desktop Only) - Fades in */}
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center lg:p-4 isolate">
+      {/* 1. BACKDROP */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm hidden lg:block"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={() => navigate(-1)}
       />
 
-      {/* 2. CARD CONTAINER - Animated Entry */}
+      {/* 2. CARD CONTAINER */}
       <motion.div
-        // Mobile: Slide up from bottom | Desktop: Fade in + Scale up
         initial={{ y: "100%", opacity: 0, scale: 0.95 }}
         animate={{ y: 0, opacity: 1, scale: 1 }}
         exit={{ y: "100%", opacity: 0, scale: 0.95 }}
@@ -130,14 +134,18 @@ export default function CreateEvent() {
         {/* SCROLLABLE CONTENT */}
         <div className="flex-1 overflow-y-auto">
           <div className="flex px-4 py-6 gap-3">
-            {/* User Avatar */}
+            {/* User Avatar (FIXED) */}
             <div className="shrink-0">
               <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 border border-gray-100 flex items-center justify-center">
-                {user?.avatar_url ? (
+                {avatarUrl && !avatarError ? (
                   <img
-                    src={user.avatar_url}
-                    alt={user.username || "User"}
+                    src={avatarUrl}
+                    alt={user?.username || "User"}
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      setAvatarError(true);
+                      console.warn("Avatar failed to load:", e);
+                    }}
                   />
                 ) : (
                   <User className="text-gray-400 w-6 h-6" />
@@ -246,6 +254,7 @@ export default function CreateEvent() {
           />
         </div>
       </motion.div>
-    </div>
+    </div>,
+    document.body
   );
 }

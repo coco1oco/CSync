@@ -1,49 +1,56 @@
-import { Outlet, Navigate, useLocation } from "react-router-dom"; // Added useLocation
+import { Outlet, Navigate, useLocation } from "react-router-dom";
 import { BottomNavigation } from "./BottomNavigation";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { useAuth } from "@/context/authContext";
-import { motion, AnimatePresence } from "framer-motion"; // <--- IMPORT THIS
+import { motion, AnimatePresence } from "framer-motion";
+import { Loader2 } from "lucide-react";
 
 export default function AppLayout() {
   const { user, loading } = useAuth();
-  const location = useLocation(); // <--- Need this to track page changes
+  const location = useLocation();
 
-  // Default role fallback
   const userRole = (user as any)?.role || "member";
 
   if (loading)
     return (
-      <div className="flex h-screen items-center justify-center bg-white">
-        Loading...
+      <div className="flex h-screen items-center justify-center bg-gray-50">
+        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
       </div>
     );
   if (!user) return <Navigate to="/SignIn" replace />;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row">
+      {/* SIDEBAR (Desktop) */}
       <Sidebar userRole={userRole} />
 
-      <div className="lg:hidden">
-        <Header showProfile={true} />
+      {/* MAIN CONTENT WRAPPER */}
+      <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
+        {/* HEADER (Mobile) */}
+        <div className="lg:hidden sticky top-0 z-40">
+          <Header showProfile={true} />
+        </div>
+
+        {/* MAIN SCROLLABLE AREA */}
+        {/* Changed max-w-4xl to max-w-2xl for tighter feed */}
+        <main className="flex-1 px-0 pb-24 lg:pb-8 lg:px-8 lg:pt-8 w-full max-w-2xl mx-auto">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              className="h-full"
+            >
+              <Outlet />
+            </motion.div>
+          </AnimatePresence>
+        </main>
       </div>
 
-      <main className="lg:ml-64 min-h-screen pb-24 lg:pb-8 px-4 pt-4 lg:px-8 lg:pt-8 max-w-5xl mx-auto">
-        {/* 🚀 THE ANIMATION MAGIC */}
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={location.pathname} // This tells Framer "The page changed!"
-            initial={{ opacity: 0, y: 5 }} // Start slightly lower and transparent
-            animate={{ opacity: 1, y: 0 }} // Fade in and slide up
-            exit={{ opacity: 0, y: -5 }} // Fade out and slide up slightly
-            transition={{ duration: 0.2 }} // Fast (200ms) so it feels snappy
-            className="h-full"
-          >
-            <Outlet />
-          </motion.div>
-        </AnimatePresence>
-      </main>
-
+      {/* BOTTOM NAV (Mobile) */}
       <div className="lg:hidden">
         <BottomNavigation userRole={userRole} />
       </div>
