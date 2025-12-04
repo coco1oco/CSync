@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/authContext";
 import type { OutreachEvent } from "@/types";
-import { EventCard } from "@/components/EventCard";
+import { FeedPost } from "@/components/FeedPost"; // ✅ Import the new component
 import { Button } from "@/components/ui/button";
-import { Heart, MessageCircle, Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 
 export function UserHomePage() {
   const { user } = useAuth();
@@ -13,11 +13,6 @@ export function UserHomePage() {
 
   const [events, setEvents] = useState<OutreachEvent[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Interaction states
-  const [likedEvents, setLikedEvents] = useState<{ [key: string]: boolean }>(
-    {}
-  );
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
 
   const isAdmin = (user as any)?.role === "admin";
@@ -64,10 +59,6 @@ export function UserHomePage() {
     }
   };
 
-  const handleLike = (eventId: string) => {
-    setLikedEvents((prev) => ({ ...prev, [eventId]: !prev[eventId] }));
-  };
-
   if (loading) {
     return (
       <div className="flex justify-center pt-20">
@@ -78,7 +69,7 @@ export function UserHomePage() {
 
   return (
     <div className="space-y-4">
-      {/* 1. Desktop Title (Hidden on mobile) */}
+      {/* Desktop Title */}
       <div className="hidden lg:flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-blue-950">Community Feed</h1>
         {isAdmin && (
@@ -91,7 +82,7 @@ export function UserHomePage() {
         )}
       </div>
 
-      {/* 2. Empty State */}
+      {/* Empty State */}
       {events.length === 0 && (
         <div className="text-center py-20 bg-white lg:rounded-2xl border-2 border-dashed border-gray-100 mx-4 lg:mx-0">
           <p className="text-gray-500 font-medium">No posts yet</p>
@@ -107,48 +98,20 @@ export function UserHomePage() {
         </div>
       )}
 
-      {/* 3. Feed List */}
-      <div className="flex flex-col gap-4 lg:gap-6">
+      {/* Feed List - Now using FeedPost */}
+      <div className="flex flex-col">
         {events.map((event) => (
-          <div
+          <FeedPost
             key={event.id}
-            className="bg-white shadow-sm lg:rounded-2xl overflow-hidden border-y border-gray-100 lg:border"
-          >
-            <EventCard
-              event={event}
-              isAdmin={isAdmin}
-              onEdit={() => navigate(`/admin/events/edit/${event.id}`)}
-              onDelete={() => setDeleteEventId(event.id)}
-            />
-
-            {/* Actions Footer */}
-            <div className="px-4 py-3 border-t border-gray-50 flex items-center gap-6">
-              <button
-                onClick={() => handleLike(event.id)}
-                className={`flex items-center gap-2 text-sm font-medium transition-colors ${
-                  likedEvents[event.id]
-                    ? "text-pink-600"
-                    : "text-gray-500 hover:text-gray-900"
-                }`}
-              >
-                <Heart
-                  className={`w-5 h-5 ${
-                    likedEvents[event.id] ? "fill-current" : ""
-                  }`}
-                />
-                <span>{likedEvents[event.id] ? "1" : "Like"}</span>
-              </button>
-
-              <button className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors">
-                <MessageCircle className="w-5 h-5" />
-                <span>Comment</span>
-              </button>
-            </div>
-          </div>
+            event={event}
+            isAdmin={isAdmin}
+            onEdit={() => navigate(`/admin/events/edit/${event.id}`)}
+            onDelete={() => setDeleteEventId(event.id)}
+          />
         ))}
       </div>
 
-      {/* 4. FAB (Mobile Only - Admin) */}
+      {/* FAB (Mobile Only - Admin) */}
       {isAdmin && (
         <Button
           onClick={() => navigate("/admin/events/create")}
@@ -158,9 +121,9 @@ export function UserHomePage() {
         </Button>
       )}
 
-      {/* 5. Delete Modal */}
+      {/* Delete Modal */}
       {deleteEventId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-sm bg-white rounded-2xl p-6 shadow-2xl scale-100">
             <h2 className="text-xl font-bold text-gray-900 mb-2">
               Delete Post?

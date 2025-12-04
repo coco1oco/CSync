@@ -1,53 +1,31 @@
 import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/authContext";
+import { Button } from "@/components/ui/button";
+import { LogOut } from "lucide-react";
 import FailedImageIcon from "@/assets/FailedImage.svg";
-import type { UserProfile } from "@/types";
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
 
 export default function ProfilePage() {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [needsCompletion, setNeedsCompletion] = useState(false);
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    const loadProfile = async () => {
-      setLoading(true);
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-      if (userError || !user) {
-        setLoading(false);
-        return;
-      }
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate("/SignIn");
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
 
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .maybeSingle();
+  if (!user) return null;
 
-      if (data) {
-        const p = data as UserProfile;
-        setProfile(p);
-        setNeedsCompletion(!p.first_name || !p.last_name);
-      }
-      setLoading(false);
-    };
-    loadProfile();
-  }, []);
-
-  if (loading)
-    return <p className="p-4 text-center text-gray-500">Loading...</p>;
-  if (!profile)
-    return <p className="p-4 text-center text-gray-500">No profile found</p>;
+  // Check if profile is complete
+  const needsCompletion = !user.first_name || !user.last_name;
 
   return (
-    <div className="space-y-6">
-      {/* Removed Sticky Header - AppLayout handles navigation */}
-
-      {/* Simple Page Title */}
-      <h1 className="text-2xl font-bold text-gray-900 px-2">My Profile</h1>
+    <div className="space-y-6 pb-20 pt-6 px-4">
+      {/* Page Title */}
+      <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
 
       {/* Banner if incomplete */}
       {needsCompletion && (
@@ -59,9 +37,9 @@ export default function ProfilePage() {
       {/* Profile Card */}
       <div className="flex flex-col items-center space-y-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
         <div className="relative">
-          <div className="w-24 h-24 rounded-full bg-gray-100 p-1 overflow-hidden">
+          <div className="w-24 h-24 rounded-full bg-gray-100 p-1 overflow-hidden border border-gray-200">
             <img
-              src={profile.avatar_url || FailedImageIcon}
+              src={user.avatar_url || FailedImageIcon}
               alt="Profile"
               className="w-full h-full rounded-full object-cover"
             />
@@ -70,30 +48,42 @@ export default function ProfilePage() {
 
         <div className="text-center space-y-1">
           <h2 className="text-xl font-bold text-gray-900">
-            {profile.first_name} {profile.last_name}
+            {user.first_name} {user.last_name}
           </h2>
-          <p className="text-sm text-gray-500 font-medium">
-            @{profile.username}
-          </p>
-          <p className="text-xs text-gray-400">{profile.pronouns}</p>
+          <p className="text-sm text-gray-500 font-medium">@{user.username}</p>
+          {user.pronouns && (
+            <p className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-full inline-block">
+              {user.pronouns}
+            </p>
+          )}
         </div>
 
         <div className="text-center space-y-1 w-full border-t border-gray-50 pt-4">
-          <p className="text-sm text-gray-600">{profile.email}</p>
+          <p className="text-sm text-gray-600">{user.email}</p>
           <p className="text-sm text-gray-500 italic">
-            {profile.bio || "No bio yet"}
+            {user.bio || "No bio yet"}
           </p>
         </div>
 
-        <Link
-          to="/ProfilePage/Edit"
-          className="w-full block text-center bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm font-bold py-3 px-4 rounded-xl transition-colors"
-        >
-          Edit Profile
-        </Link>
-      </div>
+        <div className="w-full space-y-3 pt-2">
+          <Link
+            to="/ProfilePage/Edit"
+            className="w-full block text-center bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm font-bold py-3 px-4 rounded-xl transition-colors"
+          >
+            Edit Profile
+          </Link>
 
-      {/* Removed <BottomNavigation /> - AppLayout handles it */}
+          {/* Sign Out Button - Hidden on Desktop (lg:hidden) */}
+          <Button
+            variant="ghost"
+            onClick={handleSignOut}
+            className="w-full lg:hidden text-red-600 hover:text-red-700 hover:bg-red-50 h-12 rounded-xl flex items-center justify-center gap-2 border border-transparent hover:border-red-100"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign Out
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
