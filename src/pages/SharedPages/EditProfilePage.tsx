@@ -1,5 +1,5 @@
 import { useAuth } from "@/context/authContext";
-import { useState, useEffect } from "react"; // Added useEffect
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Camera, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,7 +34,6 @@ export default function EditProfilePage() {
     "he/they",
   ];
 
-  // ✅ FIX: This effect runs when 'user' loads to populate the form
   useEffect(() => {
     if (user) {
       setFirstName(user.first_name || "");
@@ -75,7 +74,6 @@ export default function EditProfilePage() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Upload failed";
       setError(errorMessage);
-      // Revert if failed
       setAvatarUrl(user?.avatar_url || "");
     } finally {
       setIsUploadingImage(false);
@@ -111,9 +109,10 @@ export default function EditProfilePage() {
   };
 
   return (
-    <div className="-mt-4 -mx-4 lg:-mt-8 lg:-mx-8 min-h-screen bg-white flex flex-col relative pb-20">
+    // ✅ FIX: Removed negative margins (-mt-4) and added proper spacing
+    <div className="min-h-screen bg-white flex flex-col relative pb-20 mt-2">
       {/* === HEADER === */}
-      <header className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 bg-white/90 backdrop-blur-md border-b border-gray-100">
+      <header className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 bg-white/95 backdrop-blur-md border-b border-gray-100">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate(-1)}

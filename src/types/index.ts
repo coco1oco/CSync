@@ -1,7 +1,4 @@
-// src/types/index.ts
-// All TypeScript interfaces in one place
-
-export type UserRole = 'user' | 'admin';
+export type UserRole = "user" | "admin";
 
 export interface UserProfile {
   id: string;
@@ -13,6 +10,16 @@ export interface UserProfile {
   last_name: string | null;
   bio: string | null;
   pronouns: string | null;
+}
+
+// ✅ NEW: Comment Interface
+export interface Comment {
+  id: string;
+  user_id: string;
+  event_id: string;
+  content: string;
+  created_at: string;
+  user?: UserProfile; // We will join the profile data here
 }
 
 export interface OutreachEvent {
@@ -33,8 +40,6 @@ export type UpdateProfilePayload = {
   bio?: string;
   avatar_url?: string;
   pronouns?: string;
-  first_name?:string;
-  last_name?:  string;
-
+  first_name?: string;
+  last_name?: string;
 };
-
