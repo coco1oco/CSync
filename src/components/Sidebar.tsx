@@ -1,3 +1,4 @@
+import { useState } from "react"; // ✅ Import useState
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Home,
@@ -6,6 +7,7 @@ import {
   PawPrint,
   LogOut,
   User,
+  Loader2, // ✅ Import Loader2
 } from "lucide-react";
 import { useAuth } from "@/context/authContext";
 import logo from "@/assets/images/Pawpal.svg";
@@ -19,6 +21,7 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut } = useAuth();
+  const [isSigningOut, setIsSigningOut] = useState(false); // ✅ Local loading state
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -34,8 +37,14 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
   ];
 
   const handleSignOut = async () => {
-    await signOut();
-    navigate("/SignIn");
+    setIsSigningOut(true); // ✅ Start loading immediately
+    try {
+      await signOut();
+      navigate("/SignIn");
+    } catch (error) {
+      console.error("Sign out failed", error);
+      setIsSigningOut(false); // Stop loading only if it fails
+    }
   };
 
   return (
@@ -85,10 +94,15 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
 
         <button
           onClick={handleSignOut}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-full text-red-500 hover:bg-red-50 transition-all font-medium"
+          disabled={isSigningOut}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-full text-red-500 hover:bg-red-50 transition-all font-medium disabled:opacity-50"
         >
-          <LogOut size={24} />
-          <span>Sign Out</span>
+          {isSigningOut ? (
+            <Loader2 size={24} className="animate-spin" />
+          ) : (
+            <LogOut size={24} />
+          )}
+          <span>{isSigningOut ? "Signing Out..." : "Sign Out"}</span>
         </button>
       </div>
     </aside>
