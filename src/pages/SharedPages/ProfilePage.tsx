@@ -1,19 +1,23 @@
 import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react"; // ✅ Import useState
 import { useAuth } from "@/context/authContext";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, Loader2 } from "lucide-react"; // ✅ Import Loader2
 import FailedImageIcon from "@/assets/FailedImage.svg";
 
 export default function ProfilePage() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const [isSigningOut, setIsSigningOut] = useState(false); // ✅ Local loading state
 
   const handleSignOut = async () => {
+    setIsSigningOut(true); // ✅ Show loading immediately
     try {
       await signOut();
       navigate("/SignIn");
     } catch (error) {
       console.error("Error signing out:", error);
+      setIsSigningOut(false);
     }
   };
 
@@ -77,10 +81,15 @@ export default function ProfilePage() {
           <Button
             variant="ghost"
             onClick={handleSignOut}
-            className="w-full lg:hidden text-red-600 hover:text-red-700 hover:bg-red-50 h-12 rounded-xl flex items-center justify-center gap-2 border border-transparent hover:border-red-100"
+            disabled={isSigningOut} // ✅ Disable while loading
+            className="w-full lg:hidden text-red-600 hover:text-red-700 hover:bg-red-50 h-12 rounded-xl flex items-center justify-center gap-2 border border-transparent hover:border-red-100 disabled:opacity-70"
           >
-            <LogOut className="w-4 h-4" />
-            Sign Out
+            {isSigningOut ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <LogOut className="w-4 h-4" />
+            )}
+            {isSigningOut ? "Signing Out..." : "Sign Out"}
           </Button>
         </div>
       </div>

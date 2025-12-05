@@ -6,6 +6,7 @@ import {
 import { AuthProvider } from "@/context/authContext";
 import { ProtectedRoute } from "./ProtectedRoute";
 import AppLayout from "@/components/AppLayout";
+import AuthLayout from "@/components/AuthLayout"; // ✅ Import the new layout
 
 // Pages
 import Welcome from "@/pages/Authentication/Welcome";
@@ -18,7 +19,7 @@ import UpdatePassword from "@/pages/Authentication/UpdatePassword";
 import { UserHomePage } from "@/pages/UsersD/UserHomePage";
 import { AdminHomePage } from "@/pages/AdminD/AdminHomePage";
 import CreateEvent from "@/pages/AdminD/CreateEvent";
-import EditEvent from "@/pages/AdminD/EditEvent"; // ✅ IMPORT THIS
+import EditEvent from "@/pages/AdminD/EditEvent";
 import ProfilePage from "@/pages/SharedPages/ProfilePage";
 import MenuPage from "@/pages/SharedPages/MenuPage";
 import EditProfilePage from "@/pages/SharedPages/EditProfilePage";
@@ -29,30 +30,35 @@ import PetProfilePage from "@/pages/PetProfile/PetProfilePage";
 import PetEditProfile from "@/pages/PetProfile/PetEditProfile";
 
 const router = createBrowserRouter([
-  // ... (Public Routes remain unchanged)
+  // --- PUBLIC ROUTES (Wrapped in AuthLayout for animation) ---
   {
-    path: "/welcome",
-    element: <Welcome />,
-  },
-  {
-    path: "/SignIn",
-    element: <SignIn />,
-  },
-  {
-    path: "/SignUp",
-    element: <SignUp />,
-  },
-  {
-    path: "/ForgotPassword",
-    element: <ForgotPassword />,
-  },
-  {
-    path: "/reset-password",
-    element: <UpdatePassword />,
-  },
-  {
-    path: "/unauthorized",
-    element: <Unauthorized />,
+    element: <AuthLayout />, // ✅ Wrap public routes here
+    children: [
+      {
+        path: "/welcome",
+        element: <Welcome />,
+      },
+      {
+        path: "/SignIn",
+        element: <SignIn />,
+      },
+      {
+        path: "/SignUp",
+        element: <SignUp />,
+      },
+      {
+        path: "/ForgotPassword",
+        element: <ForgotPassword />,
+      },
+      {
+        path: "/reset-password",
+        element: <UpdatePassword />,
+      },
+      {
+        path: "/unauthorized",
+        element: <Unauthorized />,
+      },
+    ],
   },
 
   // --- PROTECTED ROUTES ---
@@ -87,7 +93,6 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-      // ✅ NEW EDIT ROUTE
       {
         path: "/admin/events/edit/:id",
         element: (
@@ -127,6 +132,7 @@ const router = createBrowserRouter([
     ],
   },
 
+  // --- FALLBACK ---
   {
     path: "*",
     element: <Navigate to="/welcome" replace />,

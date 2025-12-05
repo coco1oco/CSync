@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { OutreachEvent } from "@/types";
-import { motion, AnimatePresence } from "framer-motion"; // ✅ Import AnimatePresence
+import { motion, AnimatePresence } from "framer-motion";
 
 interface EventCardProps {
   event: OutreachEvent;
@@ -26,7 +26,7 @@ interface EventCardProps {
   onDelete?: () => void;
 }
 
-// ✅ Animation Variants for the slide effect
+// Animation Variants for the slide effect
 const slideVariants = {
   enter: (direction: number) => ({
     x: direction > 0 ? 1000 : -1000,
@@ -44,7 +44,7 @@ const slideVariants = {
   }),
 };
 
-// ✅ Swipe configuration
+// Swipe configuration
 const swipeConfidenceThreshold = 10000;
 const swipePower = (offset: number, velocity: number) => {
   return Math.abs(offset) * velocity;
@@ -56,7 +56,7 @@ export function EventCard({
   onEdit,
   onDelete,
 }: Readonly<EventCardProps>) {
-  const [[page, direction], setPage] = useState([0, 0]); // ✅ Track page and direction tuple
+  const [[page, direction], setPage] = useState([0, 0]);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
@@ -69,7 +69,6 @@ export function EventCard({
     created_at,
   } = event;
 
-  // Derived index from the page state to handle infinite wrapping safely
   const imageIndex = Math.abs(page % images.length);
 
   const paginate = (newDirection: number) => {
@@ -84,6 +83,7 @@ export function EventCard({
   const MAX_LENGTH = 150;
   const shouldTruncate = description && description.length > MAX_LENGTH;
 
+  // Lock body scroll when lightbox is open
   useEffect(() => {
     if (isLightboxOpen) {
       document.body.style.overflow = "hidden";
@@ -124,7 +124,7 @@ export function EventCard({
                 <>
                   <span>•</span>
                   <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                    href={`http://googleusercontent.com/maps.google.com/?q=${encodeURIComponent(
                       location
                     )}`}
                     target="_blank"
@@ -174,13 +174,27 @@ export function EventCard({
           <h3 className="font-bold text-gray-900 text-base mb-1">{title}</h3>
         )}
         <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
+          {/* ✅ CLICK-TO-COLLAPSE LOGIC */}
           {isExpanded || !shouldTruncate ? (
-            description
+            <span
+              onClick={() => {
+                if (shouldTruncate) setIsExpanded(false);
+              }}
+              className={
+                shouldTruncate ? "cursor-pointer active:opacity-70" : ""
+              }
+              title={shouldTruncate ? "Click to collapse" : undefined}
+            >
+              {description}
+            </span>
           ) : (
             <>
               {description.slice(0, MAX_LENGTH)}...
               <button
-                onClick={() => setIsExpanded(true)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsExpanded(true);
+                }}
                 className="text-gray-500 font-semibold hover:underline ml-1 cursor-pointer"
               >
                 See more
@@ -196,9 +210,9 @@ export function EventCard({
           className="mt-2 relative w-full aspect-[4/3] bg-gray-50 overflow-hidden group cursor-pointer"
           onClick={() => setIsLightboxOpen(true)}
         >
-          {/* Ambient Background (Smooth Fade) */}
+          {/* Ambient Background */}
           <motion.div
-            key={images[imageIndex]} // Change key to trigger fade
+            key={images[imageIndex]}
             initial={{ opacity: 0 }}
             animate={{ opacity: 0.6 }}
             transition={{ duration: 0.5 }}
@@ -206,11 +220,11 @@ export function EventCard({
             style={{ backgroundImage: `url(${images[imageIndex]})` }}
           />
 
-          {/* ✅ ANIMATED IMAGE CAROUSEL */}
+          {/* Animated Image Carousel */}
           <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
             <AnimatePresence initial={false} custom={direction}>
               <motion.img
-                key={page} // Key change triggers the animation
+                key={page}
                 src={images[imageIndex]}
                 custom={direction}
                 variants={slideVariants}
@@ -221,16 +235,15 @@ export function EventCard({
                   x: { type: "spring", stiffness: 300, damping: 30 },
                   opacity: { duration: 0.2 },
                 }}
-                // Swipe Logic
                 drag="x"
                 dragConstraints={{ left: 0, right: 0 }}
                 dragElastic={1}
                 onDragEnd={(e, { offset, velocity }) => {
                   const swipe = swipePower(offset.x, velocity.x);
                   if (swipe < -swipeConfidenceThreshold) {
-                    paginate(1); // Next
+                    paginate(1);
                   } else if (swipe > swipeConfidenceThreshold) {
-                    paginate(-1); // Prev
+                    paginate(-1);
                   }
                 }}
                 alt="Event content"
@@ -288,7 +301,6 @@ export function EventCard({
               <X size={28} />
             </button>
 
-            {/* Lightbox also gets the same animation treatment */}
             <div
               className="relative max-w-5xl w-full h-full flex items-center justify-center overflow-hidden"
               onClick={(e) => e.stopPropagation()}
