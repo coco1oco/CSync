@@ -29,6 +29,10 @@ import AddPetPage from "@/pages/PetProfile/AddPetPage";
 import PetProfilePage from "@/pages/PetProfile/PetProfilePage";
 import PetEditProfile from "@/pages/PetProfile/PetEditProfile";
 
+//DUMMY PAGES
+import MessagesPage from "@/pages/Dummy/MessagesPage";
+import NotificationsPage from "@/pages/Dummy/NotificationsPage";
+
 const router = createBrowserRouter([
   // --- PUBLIC ROUTES (Wrapped in AuthLayout for animation) ---
   {
@@ -69,6 +73,16 @@ const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
+      // Dummy Pages for UI/UX Testing
+      {
+        path: "/messages",
+        element: <MessagesPage />,
+      },
+      {
+        path: "/notifications",
+        element: <NotificationsPage />,
+      },
+      // Actual App Routes
       {
         path: "/",
         element: <UserHomePage />,
