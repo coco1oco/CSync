@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient"; // adjust path to your Supabase client
+import { supabase } from "@/lib/supabaseClient";
 
 interface Pet {
   id: string;
@@ -47,8 +47,9 @@ export function usePets(userId: string | undefined) {
     fetchPets();
   }, [userId]);
 
-  // ✅ FIXED: Properly return the inserted pet
-  const addPet = async (petData: Omit<Pet, "id" | "created_at" | "owner_id">) => {
+  const addPet = async (
+    petData: Omit<Pet, "id" | "created_at" | "owner_id">
+  ) => {
     if (!userId) {
       console.error("No user ID available");
       return null;
@@ -63,7 +64,7 @@ export function usePets(userId: string | undefined) {
             ...petData,
           },
         ])
-        .select(); // ✅ Important: select() returns the inserted data
+        .select();
 
       if (error) {
         console.error("Error adding pet:", error);
@@ -72,16 +73,10 @@ export function usePets(userId: string | undefined) {
       }
 
       console.log("Pet added successfully:", data);
-      
-      // ✅ Refetch pets list to show new pet immediately
-      const { data: updatedPets } = await supabase
-        .from("pets")
-        .select("*")
-        .eq("owner_id", userId)
-        .order("created_at", { ascending: false });
-      
-      if (updatedPets) {
-        setPets(updatedPets);
+
+      // ✅ OPTIMIZATION: Update local state immediately without refetching from server
+      if (data && data.length > 0) {
+        setPets((prevPets) => [data[0], ...prevPets]);
       }
 
       return data?.[0] || null;
@@ -103,6 +98,10 @@ export function usePets(userId: string | undefined) {
         setError(error.message);
         return false;
       }
+      // Update local state locally as well for UI consistency (optional but recommended)
+      setPets((prev) =>
+        prev.map((p) => (p.id === petId ? { ...p, ...updates } : p))
+      );
       return true;
     } catch (err) {
       console.error("Unexpected error:", err);
@@ -112,16 +111,15 @@ export function usePets(userId: string | undefined) {
 
   const deletePet = async (petId: string) => {
     try {
-      const { error } = await supabase
-        .from("pets")
-        .delete()
-        .eq("id", petId);
+      const { error } = await supabase.from("pets").delete().eq("id", petId);
 
       if (error) {
         console.error("Error deleting pet:", error);
         setError(error.message);
         return false;
       }
+
+      setPets((prev) => prev.filter((p) => p.id !== petId));
       return true;
     } catch (err) {
       console.error("Unexpected error:", err);

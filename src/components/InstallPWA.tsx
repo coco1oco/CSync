@@ -14,18 +14,12 @@ export default function InstallPWA() {
       "(display-mode: standalone)"
     ).matches;
 
-    // --- TEMPORARY TESTING CHANGE ---
-    // Change this line to 'if (true)' so you can see it on your computer!
-    if (true) {
-      setIsVisible(true);
-    }
-    // --------------------------------
-
-    // ORIGINAL CODE (Save this for later):
+    // ✅ Reverted to production logic: Only show on iOS browsers (not installed)
     if (isIOS && !isStandalone) {
       setIsVisible(true);
     }
   }, []);
+
   if (!isVisible) return null;
 
   return (
@@ -40,7 +34,7 @@ export default function InstallPWA() {
         </button>
 
         <div className="flex items-start gap-4">
-          {/* App Icon Preview (Optional) */}
+          {/* App Icon Preview */}
           <div className="h-12 w-12 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 text-white font-bold shadow-md">
             P
           </div>
