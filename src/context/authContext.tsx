@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useMemo,
+} from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 type UserProfile = {
@@ -34,10 +40,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // --- 🛡️ DEMO CONFIGURATION ---
   const ADMIN_EMAILS = ["kmirafelix@gmail.com", "admin@pawpal.com"];
 
-  // Helper: Extract usable profile data directly from Session Metadata
   const getUserFromSession = (sessionUser: any): UserProfile => {
     const meta = sessionUser.user_metadata || {};
     return {
@@ -53,8 +57,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   };
 
-  // Helper: Fetch authoritative data from DB
-  // Added 'retries' parameter for robustness against Free Tier "Cold Starts"
   const fetchProfileSafe = async (
     userId: string,
     sessionUser: any,
@@ -67,7 +69,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         .eq("id", userId)
         .maybeSingle();
 
-      // INCREASED TIMEOUT: Changed 10000 (10s) to 20000 (20s)
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("Profile fetch timeout")), 20000)
       );
@@ -76,12 +77,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       if (result.error) throw result.error;
 
-      // ✅ EXPANDED FIX: Sync FULL Profile to Session Metadata
-      // This ensures Avatar, Name, and Username persist during DB "Cold Starts"
       const db = result.data;
       const meta = sessionUser.user_metadata || {};
 
-      // Check if key fields differ between DB and Session
       if (db) {
         const needsSync =
           db.role !== meta.role ||
@@ -90,11 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           db.first_name !== meta.first_name;
 
         if (needsSync) {
-          console.log("♻️ Syncing full profile to session cache...", {
-            role: db.role,
-            username: db.username,
-          });
-
+          console.log("♻️ Syncing full profile to session cache...");
           supabase.auth.updateUser({
             data: {
               role: db.role,
@@ -111,29 +105,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       return result.data || null;
     } catch (err) {
-      // NEW: Simple Retry Logic
-      // If the DB was sleeping, the first request might fail/timeout.
-      // We immediately try one more time, which usually succeeds.
       if (retries > 0) {
-        console.log(
-          `Profile fetch failed, retrying... (${retries} attempts left)`
-        );
+        console.log(`Profile fetch failed, retrying...`);
         return fetchProfileSafe(userId, sessionUser, retries - 1);
       }
-
-      console.warn("⚠️ Profile fetch issue:", err);
-
-      // Fallback: If DB fails, check Admin allowlist so they aren't locked out
       if (sessionUser?.email && ADMIN_EMAILS.includes(sessionUser.email)) {
         return { role: "admin" };
       }
       return null;
     }
   };
+
   useEffect(() => {
     let mounted = true;
 
-    // 1. Initial Session Load (Blocking)
     const initSession = async () => {
       try {
         const {
@@ -142,9 +127,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
         if (session?.user) {
           const instantUser = getUserFromSession(session.user);
-
-          // Wait for DB profile before setting loading=false
-          // This prevents the "user" -> "admin" flash/bug
           const dbProfile = await fetchProfileSafe(
             session.user.id,
             session.user
@@ -163,16 +145,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     initSession();
 
-    // 2. Auth State Listener (Real-time updates)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
 
       if (event === "SIGNED_IN" && session?.user) {
-        // On explicit sign-in, we can show the UI faster but still fetch profile
         const instantUser = getUserFromSession(session.user);
-        setUser(instantUser); // Show something immediately
+        setUser(instantUser);
 
         const dbProfile = await fetchProfileSafe(session.user.id, session.user);
         if (mounted && dbProfile) {
@@ -211,9 +191,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  return (
-    <AuthContext.Provider value={{ user, loading, signOut, refreshProfile }}>
-      {children}
-    </AuthContext.Provider>
+  // ✅ Optimization: Memoize the value to prevent unnecessary re-renders in consumers
+  const value = useMemo(
+    () => ({ user, loading, signOut, refreshProfile }),
+    [user, loading]
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
