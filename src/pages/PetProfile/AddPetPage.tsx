@@ -55,7 +55,9 @@ export default function AddPetPage() {
     fileInputRef.current?.click();
   };
 
-  const handlePetImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePetImageChange = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -102,7 +104,9 @@ export default function AddPetPage() {
         breed: formData.breed || null,
         color: formData.color || null,
         sex: formData.sex || null,
-        dob: formData.dob ? new Date(formData.dob).toISOString().split("T")[0] : null,
+        dob: formData.dob
+          ? new Date(formData.dob).toISOString().split("T")[0]
+          : null,
         location: formData.location || null,
         microchip_id: formData.microchip_id || null,
         petimage_url: petImageUrl,
@@ -333,7 +337,11 @@ export default function AddPetPage() {
               disabled={loading || uploading}
               className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-lg transition disabled:opacity-50"
             >
-              {loading ? "Saving..." : uploading ? "Uploading image..." : "Add Pet"}
+              {loading
+                ? "Saving..."
+                : uploading
+                ? "Uploading image..."
+                : "Add Pet"}
             </Button>
           </form>
         </div>

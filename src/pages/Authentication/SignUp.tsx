@@ -1,209 +1,131 @@
-import { useState, useEffect } from "react"; // Combined React imports
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/authContext";
 import { supabase } from "@/lib/supabaseClient";
 
 import logo from "@/assets/images/Pawpal.svg";
 import heroBg from "@/assets/images/hero_2.jpg";
 
+// 1. Define Regex Patterns
+// ✅ CHANGED: Now enforces @cvsu.edu.ph domain
+const CVSU_EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@cvsu\.edu\.ph$/;
+const USERNAME_REGEX = /^[a-zA-Z][a-zA-Z0-9_]{2,15}$/;
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/;
+
+// 2. Define Zod Schema
+const signUpSchema = z
+  .object({
+    email: z
+      .string()
+      .min(1, "Email is required")
+      .email("Invalid email format")
+      // ✅ UPDATED VALIDATION RULE
+      .regex(
+        CVSU_EMAIL_REGEX,
+        "Please use your institutional email (@cvsu.edu.ph)"
+      ),
+    username: z
+      .string()
+      .min(1, "Username is required")
+      .regex(
+        USERNAME_REGEX,
+        "3–16 chars, letters, numbers, and _ only. Must start with a letter."
+      ),
+    password: z
+      .string()
+      .min(1, "Password is required")
+      .regex(
+        PASSWORD_REGEX,
+        "Min 8 chars: Upper, lower, number, and special symbol."
+      ),
+    confirmPassword: z.string().min(1, "Please confirm your password"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"], // Error will show on this field
+  });
+
+// Type Inference
+type SignUpFormValues = z.infer<typeof signUpSchema>;
+
 export default function SignUp() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
 
-  const [email, setEmail] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-
+  // UI State
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
 
-  const [error, setError] = useState<string>("");
-  const [signingUp, setSigningUp] = useState<boolean>(false);
+  // 3. Initialize React Hook Form
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<SignUpFormValues>({
+    resolver: zodResolver(signUpSchema),
+    mode: "onBlur", // Validate on blur for better UX
+    defaultValues: {
+      email: "",
+      username: "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
 
-  const [emailError, setEmailError] = useState<string | null>(null);
-  const [usernameError, setUsernameError] = useState<string | null>(null);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [confirmError, setConfirmError] = useState<string | null>(null);
-
-  const [emailTouched, setEmailTouched] = useState(false);
-  const [usernameTouched, setUsernameTouched] = useState(false);
-  const [passwordTouched, setPasswordTouched] = useState(false);
-  const [confirmTouched, setConfirmTouched] = useState(false);
-
-  // 🟢 UPDATED REDIRECT LOGIC
+  // Redirect Logic
   useEffect(() => {
     if (user && !loading) {
-      // Check if the user profile is incomplete (missing name)
-      // The authContext merges profile data into the 'user' object
       if (!user.first_name || !user.last_name) {
-        // Redirect to Edit Page to complete onboarding
         navigate("/ProfilePage/Edit", { replace: true });
       } else {
-        // If they somehow already have data, go to the main profile
         navigate("/ProfilePage", { replace: true });
       }
     }
   }, [user, loading, navigate]);
 
-  const usernameRegex = /^[a-zA-Z][a-zA-Z0-9_]{2,15}$/;
-  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/;
-  const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
-
-  // 2. Update the validation function
-  const validateEmail = (value: string) => {
-    if (!value) return null;
-    // Check if it matches the Gmail pattern
-    if (!gmailRegex.test(value)) {
-      return "Only @gmail.com addresses are allowed.";
-    }
-    return null;
-  };
-  const validateUsername = (value: string) => {
-    if (!value) return null;
-    if (!usernameRegex.test(value)) return "Invalid";
-    return null;
-  };
-
-  const validatePassword = (value: string) => {
-    if (!value) return null;
-    if (!passwordRegex.test(value)) return "Invalid";
-    return null;
-  };
-
-  const validateConfirmPassword = (value: string, pwd: string) => {
-    if (!value) return null;
-    if (value !== pwd) return "Mismatch";
-    return null;
-  };
-
-  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setEmail(value);
-    if (emailTouched) setEmailError(validateEmail(value));
-  };
-
-  const handleEmailBlur = () => {
-    setEmailTouched(true);
-    setEmailError(validateEmail(email));
-  };
-
-  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setUsername(value);
-    if (usernameTouched) setUsernameError(validateUsername(value));
-  };
-
-  const handleUsernameBlur = () => {
-    setUsernameTouched(true);
-    setUsernameError(validateUsername(username));
-  };
-
-  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setPassword(value);
-    if (passwordTouched) setPasswordError(validatePassword(value));
-
-    if (confirmTouched) {
-      setConfirmError(validateConfirmPassword(confirmPassword, value));
-    }
-  };
-
-  const handlePasswordBlur = () => {
-    setPasswordTouched(true);
-    setPasswordError(validatePassword(password));
-
-    if (confirmTouched) {
-      setConfirmError(validateConfirmPassword(confirmPassword, password));
-    }
-  };
-
-  const handleConfirmPasswordChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const value = e.target.value;
-    setConfirmPassword(value);
-    if (confirmTouched) {
-      setConfirmError(validateConfirmPassword(value, password));
-    }
-  };
-
-  const handleConfirmPasswordBlur = () => {
-    setConfirmTouched(true);
-    setConfirmError(validateConfirmPassword(confirmPassword, password));
-  };
-
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-
-    setEmailTouched(true);
-    setUsernameTouched(true);
-    setPasswordTouched(true);
-    setConfirmTouched(true);
-
-    if (!email || !username || !password || !confirmPassword) {
-      setError("All fields are required.");
-      return;
-    }
-
-    const emailErr = validateEmail(email);
-    const usernameErr = validateUsername(username);
-    const passwordErr = validatePassword(password);
-    const confirmErr = validateConfirmPassword(confirmPassword, password);
-
-    setEmailError(emailErr);
-    setUsernameError(usernameErr);
-    setPasswordError(passwordErr);
-    setConfirmError(confirmErr);
-
-    if (emailErr || usernameErr || passwordErr || confirmErr) {
-      setError("Please fix highlighted fields.");
-      return;
-    }
-
-    setSigningUp(true);
+  // 4. Submit Handler
+  const onSubmit = async (data: SignUpFormValues) => {
+    setServerError(null);
 
     try {
-      const { data, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
+      // Sign Up
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
       });
 
       if (authError) throw authError;
 
-      const createdUser = data?.user;
+      const createdUser = authData.user;
 
       if (createdUser) {
-        // We only insert email and username here.
-        // First/Last name will be null, triggering the redirect above.
+        // Create Profile Entry
         const { error: profileError } = await supabase.from("profiles").upsert([
           {
             id: createdUser.id,
-            email,
-            username,
+            email: data.email,
+            username: data.username,
           },
         ]);
 
         if (profileError) throw profileError;
       }
 
-      console.log("SignUp successful, waiting for auth context...");
+      // Success handled by AuthContext + useEffect redirect
     } catch (err: any) {
-      console.error("Error:", err);
-      setError(err.message || "An error occurred during sign up");
-      setSigningUp(false);
+      console.error("SignUp Error:", err);
+      setServerError(err.message || "An error occurred during sign up");
     }
   };
-
-  const emailHasError = emailTouched && !!emailError;
-  const usernameHasError = usernameTouched && !!usernameError;
-  const passwordHasError = passwordTouched && !!passwordError;
-  const confirmHasError = confirmTouched && !!confirmError;
 
   return (
     <div className="flex h-[100dvh] w-full bg-white overflow-hidden">
@@ -247,81 +169,72 @@ export default function SignUp() {
             </p>
           </div>
 
-          {error && (
-            <div className="p-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl">
-              {error}
+          {/* Server Error */}
+          {serverError && (
+            <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl animate-in fade-in">
+              {serverError}
             </div>
           )}
 
-          <form onSubmit={handleSignUp} className="space-y-3">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+            {/* Email */}
             <div className="space-y-1">
               <Label htmlFor="email">Email Address</Label>
               <Input
                 id="email"
                 type="email"
-                value={email}
-                onChange={handleEmailChange}
-                onBlur={handleEmailBlur}
-                placeholder="name@example.com"
-                required
-                maxLength={30}
-                minLength={5}
+                placeholder="student@cvsu.edu.ph"
+                {...register("email")}
                 className={`h-11 rounded-xl bg-white focus-visible:ring-blue-600 border ${
-                  emailHasError ? "border-red-300 bg-red-50" : "border-gray-200"
+                  errors.email
+                    ? "border-red-300 focus-visible:ring-red-200"
+                    : "border-gray-200"
                 }`}
               />
-              <p
-                className={`text-[10px] ${
-                  emailHasError ? "text-red-500" : "text-gray-400"
-                }`}
-              >
-                Use a valid email you can access.
-              </p>
+              {errors.email && (
+                <p className="text-[10px] text-red-500 ml-1">
+                  {errors.email.message}
+                </p>
+              )}
             </div>
 
+            {/* Username */}
             <div className="space-y-1">
               <Label htmlFor="username">Username</Label>
               <Input
                 id="username"
                 type="text"
-                value={username}
-                onChange={handleUsernameChange}
-                onBlur={handleUsernameBlur}
                 placeholder="Username"
-                required
-                maxLength={30}
-                minLength={3}
+                {...register("username")}
                 className={`h-11 rounded-xl bg-white focus-visible:ring-blue-600 border ${
-                  usernameHasError
-                    ? "border-red-300 bg-red-50"
+                  errors.username
+                    ? "border-red-300 focus-visible:ring-red-200"
                     : "border-gray-200"
                 }`}
               />
-              <p
-                className={`text-[10px] ${
-                  usernameHasError ? "text-red-500" : "text-gray-400"
-                }`}
-              >
-                3–16 chars, letters, numbers, and _ only.
-              </p>
+              {errors.username ? (
+                <p className="text-[10px] text-red-500 ml-1">
+                  {errors.username.message}
+                </p>
+              ) : (
+                <p className="text-[10px] text-gray-400 ml-1">
+                  3–16 chars, letters, numbers, and _ only.
+                </p>
+              )}
             </div>
 
+            {/* Password */}
             <div className="space-y-1">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={handlePasswordChange}
-                  onBlur={handlePasswordBlur}
                   placeholder="Enter Password"
-                  required
-                  maxLength={30}
-                  minLength={8}
+                  {...register("password")}
                   className={`h-11 rounded-xl bg-white focus-visible:ring-blue-600 pr-10 border ${
-                    passwordHasError
-                      ? "border-red-300 bg-red-50"
+                    errors.password
+                      ? "border-red-300 focus-visible:ring-red-200"
                       : "border-gray-200"
                   }`}
                 />
@@ -333,30 +246,25 @@ export default function SignUp() {
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-              <p
-                className={`text-[10px] ${
-                  passwordHasError ? "text-red-500" : "text-gray-400"
-                }`}
-              >
-                Min 8 chars: Upper, lower, number, special symbol.
-              </p>
+              {errors.password && (
+                <p className="text-[10px] text-red-500 ml-1">
+                  {errors.password.message}
+                </p>
+              )}
             </div>
 
+            {/* Confirm Password */}
             <div className="space-y-1">
-              <Label htmlFor="confirmpassword">Confirm Password</Label>
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
               <div className="relative">
                 <Input
-                  id="confirmpassword"
+                  id="confirmPassword"
                   type={showConfirmPassword ? "text" : "password"}
-                  value={confirmPassword}
-                  onChange={handleConfirmPasswordChange}
-                  onBlur={handleConfirmPasswordBlur}
                   placeholder="Confirm Password"
-                  required
-                  minLength={8}
+                  {...register("confirmPassword")}
                   className={`h-11 rounded-xl bg-white focus-visible:ring-blue-600 pr-10 border no-eye ${
-                    confirmHasError
-                      ? "border-red-300 bg-red-50"
+                    errors.confirmPassword
+                      ? "border-red-300 focus-visible:ring-red-200"
                       : "border-gray-200"
                   }`}
                 />
@@ -372,21 +280,19 @@ export default function SignUp() {
                   )}
                 </button>
               </div>
-              <p
-                className={`text-[10px] ${
-                  confirmHasError ? "text-red-500" : "text-gray-400"
-                }`}
-              >
-                Must match the password above.
-              </p>
+              {errors.confirmPassword && (
+                <p className="text-[10px] text-red-500 ml-1">
+                  {errors.confirmPassword.message}
+                </p>
+              )}
             </div>
 
             <Button
               type="submit"
-              disabled={signingUp}
-              className="w-full h-11 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-md mt-2"
+              disabled={isSubmitting}
+              className="w-full h-11 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-md mt-2 shadow-sm"
             >
-              {signingUp ? <Loader2 className="animate-spin" /> : "Sign Up"}
+              {isSubmitting ? <Loader2 className="animate-spin" /> : "Sign Up"}
             </Button>
 
             <p className="text-[10px] text-center text-gray-500 pb-2">

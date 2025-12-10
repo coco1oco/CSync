@@ -1,133 +1,97 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/authContext";
 import { supabase } from "@/lib/supabaseClient";
 
 import logo from "@/assets/images/Pawpal.svg";
 import heroBg from "@/assets/images/hero_3.jpg";
 
+// 1. Define the Zod Schema
+// This replaces your manual regex and if/else checks
+const signInSchema = z.object({
+  email: z
+    .string()
+    .min(1, "Email is required")
+    .email("Please enter a valid email address"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .min(8, "Password must be at least 8 characters"),
+  rememberMe: z.boolean().default(false).optional(),
+});
+
+// Infer the TypeScript type from the schema automatically
+type SignInFormValues = z.infer<typeof signInSchema>;
+
 export default function SignIn() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const [showPassword, setShowPassword] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
 
-  const [email, setEmail] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
-  const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [rememberMe, setRememberMe] = useState<boolean>(false);
-  const [error, setError] = useState<string>("");
-  const [signingIn, setSigningIn] = useState<boolean>(false);
+  // 2. Initialize React Hook Form
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<SignInFormValues>({
+    resolver: zodResolver(signInSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+      rememberMe: false,
+    },
+  });
 
-  // validation state
-  const [emailError, setEmailError] = useState<string | null>(null);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [emailTouched, setEmailTouched] = useState(false);
-  const [passwordTouched, setPasswordTouched] = useState(false);
-
-  // --- FIX: REDIRECT TO FEED ---
+  // Redirect if already logged in
   useEffect(() => {
     if (!loading && user) {
-      // Send everyone to Home/Feed to avoid "Unauthorized" errors
       navigate("/", { replace: true });
     }
   }, [user, loading, navigate]);
-  // -----------------------------
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-  const validateEmail = (value: string) => {
-    if (!value) return null;
-    if (!emailRegex.test(value)) return "Invalid";
-    return null;
-  };
-
-  const validatePassword = (value: string) => {
-    if (!value) return null;
-    if (value.length < 8) return "Invalid";
-    return null;
-  };
-
-  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setEmail(value);
-    if (emailTouched) setEmailError(validateEmail(value));
-  };
-
-  const handleEmailBlur = () => {
-    setEmailTouched(true);
-    setEmailError(validateEmail(email));
-  };
-
-  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setPassword(value);
-    if (passwordTouched) setPasswordError(validatePassword(value));
-  };
-
-  const handlePasswordBlur = () => {
-    setPasswordTouched(true);
-    setPasswordError(validatePassword(password));
-  };
-
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-
-    setEmailTouched(true);
-    setPasswordTouched(true);
-
-    if (!email || !password) {
-      setError("Email and password are required");
-      return;
-    }
-
-    const emailErr = validateEmail(email);
-    const pwdErr = validatePassword(password);
-    setEmailError(emailErr);
-    setPasswordError(pwdErr);
-
-    if (emailErr || pwdErr) {
-      setError("Please fix highlighted fields.");
-      return;
-    }
-
-    setSigningIn(true);
+  // 3. The Submit Handler
+  // This only runs if Zod validation passes
+  const onSubmit = async (data: SignInFormValues) => {
+    setServerError(null);
 
     try {
-      const { data, error: signInError } =
+      const { data: authData, error: signInError } =
         await supabase.auth.signInWithPassword({
-          email,
-          password,
+          email: data.email,
+          password: data.password,
         });
 
       if (signInError) {
-        setError(signInError.message);
-        setSigningIn(false);
-        return;
+        throw signInError; // Throws to catch block
       }
 
-      if (data.user) {
+      if (authData.user) {
+        // Optional: Update last sign in
         await supabase
           .from("profiles")
           .update({ last_sign_in_at: new Date().toISOString() })
-          .eq("id", data.user.id);
+          .eq("id", authData.user.id);
       }
-      // Auth Context will trigger the useEffect above to redirect
+
+      // Navigation is handled by the useEffect above or AuthContext
     } catch (err: any) {
-      console.error("Error:", err);
-      setError(err.message || "An error occurred");
-      setSigningIn(false);
+      console.error("Login error:", err);
+      setServerError(err.message || "Invalid login credentials.");
     }
   };
 
-  const emailHasError = emailTouched && !!emailError;
-  const passwordHasError = passwordTouched && !!passwordError;
-
   return (
     <div className="flex h-[100dvh] w-full bg-white overflow-hidden">
+      {/* LEFT SIDE: Hero Image */}
       <div className="hidden lg:flex w-1/2 bg-blue-50 relative overflow-hidden">
         <img
           src={heroBg}
@@ -143,6 +107,7 @@ export default function SignIn() {
         </div>
       </div>
 
+      {/* RIGHT SIDE: Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 overflow-hidden">
         <div className="w-full max-w-sm space-y-6">
           <div className="text-center lg:text-left">
@@ -165,14 +130,15 @@ export default function SignIn() {
             </p>
           </div>
 
-          {error && (
-            <div className="p-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl">
-              {error}
+          {/* Server Error Message */}
+          {serverError && (
+            <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl animate-in fade-in">
+              {serverError}
             </div>
           )}
 
-          <form onSubmit={handleSignIn} className="space-y-4">
-            {/* Email */}
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {/* Email Field */}
             <div className="space-y-1">
               <Label htmlFor="email" className="sr-only">
                 Email
@@ -180,27 +146,24 @@ export default function SignIn() {
               <Input
                 id="email"
                 type="email"
-                value={email}
-                onChange={handleEmailChange}
-                onBlur={handleEmailBlur}
                 placeholder="name@example.com"
-                required
-                maxLength={30}
-                minLength={5}
-                className={`h-12 rounded-xl bg-white focus-visible:ring-blue-600 border ${
-                  emailHasError ? "border-red-300 bg-red-50" : "border-gray-200"
+                // 4. Connect input to react-hook-form
+                {...register("email")}
+                className={`h-12 rounded-xl bg-white border ${
+                  errors.email
+                    ? "border-red-300 focus-visible:ring-red-200"
+                    : "border-gray-200 focus-visible:ring-blue-600"
                 }`}
               />
-              <p
-                className={`text-[10px] ${
-                  emailHasError ? "text-red-500" : "text-gray-400"
-                }`}
-              >
-                Use the email you registered with.
-              </p>
+              {/* Show Zod Error Message */}
+              {errors.email && (
+                <p className="text-[10px] text-red-500 ml-1">
+                  {errors.email.message}
+                </p>
+              )}
             </div>
 
-            {/* Password */}
+            {/* Password Field */}
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password" className="sr-only">
@@ -218,15 +181,12 @@ export default function SignIn() {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={handlePasswordChange}
-                  onBlur={handlePasswordBlur}
                   placeholder="Enter your password"
-                  required
-                  className={`h-12 rounded-xl bg-white focus-visible:ring-blue-600 pr-10 border ${
-                    passwordHasError
-                      ? "border-red-300 bg-red-50"
-                      : "border-gray-200"
+                  {...register("password")}
+                  className={`h-12 rounded-xl bg-white pr-10 border ${
+                    errors.password
+                      ? "border-red-300 focus-visible:ring-red-200"
+                      : "border-gray-200 focus-visible:ring-blue-600"
                   }`}
                 />
                 <button
@@ -237,22 +197,20 @@ export default function SignIn() {
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
-              <p
-                className={`text-[10px] ${
-                  passwordHasError ? "text-red-500" : "text-gray-400"
-                }`}
-              >
-                At least 8 characters.
-              </p>
+              {errors.password && (
+                <p className="text-[10px] text-red-500 ml-1">
+                  {errors.password.message}
+                </p>
+              )}
             </div>
 
+            {/* Remember Me */}
             <div className="flex items-center justify-between text-sm text-gray-500">
-              <label className="flex items-center gap-2">
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300"
+                  {...register("rememberMe")}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
                 />
                 Remember me
               </label>
@@ -260,10 +218,10 @@ export default function SignIn() {
 
             <Button
               type="submit"
-              disabled={signingIn}
-              className="w-full h-12 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-md mt-2"
+              disabled={isSubmitting}
+              className="w-full h-12 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-md mt-2 shadow-sm transition-all active:scale-[0.98]"
             >
-              {signingIn ? <Loader2 className="animate-spin" /> : "Sign In"}
+              {isSubmitting ? <Loader2 className="animate-spin" /> : "Sign In"}
             </Button>
           </form>
         </div>
