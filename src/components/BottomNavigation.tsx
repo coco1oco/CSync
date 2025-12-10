@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import type { UserRole } from "@/types";
-import { Home, MessageCircle, Bell, PawPrint } from "lucide-react"; // ✅ Using PawPrint icon
+import { Home, MessageCircle, Bell, PawPrint, Users } from "lucide-react"; // ✅ Added Users icon
 
 interface BottomNavigationProps {
   userRole: UserRole | null;
@@ -14,15 +14,22 @@ export function BottomNavigation({
 
   const isActive = (path: string): boolean => location.pathname === path;
 
+  // Define the navigation items dynamically based on role
   const navItems = [
-   { path: "/", icon: Home, label: "Home" },
+    { path: "/", icon: Home, label: "Home" },
     { path: "/messages", icon: MessageCircle, label: "Messages" },
-    { path: "/notifications", icon: Bell, label: "Notifications" },
-    // 4th item changes based on role
+
+    // ✅ SWAP LOGIC:
+    // If Admin -> Show "Team" management
+    // If User  -> Show "Notifications"
+    ...(userRole === "admin"
+      ? [{ path: "/admin/team", icon: Users, label: "Team" }]
+      : [{ path: "/notifications", icon: Bell, label: "Alerts" }]),
+
     {
-      path: userRole === "admin" ? "/PetDashboard" : "/PetDashboard",
+      path: "/PetDashboard",
       icon: PawPrint,
-      label: userRole === "admin" ? "PetDashboard" : "PetDashboard",
+      label: "Pets", // Shortened label for better mobile spacing
     },
   ];
 
@@ -33,7 +40,7 @@ export function BottomNavigation({
           <button
             key={path}
             onClick={() => navigate(path)}
-            className={`flex flex-col items-center gap-1 rounded-lg p-2 transition-colors ${
+            className={`flex flex-col items-center gap-1 rounded-lg p-2 transition-colors min-w-[64px] ${
               isActive(path)
                 ? "text-blue-600"
                 : "text-gray-500 hover:text-gray-700"

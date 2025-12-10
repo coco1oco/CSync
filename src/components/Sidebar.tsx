@@ -1,4 +1,4 @@
-import { useState } from "react"; // ✅ Import useState
+import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Home,
@@ -7,7 +7,8 @@ import {
   PawPrint,
   LogOut,
   User,
-  Loader2, // ✅ Import Loader2
+  Loader2,
+  Users, // ✅ Added Users icon
 } from "lucide-react";
 import { useAuth } from "@/context/authContext";
 import logo from "@/assets/images/Pawpal.svg";
@@ -21,29 +22,35 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut } = useAuth();
-  const [isSigningOut, setIsSigningOut] = useState(false); // ✅ Local loading state
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
 
+  // 1. Define Base Navigation Items
   const navItems = [
     { path: "/", icon: Home, label: "Home" },
     { path: "/messages", icon: MessageCircle, label: "Messages" },
-    { path: "/notifications", icon: Bell, label: "Notifications" },
+
+    // ✅ SWAP LOGIC: Show Team Management for Admins, Notifications for Members
+    ...(userRole === "admin"
+      ? [{ path: "/admin/team", icon: Users, label: "Manage Team" }]
+      : [{ path: "/notifications", icon: Bell, label: "Notifications" }]),
+
     {
-      path: userRole === "admin" ? "/PetDashboard" : "/PetDashboard",
+      path: "/PetDashboard",
       icon: PawPrint,
-      label: userRole === "admin" ? "Pet Dashboard" : "Pet Dashboard",
+      label: "Pet Dashboard",
     },
   ];
 
   const handleSignOut = async () => {
-    setIsSigningOut(true); // ✅ Start loading immediately
+    setIsSigningOut(true);
     try {
       await signOut();
       navigate("/SignIn");
     } catch (error) {
       console.error("Sign out failed", error);
-      setIsSigningOut(false); // Stop loading only if it fails
+      setIsSigningOut(false);
     }
   };
 

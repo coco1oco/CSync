@@ -10,8 +10,23 @@ import AppLayout from "@/components/AppLayout";
 import AuthLayout from "@/components/AuthLayout";
 import { Loader2 } from "lucide-react";
 
-// --- LAZY LOADED PAGES ---
-// Authentication
+// --- LAZY IMPORTS ---
+const AdminHomePage = lazy(() =>
+  import("@/pages/AdminD/AdminHomePage").then((module) => ({
+    default: module.AdminHomePage,
+  }))
+);
+const CreateEvent = lazy(() => import("@/pages/AdminD/CreateEvent"));
+const EditEvent = lazy(() => import("@/pages/AdminD/EditEvent"));
+const ManageTeam = lazy(() => import("@/pages/AdminD/ManageTeam"));
+
+const MainPetProfilePage = lazy(
+  () => import("@/pages/PetProfile/MainPetProfilePage")
+);
+const AddPetPage = lazy(() => import("@/pages/PetProfile/AddPetPage"));
+const PetProfilePage = lazy(() => import("@/pages/PetProfile/PetProfilePage"));
+const PetEditProfile = lazy(() => import("@/pages/PetProfile/PetEditProfile"));
+
 const Welcome = lazy(() => import("@/pages/Authentication/Welcome"));
 const SignIn = lazy(() => import("@/pages/Authentication/SignIn"));
 const SignUp = lazy(() => import("@/pages/Authentication/SignUp"));
@@ -22,43 +37,19 @@ const Unauthorized = lazy(() => import("@/pages/Authentication/Unauthorized"));
 const UpdatePassword = lazy(
   () => import("@/pages/Authentication/UpdatePassword")
 );
-
-// Main Features (Handling Named Exports)
 const UserHomePage = lazy(() =>
   import("@/pages/UsersD/UserHomePage").then((module) => ({
     default: module.UserHomePage,
   }))
 );
-const AdminHomePage = lazy(() =>
-  import("@/pages/AdminD/AdminHomePage").then((module) => ({
-    default: module.AdminHomePage,
-  }))
-);
-
-// Events
-const CreateEvent = lazy(() => import("@/pages/AdminD/CreateEvent"));
-const EditEvent = lazy(() => import("@/pages/AdminD/EditEvent"));
-
-// Profile & Menu
 const ProfilePage = lazy(() => import("@/pages/SharedPages/ProfilePage"));
 const MenuPage = lazy(() => import("@/pages/SharedPages/MenuPage"));
 const EditProfilePage = lazy(
   () => import("@/pages/SharedPages/EditProfilePage")
 );
-
-// Pet Profile
-const MainPetProfilePage = lazy(
-  () => import("@/pages/PetProfile/MainPetProfilePage")
-);
-const AddPetPage = lazy(() => import("@/pages/PetProfile/AddPetPage"));
-const PetProfilePage = lazy(() => import("@/pages/PetProfile/PetProfilePage"));
-const PetEditProfile = lazy(() => import("@/pages/PetProfile/PetEditProfile"));
-
-// Dummy Pages
 const MessagesPage = lazy(() => import("@/pages/Dummy/MessagesPage"));
 const NotificationsPage = lazy(() => import("@/pages/Dummy/NotificationsPage"));
 
-// --- LOADING FALLBACK ---
 const PageLoader = () => (
   <div className="flex h-screen w-full items-center justify-center bg-gray-50">
     <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -66,7 +57,7 @@ const PageLoader = () => (
 );
 
 const router = createBrowserRouter([
-  // --- PUBLIC ROUTES ---
+  // ... Public Routes ...
   {
     element: <AuthLayout />,
     children: [
@@ -130,22 +121,6 @@ const router = createBrowserRouter([
     ),
     children: [
       {
-        path: "/messages",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <MessagesPage />
-          </Suspense>
-        ),
-      },
-      {
-        path: "/notifications",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <NotificationsPage />
-          </Suspense>
-        ),
-      },
-      {
         path: "/",
         element: (
           <Suspense fallback={<PageLoader />}>
@@ -161,6 +136,23 @@ const router = createBrowserRouter([
           </Suspense>
         ),
       },
+      {
+        path: "/messages",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <MessagesPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/notifications",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <NotificationsPage />
+          </Suspense>
+        ),
+      },
+
       {
         path: "/AdminDashboard",
         element: (
@@ -191,6 +183,18 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
+      // ✅ CORRECTED: Admin Team Management
+      {
+        path: "/admin/team",
+        element: (
+          <ProtectedRoute requiredRole="admin">
+            <Suspense fallback={<PageLoader />}>
+              <ManageTeam />
+            </Suspense>
+          </ProtectedRoute>
+        ),
+      },
+
       {
         path: "/ProfilePage",
         element: (
@@ -215,6 +219,8 @@ const router = createBrowserRouter([
           </Suspense>
         ),
       },
+
+      // PET ROUTES
       {
         path: "/PetDashboard",
         element: (
@@ -224,6 +230,7 @@ const router = createBrowserRouter([
         ),
       },
       {
+        // ✅ CORRECTED: Points to AddPetPage
         path: "/PetDashboard/new",
         element: (
           <Suspense fallback={<PageLoader />}>
@@ -249,12 +256,7 @@ const router = createBrowserRouter([
       },
     ],
   },
-
-  // --- FALLBACK ---
-  {
-    path: "*",
-    element: <Navigate to="/welcome" replace />,
-  },
+  { path: "*", element: <Navigate to="/welcome" replace /> },
 ]);
 
 export default function AppRouter() {
