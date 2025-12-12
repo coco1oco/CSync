@@ -13,6 +13,9 @@ import { Loader2 } from "lucide-react";
 // ✅ IMPORT SONNER
 import { Toaster } from "sonner";
 
+// ✅ Import the new ChatProvider
+import { ChatProvider } from "@/context/ChatContext";
+
 // --- LAZY IMPORTS ---
 const AdminHomePage = lazy(() =>
   import("@/pages/AdminD/AdminHomePage").then((module) => ({
@@ -287,11 +290,12 @@ const router = createBrowserRouter([
 export default function AppRouter() {
   return (
     <AuthProvider>
-      {/* ✅ ADD THE TOASTER HERE */}
-      {/* 'richColors' makes success green and error red automatically */}
-      <Toaster position="top-center" richColors />
-
-      <RouterProvider router={router} />
+      <ChatProvider>
+        {" "}
+        {/* 👈 WRAP HERE inside AuthProvider */}
+        <Toaster position="top-center" richColors />
+        <RouterProvider router={router} />
+      </ChatProvider>
     </AuthProvider>
   );
 }

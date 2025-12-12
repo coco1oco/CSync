@@ -8,20 +8,26 @@ import type { Message, Conversation } from "@/types";
 
 export default function MessagesPage() {
   const { user } = useAuth();
+
+  // -- STATE --
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeRoom, setActiveRoom] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // 1. Fetch the Rooms I belong to
+  // ✅ FIXED: Use 'ReturnType<typeof setTimeout>' instead of 'NodeJS.Timeout'
+  // This works in the browser (where it's a number) and Node (where it's an object)
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 1. FETCH ROOMS (Run once on load)
   useEffect(() => {
     if (!user) return;
 
     const fetchRooms = async () => {
-      // We join 'conversation_members' to filter, then get the actual 'conversations' data
       const { data, error } = await supabase
         .from("conversation_members")
         .select("conversation:conversations(id, name, is_group)")
@@ -30,7 +36,7 @@ export default function MessagesPage() {
       if (error) {
         console.error("Error fetching rooms:", error);
       } else if (data) {
-        // Flatten the structure
+        // Flatten structure
         const rooms = data.map((item: any) => item.conversation);
 
         // Custom Sort: Exec -> Committees -> General
@@ -51,29 +57,29 @@ export default function MessagesPage() {
     fetchRooms();
   }, [user]);
 
-  // 2. Fetch Messages & Subscribe to Realtime
+  // 2. ACTIVE ROOM LOGIC (Messages + Realtime + Presence)
   useEffect(() => {
-    if (!activeRoom) return;
+    if (!activeRoom || !user) return;
 
-    // A. Initial Load
+    // A. Load Initial Messages
     const fetchMessages = async () => {
       const { data, error } = await supabase
         .from("messages")
         .select("*, sender:profiles(username, avatar_url, first_name)")
         .eq("conversation_id", activeRoom.id)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: true })
+        .limit(100);
 
-      if (error) console.error("Error fetching messages:", error);
-      else setMessages(data || []);
-
+      if (!error) setMessages((data as any) || []);
       scrollToBottom();
     };
 
     fetchMessages();
 
-    // B. Realtime Subscription
+    // B. Setup Realtime Channel
     const channel = supabase
       .channel(`room-${activeRoom.id}`)
+      // -- LISTEN FOR NEW MESSAGES --
       .on(
         "postgres_changes",
         {
@@ -83,7 +89,10 @@ export default function MessagesPage() {
           filter: `conversation_id=eq.${activeRoom.id}`,
         },
         async (payload) => {
-          // Fetch the sender details for the new message
+          // If *I* sent this, ignore it (Optimistic UI already handled it)
+          if (payload.new.sender_id === user.id) return;
+
+          // Fetch sender info for the new message
           const { data: senderData } = await supabase
             .from("profiles")
             .select("username, avatar_url, first_name")
@@ -95,12 +104,37 @@ export default function MessagesPage() {
           scrollToBottom();
         }
       )
-      .subscribe();
+      // -- LISTEN FOR TYPING INDICATORS (PRESENCE) --
+      .on("presence", { event: "sync" }, () => {
+        const state = channel.presenceState();
+        const typing: string[] = [];
+
+        for (const id in state) {
+          const person = state[id][0] as any;
+          // If it's not me, and they are typing...
+          if (person && person.user_id !== user.id && person.isTyping) {
+            typing.push(person.first_name || person.username);
+          }
+        }
+        setTypingUsers(typing);
+      })
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          // Track my initial status (Not typing)
+          await channel.track({
+            user_id: user.id,
+            username: user.username,
+            first_name: user.first_name,
+            isTyping: false,
+          });
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
+      setTypingUsers([]); // Clear typing indicators when switching rooms
     };
-  }, [activeRoom]);
+  }, [activeRoom, user?.id]);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -108,13 +142,65 @@ export default function MessagesPage() {
     }, 100);
   };
 
+  // 3. BROADCAST TYPING STATUS
+  const handleTyping = async () => {
+    if (!activeRoom || !user) return;
+
+    const channel = supabase
+      .getChannels()
+      .find((c) => c.topic === `room-${activeRoom.id}`);
+
+    if (channel) {
+      // Send "I am typing"
+      await channel.track({
+        user_id: user.id,
+        username: user.username,
+        first_name: user.first_name,
+        isTyping: true,
+      });
+
+      // Clear previous timeout if exists
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
+      // Stop typing after 2 seconds of inactivity
+      typingTimeoutRef.current = setTimeout(async () => {
+        await channel.track({
+          user_id: user.id,
+          username: user.username,
+          first_name: user.first_name,
+          isTyping: false,
+        });
+      }, 2000);
+    }
+  };
+
+  // 4. SEND MESSAGE (Optimistic)
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !activeRoom || !user) return;
 
     const content = newMessage.trim();
-    setNewMessage(""); // Clear input immediately for UX
+    setNewMessage(""); // Clear input immediately
 
+    // Create Temporary Message for Immediate UI Update
+    const tempId = Date.now();
+    const optimisticMsg: any = {
+      id: tempId,
+      conversation_id: activeRoom.id,
+      sender_id: user.id,
+      content: content,
+      created_at: new Date().toISOString(),
+      sender: {
+        username: user.username || "Me",
+        avatar_url: user.avatar_url || null,
+        first_name: user.first_name || "Me",
+      },
+    };
+
+    setMessages((prev) => [...prev, optimisticMsg]);
+    scrollToBottom();
+
+    // Send to Database
     const { error } = await supabase.from("messages").insert([
       {
         conversation_id: activeRoom.id,
@@ -125,7 +211,9 @@ export default function MessagesPage() {
 
     if (error) {
       console.error("Failed to send:", error);
-      // Optional: Show error toast/restore input
+      // Rollback on error
+      setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
+      alert("Failed to send message. Please try again.");
     }
   };
 
@@ -178,7 +266,6 @@ export default function MessagesPage() {
             {/* Header */}
             <div className="h-16 border-b border-gray-100 flex items-center px-6 justify-between bg-white shadow-sm z-10">
               <div className="flex items-center gap-3">
-                {/* Mobile Menu Button could go here */}
                 <div>
                   <h2 className="font-bold text-gray-900">{activeRoom.name}</h2>
                   <p className="text-xs text-gray-500">
@@ -200,7 +287,7 @@ export default function MessagesPage() {
                     }`}
                   >
                     {!isMe && (
-                      <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 border border-gray-200">
                         {msg.sender?.avatar_url ? (
                           <img
                             src={msg.sender.avatar_url}
@@ -208,7 +295,7 @@ export default function MessagesPage() {
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-gray-500">
-                            {msg.sender?.username?.[0]?.toUpperCase()}
+                            {msg.sender?.username?.[0]?.toUpperCase() || "?"}
                           </div>
                         )}
                       </div>
@@ -221,14 +308,16 @@ export default function MessagesPage() {
                     >
                       {!isMe && (
                         <span className="text-xs text-gray-400 ml-1">
-                          {msg.sender?.first_name || "Unknown"}
+                          {msg.sender?.first_name ||
+                            msg.sender?.username ||
+                            "Unknown"}
                         </span>
                       )}
                       <div
-                        className={`px-4 py-2 rounded-2xl text-sm ${
+                        className={`px-4 py-2 rounded-2xl text-sm leading-relaxed shadow-sm ${
                           isMe
                             ? "bg-blue-600 text-white rounded-br-none"
-                            : "bg-white border border-gray-200 text-gray-800 rounded-bl-none shadow-sm"
+                            : "bg-white border border-gray-200 text-gray-800 rounded-bl-none"
                         }`}
                       >
                         {msg.content}
@@ -240,7 +329,15 @@ export default function MessagesPage() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input */}
+            {/* Typing Indicator */}
+            {typingUsers.length > 0 && (
+              <div className="px-6 py-2 text-xs text-gray-400 italic bg-white animate-pulse">
+                {typingUsers.join(", ")} {typingUsers.length > 1 ? "are" : "is"}{" "}
+                typing...
+              </div>
+            )}
+
+            {/* Input Area */}
             <div className="p-4 bg-white border-t border-gray-100">
               <form
                 onSubmit={handleSendMessage}
@@ -248,24 +345,27 @@ export default function MessagesPage() {
               >
                 <Input
                   value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
+                  onChange={(e) => {
+                    setNewMessage(e.target.value);
+                    handleTyping();
+                  }}
                   placeholder={`Message ${activeRoom.name}...`}
-                  className="rounded-full pr-12 border-gray-200 bg-gray-50 focus:bg-white transition-all"
+                  className="rounded-full pr-12 border-gray-200 bg-gray-50 focus:bg-white transition-all h-11"
                 />
                 <Button
                   type="submit"
                   size="icon"
-                  className="absolute right-1 top-1 h-8 w-8 rounded-full bg-blue-600 hover:bg-blue-700"
+                  className="absolute right-1 top-1 h-9 w-9 rounded-full bg-blue-600 hover:bg-blue-700 shadow-sm"
                   disabled={!newMessage.trim()}
                 >
-                  <Send size={14} />
+                  <Send size={16} />
                 </Button>
               </form>
             </div>
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-gray-400">
-            Select a channel
+            Select a channel to start chatting
           </div>
         )}
       </div>
