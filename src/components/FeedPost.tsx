@@ -4,13 +4,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/authContext";
 import { EventCard } from "@/components/EventCard";
 import type { OutreachEvent, Comment } from "@/types";
-import {
-  Heart,
-  MessageCircle, // ✅ Restored this icon
-  Send,
-  Loader2,
-  X,
-} from "lucide-react";
+import { Heart, MessageCircle, Send, Loader2, X, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import FailedImageIcon from "@/assets/FailedImage.svg";
@@ -62,6 +56,7 @@ export function FeedPost({ event, isAdmin, onDelete, onEdit }: FeedPostProps) {
     const previousLiked = isLiked;
     const previousCount = likesCount;
 
+    // Optimistic Update
     setIsLiked(!isLiked);
     setLikesCount(isLiked ? likesCount - 1 : likesCount + 1);
 
@@ -78,6 +73,7 @@ export function FeedPost({ event, isAdmin, onDelete, onEdit }: FeedPostProps) {
           .insert([{ event_id: event.id, user_id: user.id }]);
       }
     } catch (err) {
+      // Rollback
       setIsLiked(previousLiked);
       setLikesCount(previousCount);
       console.error("Like failed", err);
@@ -114,7 +110,6 @@ export function FeedPost({ event, isAdmin, onDelete, onEdit }: FeedPostProps) {
             <span>{likesCount > 0 ? likesCount : "Like"}</span>
           </button>
 
-          {/* ✅ Reverted to standard MessageCircle Icon */}
           <button
             onClick={() => setIsCommentsOpen(true)}
             className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors"
@@ -160,87 +155,132 @@ function CommentsModal({
 }: CommentsModalProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // 1. Fetch & Subscribe
   useEffect(() => {
-    // Lock body scroll
-    document.body.style.overflow = "hidden";
+    document.body.style.overflow = "hidden"; // Lock scroll
+
+    const fetchComments = async () => {
+      setLoading(true);
+      // ✅ OPTIMIZATION: Limit to 50 to prevent freezing
+      const { data } = await supabase
+        .from("comments")
+        .select("*, user:profiles(id, username, avatar_url)")
+        .eq("event_id", event.id)
+        .order("created_at", { ascending: true })
+        .limit(50);
+
+      if (data) setComments(data as unknown as Comment[]);
+      setLoading(false);
+      setTimeout(() => bottomRef.current?.scrollIntoView(), 100);
+    };
+
     fetchComments();
+
+    // ✅ REAL-TIME COMMENTS
+    const channel = supabase
+      .channel(`comments-${event.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "comments",
+          filter: `event_id=eq.${event.id}`,
+        },
+        async (payload) => {
+          // If I sent it, ignore (Optimistic UI handled it)
+          if (payload.new.user_id === user?.id) return;
+
+          // Fetch user details for the new comment
+          const { data: userData } = await supabase
+            .from("profiles")
+            .select("id, username, avatar_url")
+            .eq("id", payload.new.user_id)
+            .single();
+
+          const newComment = { ...payload.new, user: userData } as Comment;
+          setComments((prev) => [...prev, newComment]);
+          onCommentAdded();
+          setTimeout(
+            () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
+            100
+          );
+        }
+      )
+      .subscribe();
+
     return () => {
       document.body.style.overflow = "";
+      supabase.removeChannel(channel);
     };
-  }, []);
+  }, [event.id]);
 
-  const fetchComments = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from("comments")
-      .select("*, user:profiles(id, username, avatar_url)")
-      .eq("event_id", event.id)
-      .order("created_at", { ascending: true });
-
-    if (data) setComments(data as unknown as Comment[]);
-    setLoading(false);
-
-    // Scroll to bottom on load
-    setTimeout(
-      () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
-      100
-    );
-  };
-
+  // 2. Post Comment (Optimistic)
   const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim() || !user) return;
 
-    setIsSubmitting(true);
-    try {
-      const { error, data } = await supabase
-        .from("comments")
-        .insert([
-          {
-            event_id: event.id,
-            user_id: user.id,
-            content: newComment.trim(),
-          },
-        ])
-        .select("*, user:profiles(id, username, avatar_url)")
-        .single();
+    const content = newComment.trim();
+    setNewComment(""); // Clear input immediately
 
-      if (error) throw error;
+    // ✅ OPTIMISTIC UPDATE: Add to list instantly
+    const tempId = crypto.randomUUID();
+    const optimisticComment: any = {
+      id: tempId,
+      event_id: event.id,
+      user_id: user.id,
+      content: content,
+      created_at: new Date().toISOString(),
+      user: {
+        id: user.id,
+        username: user.username,
+        avatar_url: user.avatar_url,
+      },
+    };
 
-      if (data) {
-        setComments((prev) => [...prev, data as any]);
-        setNewComment("");
-        onCommentAdded();
-        setTimeout(
-          () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
-          100
-        );
-      }
-    } catch (err) {
-      console.error("Comment failed", err);
-    } finally {
-      setIsSubmitting(false);
+    setComments((prev) => [...prev, optimisticComment]);
+    onCommentAdded();
+    setTimeout(
+      () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
+      100
+    );
+
+    // Send to DB
+    const { error } = await supabase.from("comments").insert([
+      {
+        event_id: event.id,
+        user_id: user.id,
+        content: content,
+      },
+    ]);
+
+    if (error) {
+      console.error("Comment failed", error);
+      // Rollback if failed
+      setComments((prev) => prev.filter((c) => c.id !== tempId));
+      onCommentDeleted(); // Revert count
+      alert("Failed to post comment");
     }
   };
 
   const handleDeleteComment = async (commentId: string) => {
     if (!confirm("Delete this comment?")) return;
-    try {
-      const { error } = await supabase
-        .from("comments")
-        .delete()
-        .eq("id", commentId);
 
-      if (!error) {
-        setComments((prev) => prev.filter((c) => c.id !== commentId));
-        onCommentDeleted();
-      }
-    } catch (err) {
-      console.error("Delete comment failed", err);
+    // Optimistic Delete
+    setComments((prev) => prev.filter((c) => c.id !== commentId));
+    onCommentDeleted();
+
+    const { error } = await supabase
+      .from("comments")
+      .delete()
+      .eq("id", commentId);
+
+    if (error) {
+      console.error("Delete failed", error);
+      // We could fetchComments() to revert, but usually not worth the UX flicker
     }
   };
 
@@ -258,7 +298,6 @@ function CommentsModal({
         <div className="flex items-center justify-between p-4 border-b border-gray-100 shrink-0">
           <div className="w-8" />
           <div className="flex flex-col items-center">
-            {/* Mobile Handle */}
             <div className="w-10 h-1 bg-gray-200 rounded-full md:hidden mb-2" />
             <h3 className="font-bold text-gray-900">Comments</h3>
           </div>
@@ -283,22 +322,25 @@ function CommentsModal({
             </div>
           ) : (
             comments.map((comment) => (
-              <div key={comment.id} className="flex gap-3 group">
+              <div
+                key={comment.id}
+                className="flex gap-3 group animate-in fade-in slide-in-from-bottom-2 duration-300"
+              >
                 <img
                   src={comment.user?.avatar_url || FailedImageIcon}
                   alt="User"
                   className="w-8 h-8 rounded-full object-cover border border-gray-100 flex-shrink-0"
                 />
                 <div className="flex-1 space-y-1">
-                  <div className="bg-gray-50 rounded-2xl rounded-tl-none px-3 py-2 inline-block">
+                  <div className="bg-gray-50 rounded-2xl rounded-tl-none px-3 py-2 inline-block max-w-full">
                     <span className="font-bold text-sm text-gray-900 mr-2">
                       {comment.user?.username || "Unknown"}
                     </span>
-                    <span className="text-sm text-gray-700 break-words">
+                    <span className="text-sm text-gray-700 break-words whitespace-pre-wrap">
                       {comment.content}
                     </span>
                   </div>
-                  <div className="flex items-center gap-3 px-1">
+                  <div className="flex items-center gap-3 px-1 h-4">
                     <span className="text-[10px] text-gray-400 font-medium">
                       {new Date(comment.created_at).toLocaleDateString()}
                     </span>
@@ -306,9 +348,9 @@ function CommentsModal({
                       user?.role === "admin") && (
                       <button
                         onClick={() => handleDeleteComment(comment.id)}
-                        className="text-[10px] text-red-400 hover:text-red-600 font-semibold opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="flex items-center gap-1 text-[10px] text-red-400 hover:text-red-600 font-semibold opacity-0 group-hover:opacity-100 transition-opacity"
                       >
-                        Delete
+                        <Trash2 size={10} /> Delete
                       </button>
                     )}
                   </div>
@@ -325,7 +367,6 @@ function CommentsModal({
             onSubmit={handlePostComment}
             className="flex gap-2 items-center"
           >
-            {/* ✅ UPDATED: User Profile Picture (Visible on all screens) */}
             <img
               src={user?.avatar_url || FailedImageIcon}
               alt="Me"
@@ -342,14 +383,10 @@ function CommentsModal({
               <Button
                 type="submit"
                 size="icon"
-                disabled={isSubmitting || !newComment.trim()}
+                disabled={!newComment.trim()}
                 className="absolute right-1 top-1 h-9 w-9 rounded-full bg-blue-600 hover:bg-blue-700 text-white shrink-0 shadow-sm"
               >
-                {isSubmitting ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Send className="w-4 h-4 ml-0.5" />
-                )}
+                <Send className="w-4 h-4 ml-0.5" />
               </Button>
             </div>
           </form>
