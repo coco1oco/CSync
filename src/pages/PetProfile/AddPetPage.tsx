@@ -1,10 +1,45 @@
-import React, { useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useRef, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom"; // ✅ Import useSearchParams
 import { useAuth } from "@/context/authContext";
 import { usePets } from "@/lib/usePets";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Upload, Trash2 } from "lucide-react";
+import { ArrowLeft, Upload, Trash2, Building2, PawPrint } from "lucide-react";
+import { toast } from "sonner";
+
+// ... (Keep BREED_DATA exactly as it is) ...
+const BREED_DATA: Record<string, string[]> = {
+  Dog: [
+    "Aspin (Askal)",
+    "Beagle",
+    "Bulldog",
+    "Chihuahua",
+    "Dachshund",
+    "German Shepherd",
+    "Golden Retriever",
+    "Labrador Retriever",
+    "Pomeranian",
+    "Poodle",
+    "Pug",
+    "Shih Tzu",
+    "Siberian Husky",
+    "Mixed Breed",
+  ],
+  Cat: [
+    "Puspin (Domestic Short Hair)",
+    "Persian",
+    "Siamese",
+    "Maine Coon",
+    "British Shorthair",
+    "Ragdoll",
+    "Bengal",
+    "Scottish Fold",
+    "Sphynx",
+    "Mixed Breed",
+  ],
+  Bird: ["Parakeet", "Cockatiel", "Lovebird", "Canary", "Parrot", "Finch"],
+  Rabbit: ["Netherland Dwarf", "Holland Lop", "Lionhead", "Mini Rex"],
+};
 
 interface FormData {
   name: string;
@@ -19,8 +54,17 @@ interface FormData {
 
 export default function AddPetPage() {
   const { user } = useAuth();
-  const { addPet } = usePets(user?.id);
   const navigate = useNavigate();
+
+  // ✅ 1. READ URL PARAMETER
+  const [searchParams] = useSearchParams();
+  const modeParam = searchParams.get("mode");
+  const isCampusMode = modeParam === "campus";
+
+  // ✅ 2. INIT HOOK WITH CORRECT MODE
+  // If ?mode=campus, addPet will automatically set is_org_pet = true
+  const { addPet } = usePets(user?.id, isCampusMode ? "campus" : "personal");
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState<FormData>({
@@ -34,21 +78,31 @@ export default function AddPetPage() {
     microchip_id: "",
   });
 
+  // ... (Keep Breed Suggestions State & Effect) ...
+  const [availableBreeds, setAvailableBreeds] = useState<string[]>([]);
+  useEffect(() => {
+    if (formData.species && BREED_DATA[formData.species]) {
+      setAvailableBreeds(BREED_DATA[formData.species]);
+    } else {
+      setAvailableBreeds([]);
+    }
+  }, [formData.species]);
+
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [petImageUrl, setPetImageUrl] = useState<string | null>(null);
   const [petImagePreview, setPetImagePreview] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
+  // ... (Keep handleInputChange, handlePickPetImage, handlePetImageChange, handleRemoveImage) ...
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    if (name === "species" && value !== formData.species) {
+      setFormData((prev) => ({ ...prev, [name]: value, breed: "" }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const handlePickPetImage = () => {
@@ -60,21 +114,16 @@ export default function AddPetPage() {
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // Show preview immediately
     const preview = URL.createObjectURL(file);
     setPetImagePreview(preview);
-
-    // Upload to Cloudinary
     setUploading(true);
     try {
       const cloudinaryUrl = await uploadImageToCloudinary(file);
       setPetImageUrl(cloudinaryUrl);
-      console.log("✅ Pet image uploaded:", cloudinaryUrl);
+      toast.success("Photo uploaded successfully!");
     } catch (error) {
-      console.error("❌ Failed to upload pet image:", error);
       setPetImagePreview(null);
-      setError("Failed to upload image. Please try again.");
+      toast.error("Failed to upload image. Please try again.");
     }
     setUploading(false);
   };
@@ -82,22 +131,15 @@ export default function AddPetPage() {
   const handleRemoveImage = () => {
     setPetImageUrl(null);
     setPetImagePreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
-    setSuccess(null);
 
     try {
-      console.log("User ID:", user?.id);
-      console.log("Form Data:", formData);
-      console.log("Pet Image URL:", petImageUrl);
-
+      // Logic handled by usePets hook based on 'mode'
       const result = await addPet({
         name: formData.name,
         species: formData.species || null,
@@ -112,20 +154,22 @@ export default function AddPetPage() {
         petimage_url: petImageUrl,
       });
 
-      console.log("Add Pet Result:", result);
-
       if (result) {
-        setSuccess("Pet added successfully!");
-        console.log("Pet saved successfully, navigating...");
+        toast.success(
+          isCampusMode
+            ? `Successfully registered ${formData.name} to Campus Dogs! 🎓`
+            : `Welcome to the family, ${formData.name}! 🐾`
+        );
+
         setTimeout(() => {
           navigate("/PetDashboard");
         }, 1500);
       } else {
-        setError("Failed to save pet. Check console for errors.");
+        toast.error("Failed to save pet. Check console for errors.");
       }
     } catch (err: any) {
       console.error("Error adding pet:", err);
-      setError(err.message || "Failed to add pet");
+      toast.error(err.message || "Failed to add pet");
     } finally {
       setLoading(false);
     }
@@ -142,23 +186,22 @@ export default function AddPetPage() {
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-2xl font-bold">Add New Pet</h1>
+          <div>
+            <h1 className="text-2xl font-bold">
+              {isCampusMode ? "Register Campus Dog" : "Add New Pet"}
+            </h1>
+            {isCampusMode && (
+              <span className="flex items-center gap-1 text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full w-fit mt-1">
+                <Building2 size={12} /> YFA Management
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Form Card */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Error/Success Messages */}
-            {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                {error}
-              </div>
-            )}
-            {success && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-                {success}
-              </div>
-            )}
+            {/* ... (Keep form inputs exactly the same as before) ... */}
 
             {/* Image Upload */}
             <div>
@@ -186,7 +229,6 @@ export default function AddPetPage() {
                   <span className="text-gray-500">No photo</span>
                 </div>
               )}
-
               <label className="flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 cursor-pointer transition">
                 <Upload className="w-4 h-4" />
                 <span className="text-sm font-medium text-gray-600">
@@ -229,7 +271,7 @@ export default function AddPetPage() {
                   name="species"
                   value={formData.species}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white"
                 >
                   <option value="">Select species</option>
                   <option value="Dog">Dog</option>
@@ -249,9 +291,19 @@ export default function AddPetPage() {
                   name="breed"
                   value={formData.breed}
                   onChange={handleInputChange}
-                  placeholder="e.g., Golden Retriever"
+                  list="breed-suggestions"
+                  placeholder={
+                    availableBreeds.length > 0
+                      ? "Select/Type..."
+                      : "e.g. Golden Retriever"
+                  }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 />
+                <datalist id="breed-suggestions">
+                  {availableBreeds.map((breed) => (
+                    <option key={breed} value={breed} />
+                  ))}
+                </datalist>
               </div>
             </div>
 
@@ -278,7 +330,7 @@ export default function AddPetPage() {
                   name="sex"
                   value={formData.sex}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white"
                 >
                   <option value="">Select sex</option>
                   <option value="Male">Male</option>
@@ -301,7 +353,7 @@ export default function AddPetPage() {
               />
             </div>
 
-            {/* Location */}
+            {/* Location & Microchip */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Location
@@ -315,8 +367,6 @@ export default function AddPetPage() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
               />
             </div>
-
-            {/* Microchip ID */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Microchip ID
@@ -331,7 +381,6 @@ export default function AddPetPage() {
               />
             </div>
 
-            {/* Submit Button */}
             <Button
               type="submit"
               disabled={loading || uploading}
@@ -341,6 +390,8 @@ export default function AddPetPage() {
                 ? "Saving..."
                 : uploading
                 ? "Uploading image..."
+                : isCampusMode
+                ? "Register Campus Dog"
                 : "Add Pet"}
             </Button>
           </form>

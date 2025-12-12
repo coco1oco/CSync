@@ -18,7 +18,18 @@ export default function AppLayout() {
         <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
       </div>
     );
+
   if (!user) return <Navigate to="/SignIn" replace />;
+
+  // 🛡️ SECURITY CHECK: FORCE PROFILE COMPLETION
+  // If user is missing their name, AND they are not already on the Edit page,
+  // force them to go there.
+  const isProfileIncomplete = !user.first_name || !user.last_name;
+  const isOnEditPage = location.pathname === "/ProfilePage/Edit";
+
+  if (isProfileIncomplete && !isOnEditPage) {
+    return <Navigate to="/ProfilePage/Edit" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row">
@@ -33,7 +44,6 @@ export default function AppLayout() {
         </div>
 
         {/* MAIN SCROLLABLE AREA */}
-        {/* Changed max-w-4xl to max-w-2xl for tighter feed */}
         <main className="flex-1 px-0 pb-24 lg:pb-8 lg:px-8 lg:pt-8 w-full max-w-2xl mx-auto">
           <AnimatePresence mode="wait">
             <motion.div

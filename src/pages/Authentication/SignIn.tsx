@@ -1,21 +1,21 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/context/authContext";
 import { supabase } from "@/lib/supabaseClient";
+// ✅ IMPORT TOAST
+import { toast } from "sonner";
 
 import logo from "@/assets/images/Pawpal.svg";
 import heroBg from "@/assets/images/hero_3.jpg";
 
 // 1. Define the Zod Schema
-// This replaces your manual regex and if/else checks
 const signInSchema = z.object({
   email: z
     .string()
@@ -28,16 +28,12 @@ const signInSchema = z.object({
   rememberMe: z.boolean().default(false).optional(),
 });
 
-// Infer the TypeScript type from the schema automatically
 type SignInFormValues = z.infer<typeof signInSchema>;
 
 export default function SignIn() {
-  const navigate = useNavigate();
-  const { user, loading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
-  const [serverError, setServerError] = useState<string | null>(null);
+  // ❌ REMOVED: serverError state (replaced by toast)
 
-  // 2. Initialize React Hook Form
   const {
     register,
     handleSubmit,
@@ -51,18 +47,7 @@ export default function SignIn() {
     },
   });
 
-  // Redirect if already logged in
-  useEffect(() => {
-    if (!loading && user) {
-      navigate("/", { replace: true });
-    }
-  }, [user, loading, navigate]);
-
-  // 3. The Submit Handler
-  // This only runs if Zod validation passes
   const onSubmit = async (data: SignInFormValues) => {
-    setServerError(null);
-
     try {
       const { data: authData, error: signInError } =
         await supabase.auth.signInWithPassword({
@@ -70,9 +55,7 @@ export default function SignIn() {
           password: data.password,
         });
 
-      if (signInError) {
-        throw signInError; // Throws to catch block
-      }
+      if (signInError) throw signInError;
 
       if (authData.user) {
         // Optional: Update last sign in
@@ -80,12 +63,16 @@ export default function SignIn() {
           .from("profiles")
           .update({ last_sign_in_at: new Date().toISOString() })
           .eq("id", authData.user.id);
+
+        // ✅ SUCCESS TOAST
+        toast.success("Welcome back! 🐾");
       }
 
-      // Navigation is handled by the useEffect above or AuthContext
+      // AuthContext will handle the redirect via PublicRoute
     } catch (err: any) {
       console.error("Login error:", err);
-      setServerError(err.message || "Invalid login credentials.");
+      // ✅ ERROR TOAST
+      toast.error(err.message || "Invalid login credentials.");
     }
   };
 
@@ -130,12 +117,7 @@ export default function SignIn() {
             </p>
           </div>
 
-          {/* Server Error Message */}
-          {serverError && (
-            <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl animate-in fade-in">
-              {serverError}
-            </div>
-          )}
+          {/* ❌ REMOVED: Server Error Message Div */}
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {/* Email Field */}
@@ -147,7 +129,6 @@ export default function SignIn() {
                 id="email"
                 type="email"
                 placeholder="name@example.com"
-                // 4. Connect input to react-hook-form
                 {...register("email")}
                 className={`h-12 rounded-xl bg-white border ${
                   errors.email
@@ -155,7 +136,6 @@ export default function SignIn() {
                     : "border-gray-200 focus-visible:ring-blue-600"
                 }`}
               />
-              {/* Show Zod Error Message */}
               {errors.email && (
                 <p className="text-[10px] text-red-500 ml-1">
                   {errors.email.message}

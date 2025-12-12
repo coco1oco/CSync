@@ -1,21 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/context/authContext";
 import { supabase } from "@/lib/supabaseClient";
 
 import logo from "@/assets/images/Pawpal.svg";
 import heroBg from "@/assets/images/hero_2.jpg";
 
 // 1. Define Regex Patterns
-// ✅ CHANGED: Now enforces @cvsu.edu.ph domain
 const CVSU_EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@cvsu\.edu\.ph$/;
 const USERNAME_REGEX = /^[a-zA-Z][a-zA-Z0-9_]{2,15}$/;
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/;
@@ -27,7 +25,6 @@ const signUpSchema = z
       .string()
       .min(1, "Email is required")
       .email("Invalid email format")
-      // ✅ UPDATED VALIDATION RULE
       .regex(
         CVSU_EMAIL_REGEX,
         "Please use your institutional email (@cvsu.edu.ph)"
@@ -50,29 +47,26 @@ const signUpSchema = z
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
-    path: ["confirmPassword"], // Error will show on this field
+    path: ["confirmPassword"],
   });
 
-// Type Inference
 type SignUpFormValues = z.infer<typeof signUpSchema>;
 
 export default function SignUp() {
-  const navigate = useNavigate();
-  const { user, loading } = useAuth();
+  // ✅ REMOVED: navigate, useAuth, and useEffect
+  // The PublicRoute wrapper now handles the redirect if they are already logged in.
 
-  // UI State
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  // 3. Initialize React Hook Form
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<SignUpFormValues>({
     resolver: zodResolver(signUpSchema),
-    mode: "onBlur", // Validate on blur for better UX
+    mode: "onBlur",
     defaultValues: {
       email: "",
       username: "",
@@ -81,23 +75,10 @@ export default function SignUp() {
     },
   });
 
-  // Redirect Logic
-  useEffect(() => {
-    if (user && !loading) {
-      if (!user.first_name || !user.last_name) {
-        navigate("/ProfilePage/Edit", { replace: true });
-      } else {
-        navigate("/ProfilePage", { replace: true });
-      }
-    }
-  }, [user, loading, navigate]);
-
-  // 4. Submit Handler
   const onSubmit = async (data: SignUpFormValues) => {
     setServerError(null);
 
     try {
-      // Sign Up
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
@@ -120,7 +101,8 @@ export default function SignUp() {
         if (profileError) throw profileError;
       }
 
-      // Success handled by AuthContext + useEffect redirect
+      // Success! AuthContext will update, PublicRoute will see the user,
+      // and AppRouter will automatically flip them to the Dashboard.
     } catch (err: any) {
       console.error("SignUp Error:", err);
       setServerError(err.message || "An error occurred during sign up");

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Loader2, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import logo from "@/assets/images/Pawpal.svg";
-import heroBg from "@/assets/images/hero_4.jpg"; // Re-using the 'Forgot' hero image
+import heroBg from "@/assets/images/hero_4.jpg";
 
 export default function UpdatePassword() {
   const navigate = useNavigate();
@@ -16,9 +16,6 @@ export default function UpdatePassword() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-
-  // Logic: Supabase automatically handles the session from the email link.
-  // We just need to call updateUser to change the password for the *current* session.
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();

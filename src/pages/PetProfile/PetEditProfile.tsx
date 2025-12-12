@@ -1,10 +1,46 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/authContext";
 import { usePets } from "@/lib/usePets";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Upload, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { toast } from "sonner"; // ✅ Toasts
+import { uploadImageToCloudinary } from "@/lib/cloudinary"; // ✅ Consistent Uploads
+
+// ✅ Reuse the Breed Data for consistency
+const BREED_DATA: Record<string, string[]> = {
+  Dog: [
+    "Aspin (Askal)",
+    "Beagle",
+    "Bulldog",
+    "Chihuahua",
+    "Dachshund",
+    "German Shepherd",
+    "Golden Retriever",
+    "Labrador Retriever",
+    "Pomeranian",
+    "Poodle",
+    "Pug",
+    "Shih Tzu",
+    "Siberian Husky",
+    "Mixed Breed",
+  ],
+  Cat: [
+    "Puspin (Domestic Short Hair)",
+    "Persian",
+    "Siamese",
+    "Maine Coon",
+    "British Shorthair",
+    "Ragdoll",
+    "Bengal",
+    "Scottish Fold",
+    "Sphynx",
+    "Mixed Breed",
+  ],
+  Bird: ["Parakeet", "Cockatiel", "Lovebird", "Canary", "Parrot", "Finch"],
+  Rabbit: ["Netherland Dwarf", "Holland Lop", "Lionhead", "Mini Rex"],
+};
 
 interface FormData {
   name: string;
@@ -21,8 +57,9 @@ interface FormData {
 export default function PetEditProfile() {
   const { petId } = useParams<{ petId: string }>();
   const { user } = useAuth();
-  const { pets } = usePets(user?.id);
+  const { pets } = usePets(user?.id); // Note: We might want a dedicated fetchPet(id) later for freshness
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState<FormData>({
     name: "",
@@ -36,14 +73,16 @@ export default function PetEditProfile() {
     petimage_url: "",
   });
 
+  // Smart Breed Logic
+  const [availableBreeds, setAvailableBreeds] = useState<string[]>([]);
+
   const [loading, setLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   const pet = pets.find((p) => p.id === petId);
 
+  // Load Pet Data
   useEffect(() => {
     if (pet) {
       setFormData({
@@ -63,14 +102,26 @@ export default function PetEditProfile() {
     }
   }, [pet]);
 
+  // Update Breeds when Species changes (Initial load + User change)
+  useEffect(() => {
+    if (formData.species && BREED_DATA[formData.species]) {
+      setAvailableBreeds(BREED_DATA[formData.species]);
+    } else {
+      setAvailableBreeds([]);
+    }
+  }, [formData.species]);
+
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+
+    // Clear breed if species changes
+    if (name === "species" && value !== formData.species) {
+      setFormData((prev) => ({ ...prev, [name]: value, breed: "" }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,50 +143,29 @@ export default function PetEditProfile() {
       ...prev,
       petimage_url: "",
     }));
-  };
-
-  const uploadImage = async (file: File): Promise<string | null> => {
-    try {
-      const fileName = `${user?.id}/${petId}/${Date.now()}-${file.name}`;
-      const { data, error } = await supabase.storage
-        .from("pet-images")
-        .upload(fileName, file, { upsert: true });
-
-      if (error) throw error;
-
-      const { data: publicData } = supabase.storage
-        .from("pet-images")
-        .getPublicUrl(data.path);
-
-      return publicData.publicUrl;
-    } catch (err: any) {
-      console.error("Error uploading image:", err);
-      setError("Failed to upload image");
-      return null;
-    }
+    // Reset file input
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
-    setSuccess(null);
 
     try {
       let imageUrl = formData.petimage_url;
 
-      // Upload new image if selected
+      // ✅ Use standard Cloudinary uploader
       if (imageFile) {
-        const uploadedUrl = await uploadImage(imageFile);
-        if (uploadedUrl) {
-          imageUrl = uploadedUrl;
-        } else {
-          setLoading(false);
-          return;
+        toast.info("Uploading new photo...");
+        try {
+          const uploadedUrl = await uploadImageToCloudinary(imageFile);
+          if (uploadedUrl) imageUrl = uploadedUrl;
+        } catch (uploadErr) {
+          console.error("Upload failed", uploadErr);
+          toast.error("Failed to upload image, but saving profile...");
         }
       }
 
-      // Update pet in database
       const { error: updateError } = await supabase
         .from("pets")
         .update({
@@ -144,9 +174,9 @@ export default function PetEditProfile() {
           breed: formData.breed,
           color: formData.color,
           sex: formData.sex,
-          dob: formData.dob,
-          microchip_id: formData.microchip_id,
-          location: formData.location,
+          dob: formData.dob || null,
+          microchip_id: formData.microchip_id || null,
+          location: formData.location || null,
           petimage_url: imageUrl,
         })
         .eq("id", petId)
@@ -154,15 +184,15 @@ export default function PetEditProfile() {
 
       if (updateError) throw updateError;
 
-      setSuccess("Pet profile updated successfully!");
+      // ✅ Success Toast
+      toast.success("Pet profile updated successfully!");
 
-      // Redirect after 1.5 seconds
       setTimeout(() => {
         navigate(`/PetDashboard/${petId}`);
-      }, 1500);
+      }, 1000);
     } catch (err: any) {
       console.error("Error updating pet:", err);
-      setError(err.message || "Failed to update pet profile");
+      toast.error(err.message || "Failed to update pet profile");
     } finally {
       setLoading(false);
     }
@@ -171,7 +201,10 @@ export default function PetEditProfile() {
   if (!pet) {
     return (
       <div className="w-full min-h-screen bg-white p-4 flex items-center justify-center">
-        <p className="text-gray-600">Pet not found</p>
+        <div className="text-center">
+          <div className="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+          <p className="text-gray-500">Loading pet details...</p>
+        </div>
       </div>
     );
   }
@@ -193,18 +226,6 @@ export default function PetEditProfile() {
         {/* Form Card */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Error/Success Messages */}
-            {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                {error}
-              </div>
-            )}
-            {success && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-                {success}
-              </div>
-            )}
-
             {/* Image Upload */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-3">
@@ -234,9 +255,10 @@ export default function PetEditProfile() {
               <label className="flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 cursor-pointer transition">
                 <Upload className="w-4 h-4" />
                 <span className="text-sm font-medium text-gray-600">
-                  Upload Photo
+                  {imageFile ? "Change Photo" : "Upload Photo"}
                 </span>
                 <input
+                  ref={fileInputRef}
                   type="file"
                   accept="image/*"
                   onChange={handleImageChange}
@@ -255,7 +277,6 @@ export default function PetEditProfile() {
                 name="name"
                 value={formData.name}
                 onChange={handleInputChange}
-                placeholder="Enter pet name"
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
               />
@@ -271,7 +292,7 @@ export default function PetEditProfile() {
                   name="species"
                   value={formData.species}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white"
                 >
                   <option value="">Select species</option>
                   <option value="Dog">Dog</option>
@@ -282,6 +303,8 @@ export default function PetEditProfile() {
                   <option value="Other">Other</option>
                 </select>
               </div>
+
+              {/* ✅ SMART BREED INPUT */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Breed
@@ -291,9 +314,19 @@ export default function PetEditProfile() {
                   name="breed"
                   value={formData.breed}
                   onChange={handleInputChange}
-                  placeholder="e.g., Golden Retriever"
+                  list="breed-suggestions-edit" // Unique ID
+                  placeholder={
+                    availableBreeds.length > 0
+                      ? "Select/Type..."
+                      : "e.g. Bulldog"
+                  }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 />
+                <datalist id="breed-suggestions-edit">
+                  {availableBreeds.map((breed) => (
+                    <option key={breed} value={breed} />
+                  ))}
+                </datalist>
               </div>
             </div>
 
@@ -308,7 +341,6 @@ export default function PetEditProfile() {
                   name="color"
                   value={formData.color}
                   onChange={handleInputChange}
-                  placeholder="e.g., Brown"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 />
               </div>
@@ -320,7 +352,7 @@ export default function PetEditProfile() {
                   name="sex"
                   value={formData.sex}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white"
                 >
                   <option value="">Select sex</option>
                   <option value="Male">Male</option>
@@ -329,33 +361,33 @@ export default function PetEditProfile() {
               </div>
             </div>
 
-            {/* Date of Birth */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Date of Birth
-              </label>
-              <input
-                type="date"
-                name="dob"
-                value={formData.dob}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              />
-            </div>
-
-            {/* Location */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Location
-              </label>
-              <input
-                type="text"
-                name="location"
-                value={formData.location}
-                onChange={handleInputChange}
-                placeholder="e.g., New York, NY"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              />
+            {/* Date of Birth & Location */}
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Date of Birth
+                </label>
+                <input
+                  type="date"
+                  name="dob"
+                  value={formData.dob}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Location
+                </label>
+                <input
+                  type="text"
+                  name="location"
+                  value={formData.location}
+                  onChange={handleInputChange}
+                  placeholder="e.g., New York, NY"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                />
+              </div>
             </div>
 
             {/* Microchip ID */}
@@ -368,7 +400,6 @@ export default function PetEditProfile() {
                 name="microchip_id"
                 value={formData.microchip_id}
                 onChange={handleInputChange}
-                placeholder="Enter microchip ID"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
               />
             </div>
@@ -379,7 +410,7 @@ export default function PetEditProfile() {
               disabled={loading}
               className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-lg transition disabled:opacity-50"
             >
-              {loading ? "Saving..." : "Save Changes"}
+              {loading ? "Saving Changes..." : "Update Profile"}
             </Button>
           </form>
         </div>
