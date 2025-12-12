@@ -6,9 +6,12 @@ import {
 } from "react-router-dom";
 import { AuthProvider } from "@/context/authContext";
 import { ProtectedRoute } from "./ProtectedRoute";
+import { PublicRoute } from "./PublicRoute";
 import AppLayout from "@/components/AppLayout";
 import AuthLayout from "@/components/AuthLayout";
 import { Loader2 } from "lucide-react";
+// ✅ IMPORT SONNER
+import { Toaster } from "sonner";
 
 // --- LAZY IMPORTS ---
 const AdminHomePage = lazy(() =>
@@ -26,6 +29,7 @@ const MainPetProfilePage = lazy(
 const AddPetPage = lazy(() => import("@/pages/PetProfile/AddPetPage"));
 const PetProfilePage = lazy(() => import("@/pages/PetProfile/PetProfilePage"));
 const PetEditProfile = lazy(() => import("@/pages/PetProfile/PetEditProfile"));
+const CampusPetsPage = lazy(() => import("@/pages/PetProfile/CampusPetsPage"));
 
 const Welcome = lazy(() => import("@/pages/Authentication/Welcome"));
 const SignIn = lazy(() => import("@/pages/Authentication/SignIn"));
@@ -47,8 +51,10 @@ const MenuPage = lazy(() => import("@/pages/SharedPages/MenuPage"));
 const EditProfilePage = lazy(
   () => import("@/pages/SharedPages/EditProfilePage")
 );
-const MessagesPage = lazy(() => import("@/pages/Dummy/MessagesPage"));
-const NotificationsPage = lazy(() => import("@/pages/Dummy/NotificationsPage"));
+const MessagesPage = lazy(() => import("@/pages/SharedPages/MessagesPage"));
+const NotificationsPage = lazy(
+  () => import("@/pages/SharedPages/NotificationsPage")
+);
 
 const PageLoader = () => (
   <div className="flex h-screen w-full items-center justify-center bg-gray-50">
@@ -59,7 +65,12 @@ const PageLoader = () => (
 const router = createBrowserRouter([
   // ... Public Routes ...
   {
-    element: <AuthLayout />,
+    // ✅ WRAPPED IN PUBLIC ROUTE
+    element: (
+      <PublicRoute>
+        <AuthLayout />
+      </PublicRoute>
+    ),
     children: [
       {
         path: "/welcome",
@@ -129,6 +140,14 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: "/reset-password",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <UpdatePassword />
+          </Suspense>
+        ),
+      },
+      {
         path: "/UserDashboard",
         element: (
           <Suspense fallback={<PageLoader />}>
@@ -183,7 +202,6 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-      // ✅ CORRECTED: Admin Team Management
       {
         path: "/admin/team",
         element: (
@@ -230,7 +248,14 @@ const router = createBrowserRouter([
         ),
       },
       {
-        // ✅ CORRECTED: Points to AddPetPage
+        path: "/campus-pets",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <CampusPetsPage />
+          </Suspense>
+        ),
+      },
+      {
         path: "/PetDashboard/new",
         element: (
           <Suspense fallback={<PageLoader />}>
@@ -262,6 +287,10 @@ const router = createBrowserRouter([
 export default function AppRouter() {
   return (
     <AuthProvider>
+      {/* ✅ ADD THE TOASTER HERE */}
+      {/* 'richColors' makes success green and error red automatically */}
+      <Toaster position="top-center" richColors />
+
       <RouterProvider router={router} />
     </AuthProvider>
   );

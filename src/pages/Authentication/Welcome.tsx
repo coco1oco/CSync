@@ -1,24 +1,14 @@
-import { Link, useNavigate } from "react-router-dom";
-import { useEffect } from "react";
-import { useAuth } from "@/context/authContext";
+import { Link } from "react-router-dom";
 import logo from "@/assets/images/Pawpal.svg";
 import heroBg from "@/assets/images/hero_1.jpg";
 
 export default function Welcome() {
-  const { user, loading } = useAuth();
-  const navigate = useNavigate();
-
-  // Safety Check: If user is already logged in, send them to the Feed
-  useEffect(() => {
-    if (!loading && user) {
-      navigate("/", { replace: true });
-    }
-  }, [user, loading, navigate]);
+  // ✅ REMOVED: useAuth and useEffect redirect logic
+  // The PublicRoute wrapper in AppRouter handles this now.
 
   return (
     <div className="flex flex-col lg:flex-row h-screen w-full bg-white overflow-hidden">
       {/* LEFT SECTION (Desktop Only - Hero Image) */}
-      {/* 'hidden' on mobile, 'lg:block' on desktop */}
       <div className="hidden lg:block lg:w-1/2 lg:h-full bg-blue-50 overflow-hidden shrink-0 relative">
         <img
           src={heroBg}
@@ -26,14 +16,12 @@ export default function Welcome() {
           className="absolute inset-0 w-full h-full object-cover opacity-90"
         />
 
-        {/* Logo Overlay - Clean Version (No Blur/Glass) */}
+        {/* Logo Overlay */}
         <div className="absolute inset-0 flex items-center justify-center bg-blue-900/10 backdrop-blur-[1px]">
           <div className="w-64 h-64 flex items-center justify-center animate-in zoom-in duration-700">
             <img
               src={logo}
               alt="PawPal Logo"
-              // 'rounded-full' ensures it stays circular
-              // 'shadow-2xl' makes it pop off the background
               className="w-full h-full object-contain rounded-full shadow-2xl"
             />
           </div>
@@ -43,7 +31,7 @@ export default function Welcome() {
       {/* RIGHT SECTION (Content) */}
       <div className="w-full flex-1 lg:w-1/2 flex items-center justify-center p-8 lg:p-16 relative bg-white">
         <div className="w-full max-w-lg space-y-10">
-          {/* Mobile Logo (Visible only on mobile since Hero is hidden) */}
+          {/* Mobile Logo */}
           <div className="lg:hidden flex justify-center mb-8">
             <img src={logo} alt="PawPal" className="h-32 w-32 object-contain" />
           </div>

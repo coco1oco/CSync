@@ -43,3 +43,18 @@ export type UpdateProfilePayload = {
   first_name?: string;
   last_name?: string;
 };
+
+export interface Message {
+  id: number;
+  conversation_id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+  sender?: UserProfile; // We will join this
+}
+
+export interface Conversation {
+  id: string;
+  name: string;
+  is_group: boolean;
+}
