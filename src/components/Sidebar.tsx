@@ -8,9 +8,10 @@ import {
   LogOut,
   User,
   Loader2,
-  Users, // ✅ Added Users icon
+  Users,
 } from "lucide-react";
 import { useAuth } from "@/context/authContext";
+import { useChat } from "@/context/ChatContext"; // ✅ IMPORTED
 import logo from "@/assets/images/Pawpal.svg";
 import type { UserRole } from "@/types";
 
@@ -22,20 +23,17 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut } = useAuth();
+  const { unreadCount } = useChat(); // ✅ GET COUNT
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
 
-  // 1. Define Base Navigation Items
   const navItems = [
     { path: "/", icon: Home, label: "Home" },
     { path: "/messages", icon: MessageCircle, label: "Messages" },
-
-    // ✅ SWAP LOGIC: Show Team Management for Admins, Notifications for Members
     ...(userRole === "admin"
       ? [{ path: "/admin/team", icon: Users, label: "Manage Team" }]
       : [{ path: "/notifications", icon: Bell, label: "Notifications" }]),
-
     {
       path: "/PetDashboard",
       icon: PawPrint,
@@ -56,13 +54,11 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
 
   return (
     <aside className="hidden lg:flex flex-col w-64 h-screen fixed left-0 top-0 border-r border-gray-200 bg-white z-50">
-      {/* 1. Logo Area */}
       <div className="p-6 flex items-center gap-3">
         <img src={logo} alt="PawPal" className="h-8 w-8" />
         <span className="font-bold text-xl text-blue-950">PawPal</span>
       </div>
 
-      {/* 2. Navigation Links */}
       <nav className="flex-1 px-4 space-y-2 py-4">
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -72,20 +68,28 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
             <Link
               key={item.path}
               to={item.path}
-              className={`flex items-center gap-3 px-4 py-3 rounded-full transition-all font-medium ${
+              className={`flex items-center gap-3 px-4 py-3 rounded-full transition-all font-medium relative ${
                 active
                   ? "bg-blue-50 text-blue-600"
                   : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
               }`}
             >
-              <Icon size={24} strokeWidth={active ? 2.5 : 2} />
+              <div className="relative">
+                <Icon size={24} strokeWidth={active ? 2.5 : 2} />
+
+                {/* ✅ BADGE LOGIC */}
+                {item.label === "Messages" && unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] flex items-center justify-center border-2 border-white shadow-sm">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </div>
               {item.label}
             </Link>
           );
         })}
       </nav>
 
-      {/* 3. Profile & Logout (Bottom) */}
       <div className="p-4 border-t border-gray-100 space-y-2">
         <Link
           to="/ProfilePage"
