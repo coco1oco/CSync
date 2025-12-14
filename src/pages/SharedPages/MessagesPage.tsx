@@ -6,7 +6,6 @@ import { Users, Lock, Hash, Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Message, Conversation } from "@/types";
-import { RealtimeChannel } from "@supabase/supabase-js"; // ✅ Import type
 
 export default function MessagesPage() {
   const { user } = useAuth();
@@ -21,11 +20,10 @@ export default function MessagesPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // ⚡ PERFORMANCE & CONNECTION REFS
-  const channelRef = useRef<RealtimeChannel | null>(null); // ✅ HOLDS THE CONNECTION
+  // ⚡ PERFORMANCE REFS
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastTypingSentRef = useRef<number>(0);
-  const profileCache = useRef<Record<string, any>>({});
+  const lastTypingSentRef = useRef<number>(0); // Tracks last time we told Supabase we are typing
+  const profileCache = useRef<Record<string, any>>({}); // Caches user profiles to avoid slow fetches
 
   // 1. FETCH ROOMS
   useEffect(() => {
@@ -60,7 +58,6 @@ export default function MessagesPage() {
   useEffect(() => {
     if (!activeRoom || !user) return;
 
-    // Mark read
     const markAsRead = async () => {
       await supabase.rpc("mark_room_as_read", {
         room_id: activeRoom.id,
@@ -81,6 +78,7 @@ export default function MessagesPage() {
 
       if (!error && data) {
         setMessages(data as any);
+        // Cache the profiles we just loaded
         data.forEach((msg: any) => {
           if (msg.sender_id && msg.sender) {
             profileCache.current[msg.sender_id] = msg.sender;
@@ -93,8 +91,7 @@ export default function MessagesPage() {
     fetchMessages();
 
     // B. Setup Realtime Channel
-    // ✅ Store it in the Ref so handleTyping can use it later
-    channelRef.current = supabase
+    const channel = supabase
       .channel(`room-${activeRoom.id}`)
       .on(
         "postgres_changes",
@@ -105,12 +102,15 @@ export default function MessagesPage() {
           filter: `conversation_id=eq.${activeRoom.id}`,
         },
         async (payload) => {
-          if (payload.new.sender_id === user.id) return;
+          if (payload.new.sender_id === user.id) return; // Ignore my own messages (Optimistic UI)
 
           markAsRead();
 
+          // ⚡ FAST FETCH: Check Cache First
           let senderData = profileCache.current[payload.new.sender_id];
+
           if (!senderData) {
+            // Only fetch from DB if not in cache
             const { data } = await supabase
               .from("profiles")
               .select("username, avatar_url, first_name")
@@ -119,7 +119,7 @@ export default function MessagesPage() {
 
             if (data) {
               senderData = data;
-              profileCache.current[payload.new.sender_id] = data;
+              profileCache.current[payload.new.sender_id] = data; // Save to cache
             }
           }
 
@@ -129,25 +129,19 @@ export default function MessagesPage() {
         }
       )
       .on("presence", { event: "sync" }, () => {
-        const state = channelRef.current?.presenceState();
+        const state = channel.presenceState();
         const typing: string[] = [];
-
-        // Debug Log to check if signals are arriving
-        console.log("Presence Sync:", state);
-
         for (const id in state) {
-          const persons = state[id] as any[];
-          persons.forEach((person) => {
-            if (person.user_id !== user.id && person.isTyping) {
-              typing.push(person.first_name || person.username);
-            }
-          });
+          const person = state[id][0] as any;
+          if (person && person.user_id !== user.id && person.isTyping) {
+            typing.push(person.first_name || person.username);
+          }
         }
         setTypingUsers(typing);
       })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
-          await channelRef.current?.track({
+          await channel.track({
             user_id: user.id,
             username: user.username,
             first_name: user.first_name,
@@ -157,8 +151,7 @@ export default function MessagesPage() {
       });
 
     return () => {
-      supabase.removeChannel(channelRef.current as RealtimeChannel);
-      channelRef.current = null;
+      supabase.removeChannel(channel);
       setTypingUsers([]);
     };
   }, [activeRoom, user?.id]);
@@ -169,38 +162,40 @@ export default function MessagesPage() {
     }, 100);
   };
 
-  // ⚡ RELIABLE TYPING HANDLER
+  // ⚡ OPTIMIZED TYPING HANDLER (Throttled)
   const handleTyping = async () => {
-    // 1. Check if we have a valid connection
-    if (!channelRef.current || !user) return;
+    if (!activeRoom || !user) return;
 
     const now = Date.now();
-    // Throttle: Only send signal every 2 seconds
+    // Only update Supabase once every 2 seconds, not every keystroke
     if (now - lastTypingSentRef.current < 2000) return;
 
     lastTypingSentRef.current = now;
 
-    // 2. Send "True"
-    await channelRef.current.track({
-      user_id: user.id,
-      username: user.username,
-      first_name: user.first_name,
-      isTyping: true,
-    });
+    const channel = supabase
+      .getChannels()
+      .find((c) => c.topic === `room-${activeRoom.id}`);
 
-    // 3. Set timeout to send "False"
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    if (channel) {
+      await channel.track({
+        user_id: user.id,
+        username: user.username,
+        first_name: user.first_name,
+        isTyping: true,
+      });
 
-    typingTimeoutRef.current = setTimeout(async () => {
-      if (channelRef.current) {
-        await channelRef.current.track({
+      // Reset the "Stop Typing" timer
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
+      typingTimeoutRef.current = setTimeout(async () => {
+        await channel.track({
           user_id: user.id,
           username: user.username,
           first_name: user.first_name,
           isTyping: false,
         });
-      }
-    }, 3000);
+      }, 3000); // Stop typing after 3 seconds of silence
+    }
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -227,16 +222,6 @@ export default function MessagesPage() {
 
     setMessages((prev) => [...prev, optimisticMsg]);
     scrollToBottom();
-
-    // Reset typing status immediately upon send
-    if (channelRef.current) {
-      channelRef.current.track({
-        user_id: user.id,
-        username: user.username,
-        first_name: user.first_name,
-        isTyping: false,
-      });
-    }
 
     const { error } = await supabase.from("messages").insert([
       {
@@ -361,29 +346,12 @@ export default function MessagesPage() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* ✅ TYPING INDICATOR UI */}
-            <div className="min-h-[24px] px-6 py-2 bg-white">
-              {typingUsers.length > 0 && (
-                <div className="flex items-center gap-2 text-xs text-gray-400 italic animate-pulse">
-                  <span
-                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                    style={{ animationDelay: "0ms" }}
-                  />
-                  <span
-                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                    style={{ animationDelay: "150ms" }}
-                  />
-                  <span
-                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                    style={{ animationDelay: "300ms" }}
-                  />
-                  <span className="ml-1">
-                    {typingUsers.join(", ")}{" "}
-                    {typingUsers.length > 1 ? "are" : "is"} typing...
-                  </span>
-                </div>
-              )}
-            </div>
+            {typingUsers.length > 0 && (
+              <div className="px-6 py-2 text-xs text-gray-400 italic bg-white animate-pulse">
+                {typingUsers.join(", ")} {typingUsers.length > 1 ? "are" : "is"}{" "}
+                typing...
+              </div>
+            )}
 
             <div className="p-4 bg-white border-t border-gray-100">
               <form
