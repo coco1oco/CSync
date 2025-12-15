@@ -43,6 +43,11 @@
 
 :root {
   --radius: 0.625rem;
+
+  /* iOS safe-area insets (for notch / status bar). */
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -123,5 +128,22 @@
   .no-eye::-ms-reveal,
   .no-eye::-ms-clear {
     display: none;
+  }
+
+  /* Used by the app header to avoid the iOS notch.
+     Includes a base top/bottom padding comparable to Tailwind `py-3`. */
+  .header-safe {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+    padding-bottom: 0.75rem;
+  }
+
+  .h-app-content {
+    height: calc(100vh - 64px);
+  }
+
+  @supports (height: 100dvh) {
+    .h-app-content {
+      height: calc(100dvh - 64px);
+    }
   }
 }

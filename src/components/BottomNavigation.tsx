@@ -30,7 +30,7 @@ export function BottomNavigation({
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 border-t border-gray-200 bg-white z-50 pb-safe">
+    <nav className="fixed bottom-0 left-0 right-0 border-t border-gray-200 bg-white z-50">
       <div className="mx-auto flex max-w-md items-center justify-around px-4 py-3">
         {navItems.map(({ path, icon: Icon, label }) => (
           <button

@@ -3,8 +3,18 @@ import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/authContext";
 import { EventCard } from "@/components/EventCard";
+import { EventRegistrationModal } from "@/components/EventRegistrationModal";
 import type { OutreachEvent, Comment } from "@/types";
-import { Heart, MessageCircle, Send, Loader2, X, Trash2 } from "lucide-react";
+import {
+  Heart,
+  MessageCircle,
+  Send,
+  Loader2,
+  X,
+  Trash2,
+  CalendarCheck,
+  CheckCircle2,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import FailedImageIcon from "@/assets/FailedImage.svg";
@@ -14,31 +24,37 @@ interface FeedPostProps {
   isAdmin: boolean;
   onDelete: () => void;
   onEdit: () => void;
+  onTagClick?: (tag: string) => void;
 }
 
-export function FeedPost({ event, isAdmin, onDelete, onEdit }: FeedPostProps) {
+export function FeedPost({
+  event,
+  isAdmin,
+  onDelete,
+  onEdit,
+  onTagClick,
+}: FeedPostProps) {
   const { user } = useAuth();
 
-  // State
   const [likesCount, setLikesCount] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
   const [commentsCount, setCommentsCount] = useState(0);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
+  const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
+  const [isRegistered, setIsRegistered] = useState(false);
 
   useEffect(() => {
     fetchLikes();
     fetchCommentsCount();
+    checkRegistration();
   }, []);
 
-  // --- LIKES LOGIC ---
   const fetchLikes = async () => {
     const { count } = await supabase
       .from("likes")
       .select("*", { count: "exact", head: true })
       .eq("event_id", event.id);
-
     setLikesCount(count || 0);
-
     if (user) {
       const { data } = await supabase
         .from("likes")
@@ -52,14 +68,9 @@ export function FeedPost({ event, isAdmin, onDelete, onEdit }: FeedPostProps) {
 
   const toggleLike = async () => {
     if (!user) return;
-
     const previousLiked = isLiked;
-    const previousCount = likesCount;
-
-    // Optimistic Update
     setIsLiked(!isLiked);
     setLikesCount(isLiked ? likesCount - 1 : likesCount + 1);
-
     try {
       if (previousLiked) {
         await supabase
@@ -73,14 +84,11 @@ export function FeedPost({ event, isAdmin, onDelete, onEdit }: FeedPostProps) {
           .insert([{ event_id: event.id, user_id: user.id }]);
       }
     } catch (err) {
-      // Rollback
       setIsLiked(previousLiked);
-      setLikesCount(previousCount);
-      console.error("Like failed", err);
+      setLikesCount(likesCount);
     }
   };
 
-  // --- COMMENTS COUNT ONLY ---
   const fetchCommentsCount = async () => {
     const { count } = await supabase
       .from("comments")
@@ -89,38 +97,88 @@ export function FeedPost({ event, isAdmin, onDelete, onEdit }: FeedPostProps) {
     setCommentsCount(count || 0);
   };
 
+  const checkRegistration = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("event_registrations")
+      .select("id")
+      .eq("event_id", event.id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (data) setIsRegistered(true);
+  };
+
   return (
     <>
-      <div className="bg-white shadow-sm lg:rounded-2xl overflow-hidden border-y border-gray-100 lg:border mb-4 lg:mb-6">
+      {/* ✅ CLEAN CONTAINER: Just spacing, no white bg/borders */}
+      <div className="mb-4">
         <EventCard
           event={event}
           isAdmin={isAdmin}
           onEdit={onEdit}
           onDelete={onDelete}
-        />
+          onTagClick={onTagClick}
+        >
+          {/* ✅ ACTION BAR INJECTED INTO EVENT CARD */}
+          <div className="flex items-center justify-between mb-2">
+            {/* Left: Interactions */}
+            <div className="flex items-center gap-4">
+              <button
+                onClick={toggleLike}
+                className="flex items-center gap-1.5 group transition-all focus:outline-none"
+              >
+                <Heart
+                  className={`w-6 h-6 transition-transform group-active:scale-90 ${
+                    isLiked
+                      ? "fill-red-500 text-red-500"
+                      : "text-gray-900 hover:text-gray-600"
+                  }`}
+                  strokeWidth={isLiked ? 0 : 2}
+                />
+                {likesCount > 0 && (
+                  <span className="text-sm font-bold text-gray-900">
+                    {likesCount}
+                  </span>
+                )}
+              </button>
 
-        <div className="px-4 py-3 border-t border-gray-50 flex items-center gap-6">
-          <button
-            onClick={toggleLike}
-            className={`flex items-center gap-2 text-sm font-medium transition-colors ${
-              isLiked ? "text-pink-600" : "text-gray-500 hover:text-gray-900"
-            }`}
-          >
-            <Heart className={`w-5 h-5 ${isLiked ? "fill-current" : ""}`} />
-            <span>{likesCount > 0 ? likesCount : "Like"}</span>
-          </button>
+              <button
+                onClick={() => setIsCommentsOpen(true)}
+                className="flex items-center gap-1.5 group transition-all focus:outline-none"
+              >
+                <MessageCircle
+                  className="w-6 h-6 text-gray-900 hover:text-gray-600"
+                  strokeWidth={2}
+                />
+                {commentsCount > 0 && (
+                  <span className="text-sm font-bold text-gray-900">
+                    {commentsCount}
+                  </span>
+                )}
+              </button>
+            </div>
 
-          <button
-            onClick={() => setIsCommentsOpen(true)}
-            className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors"
-          >
-            <MessageCircle className="w-5 h-5" />
-            <span>{commentsCount > 0 ? commentsCount : "Comment"}</span>
-          </button>
-        </div>
+            {/* Right: Registration Button (Hidden for Admins) */}
+            {!isAdmin &&
+              (isRegistered ? (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 text-xs font-bold rounded-full border border-green-200">
+                  <CheckCircle2 size={14} />
+                  <span>Going</span>
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={() => setIsRegistrationOpen(true)}
+                  className="h-8 rounded-full bg-black hover:bg-gray-800 text-white text-xs font-bold px-4 shadow-sm"
+                >
+                  <CalendarCheck className="w-3.5 h-3.5 mr-1.5" />
+                  Register
+                </Button>
+              ))}
+          </div>
+        </EventCard>
       </div>
 
-      {/* COMMENTS MODAL / SHEET */}
       {isCommentsOpen && (
         <CommentsModal
           event={event}
@@ -132,12 +190,20 @@ export function FeedPost({ event, isAdmin, onDelete, onEdit }: FeedPostProps) {
           }
         />
       )}
+
+      {isRegistrationOpen && (
+        <EventRegistrationModal
+          eventId={event.id}
+          eventTitle={event.title}
+          onClose={() => setIsRegistrationOpen(false)}
+          onSuccess={() => setIsRegistered(true)}
+        />
+      )}
     </>
   );
 }
 
-// --- DEDICATED COMMENTS MODAL COMPONENT ---
-
+// ... CommentsModal Logic ...
 interface CommentsModalProps {
   event: OutreachEvent;
   user: any;
@@ -158,28 +224,89 @@ function CommentsModal({
   const [loading, setLoading] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // 1. Fetch & Subscribe
   useEffect(() => {
-    document.body.style.overflow = "hidden"; // Lock scroll
+    // Lock background scroll while modal is open.
+    const originalHtmlOverflow = document.documentElement.style.overflow;
+    const originalBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
 
     const fetchComments = async () => {
       setLoading(true);
-      // ✅ OPTIMIZATION: Limit to 50 to prevent freezing
-      const { data } = await supabase
+
+      // Preferred path: join profile info in a single query.
+      const joined = await supabase
         .from("comments")
         .select("*, user:profiles(id, username, avatar_url)")
         .eq("event_id", event.id)
         .order("created_at", { ascending: true })
         .limit(50);
 
-      if (data) setComments(data as unknown as Comment[]);
+      if (!joined.error && joined.data) {
+        setComments(joined.data as unknown as Comment[]);
+        setLoading(false);
+        setTimeout(() => bottomRef.current?.scrollIntoView(), 100);
+        return;
+      }
+
+      // Fallback path: some Supabase setups don't have a FK relationship that enables `user:profiles(...)`.
+      // In that case, fetch comments first, then fetch profiles separately.
+      if (joined.error) {
+        console.error("Failed to load comments (join)", joined.error);
+      }
+
+      const base = await supabase
+        .from("comments")
+        .select("id, user_id, event_id, content, created_at")
+        .eq("event_id", event.id)
+        .order("created_at", { ascending: true })
+        .limit(50);
+
+      if (base.error) {
+        console.error("Failed to load comments", base.error);
+        setComments([]);
+        setLoading(false);
+        return;
+      }
+
+      const rows = (base.data ?? []) as Array<
+        Pick<Comment, "id" | "user_id" | "event_id" | "content" | "created_at">
+      >;
+
+      const userIds = Array.from(
+        new Set(rows.map((c) => c.user_id).filter(Boolean))
+      );
+      const profilesRes = userIds.length
+        ? await supabase
+            .from("profiles")
+            .select("id, username, avatar_url")
+            .in("id", userIds)
+        : { data: [], error: null as unknown };
+
+      if ((profilesRes as any).error) {
+        console.error(
+          "Failed to load comment authors",
+          (profilesRes as any).error
+        );
+      }
+
+      const profileById = new Map(
+        (((profilesRes as any).data ?? []) as Array<any>).map((p) => [p.id, p])
+      );
+
+      setComments(
+        rows.map((c) => ({
+          ...c,
+          user: profileById.get(c.user_id),
+        })) as unknown as Comment[]
+      );
+
       setLoading(false);
       setTimeout(() => bottomRef.current?.scrollIntoView(), 100);
     };
 
     fetchComments();
 
-    // ✅ REAL-TIME COMMENTS
     const channel = supabase
       .channel(`comments-${event.id}`)
       .on(
@@ -191,16 +318,12 @@ function CommentsModal({
           filter: `event_id=eq.${event.id}`,
         },
         async (payload) => {
-          // If I sent it, ignore (Optimistic UI handled it)
           if (payload.new.user_id === user?.id) return;
-
-          // Fetch user details for the new comment
           const { data: userData } = await supabase
             .from("profiles")
             .select("id, username, avatar_url")
             .eq("id", payload.new.user_id)
             .single();
-
           const newComment = { ...payload.new, user: userData } as Comment;
           setComments((prev) => [...prev, newComment]);
           onCommentAdded();
@@ -211,23 +334,26 @@ function CommentsModal({
         }
       )
       .subscribe();
-
     return () => {
-      document.body.style.overflow = "";
+      document.documentElement.style.overflow = originalHtmlOverflow;
+      document.body.style.overflow = originalBodyOverflow;
       supabase.removeChannel(channel);
     };
-  }, [event.id]);
+  }, [event.id, user?.id]);
 
-  // 2. Post Comment (Optimistic)
   const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim() || !user) return;
-
     const content = newComment.trim();
-    setNewComment(""); // Clear input immediately
+    setNewComment("");
 
-    // ✅ OPTIMISTIC UPDATE: Add to list instantly
-    const tempId = crypto.randomUUID();
+    // Older iOS versions may not support `crypto.randomUUID()`.
+    const tempId =
+      typeof crypto !== "undefined" &&
+      typeof (crypto as any).randomUUID === "function"
+        ? (crypto as any).randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
     const optimisticComment: any = {
       id: tempId,
       event_id: event.id,
@@ -240,67 +366,47 @@ function CommentsModal({
         avatar_url: user.avatar_url,
       },
     };
-
     setComments((prev) => [...prev, optimisticComment]);
     onCommentAdded();
     setTimeout(
       () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
       100
     );
-
-    // Send to DB
-    const { error } = await supabase.from("comments").insert([
-      {
-        event_id: event.id,
-        user_id: user.id,
-        content: content,
-      },
-    ]);
-
+    const { error } = await supabase
+      .from("comments")
+      .insert([{ event_id: event.id, user_id: user.id, content: content }]);
     if (error) {
-      console.error("Comment failed", error);
-      // Rollback if failed
+      console.error("Failed to post comment", error);
       setComments((prev) => prev.filter((c) => c.id !== tempId));
-      onCommentDeleted(); // Revert count
-      alert("Failed to post comment");
+      onCommentDeleted();
+      alert(error.message || "Failed to post comment");
     }
   };
 
   const handleDeleteComment = async (commentId: string) => {
     if (!confirm("Delete this comment?")) return;
-
-    // Optimistic Delete
     setComments((prev) => prev.filter((c) => c.id !== commentId));
     onCommentDeleted();
-
     const { error } = await supabase
       .from("comments")
       .delete()
       .eq("id", commentId);
-
     if (error) {
-      console.error("Delete failed", error);
-      // We could fetchComments() to revert, but usually not worth the UX flicker
+      console.error("Failed to delete comment", error);
+      alert(error.message || "Failed to delete comment");
     }
   };
 
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-end justify-center md:items-center">
-      {/* BACKDROP */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
         onClick={onClose}
       />
-
-      {/* MODAL CONTAINER */}
       <div className="relative w-full md:w-[480px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl flex flex-col max-h-[85vh] md:max-h-[600px] animate-in slide-in-from-bottom-10 fade-in duration-300">
-        {/* HEADER */}
         <div className="flex items-center justify-between p-4 border-b border-gray-100 shrink-0">
           <div className="w-8" />
-          <div className="flex flex-col items-center">
-            <div className="w-10 h-1 bg-gray-200 rounded-full md:hidden mb-2" />
-            <h3 className="font-bold text-gray-900">Comments</h3>
-          </div>
+          <h3 className="font-bold text-gray-900">Comments</h3>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -308,9 +414,7 @@ function CommentsModal({
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
-
-        {/* COMMENTS LIST */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4">
           {loading ? (
             <div className="flex justify-center py-10">
               <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
@@ -360,8 +464,6 @@ function CommentsModal({
           )}
           <div ref={bottomRef} />
         </div>
-
-        {/* FOOTER INPUT */}
         <div className="p-4 border-t border-gray-100 bg-white md:rounded-b-2xl">
           <form
             onSubmit={handlePostComment}
@@ -376,7 +478,7 @@ function CommentsModal({
               <Input
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
-                placeholder={`Add a comment as ${user?.username || "user"}...`}
+                placeholder={`Add a comment...`}
                 className="bg-gray-50 border-transparent focus:border-blue-200 focus:bg-white rounded-full h-11 pl-4 pr-12 transition-all"
                 autoFocus={!loading}
               />

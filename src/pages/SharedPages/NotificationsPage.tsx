@@ -1,4 +1,4 @@
-import { Bell, Calendar, Syringe, AlertCircle } from "lucide-react";
+import { Calendar, Syringe, AlertCircle } from "lucide-react";
 
 export default function NotificationsPage() {
   const notifications = [
