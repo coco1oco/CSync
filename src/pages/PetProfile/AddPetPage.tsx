@@ -4,7 +4,7 @@ import { useAuth } from "@/context/authContext";
 import { usePets } from "@/lib/usePets";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Upload, Trash2, Building2, PawPrint } from "lucide-react";
+import { ArrowLeft, Upload, Trash2, Building2 } from "lucide-react";
 import { toast } from "sonner";
 
 // ... (Keep BREED_DATA exactly as it is) ...
@@ -103,10 +103,6 @@ export default function AddPetPage() {
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
-  };
-
-  const handlePickPetImage = () => {
-    fileInputRef.current?.click();
   };
 
   const handlePetImageChange = async (

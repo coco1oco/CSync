@@ -1,15 +1,7 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
-import {
-  ChevronLeft,
-  ChevronRight,
-  MoreHorizontal,
-  Edit,
-  Trash2,
-  MapPin,
-  X,
-} from "lucide-react";
+import { MoreHorizontal, Edit, Trash2, MapPin, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,19 +16,16 @@ interface EventCardProps {
   isAdmin: boolean;
   onEdit?: () => void;
   onDelete?: () => void;
+  onTagClick?: (tag: string) => void;
+  children?: React.ReactNode;
 }
 
-// Animation Variants for the slide effect
 const slideVariants = {
   enter: (direction: number) => ({
     x: direction > 0 ? 1000 : -1000,
     opacity: 0,
   }),
-  center: {
-    zIndex: 1,
-    x: 0,
-    opacity: 1,
-  },
+  center: { zIndex: 1, x: 0, opacity: 1 },
   exit: (direction: number) => ({
     zIndex: 0,
     x: direction < 0 ? 1000 : -1000,
@@ -44,17 +33,13 @@ const slideVariants = {
   }),
 };
 
-// Swipe configuration
-const swipeConfidenceThreshold = 10000;
-const swipePower = (offset: number, velocity: number) => {
-  return Math.abs(offset) * velocity;
-};
-
 export function EventCard({
   event,
   isAdmin,
   onEdit,
   onDelete,
+  onTagClick,
+  children,
 }: Readonly<EventCardProps>) {
   const [[page, direction], setPage] = useState([0, 0]);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -68,7 +53,6 @@ export function EventCard({
     admin,
     created_at,
   } = event;
-
   const imageIndex = Math.abs(page % images.length);
 
   const paginate = (newDirection: number) => {
@@ -80,10 +64,31 @@ export function EventCard({
     day: "numeric",
   });
 
-  const MAX_LENGTH = 150;
-  const shouldTruncate = description && description.length > MAX_LENGTH;
+  // ✅ Adjusted limit so "Show more" appears for medium-length posts too
+  const isLongText = description && description.length > 150;
 
-  // Lock body scroll when lightbox is open
+  const renderWithHashtags = (text: string) => {
+    if (!text) return null;
+    const parts = text.split(/(#[\w]+)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith("#")) {
+        return (
+          <span
+            key={index}
+            className="text-blue-600 font-normal hover:underline cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              onTagClick?.(part);
+            }}
+          >
+            {part}
+          </span>
+        );
+      }
+      return part;
+    });
+  };
+
   useEffect(() => {
     if (isLightboxOpen) {
       document.body.style.overflow = "hidden";
@@ -96,11 +101,11 @@ export function EventCard({
   }, [isLightboxOpen]);
 
   return (
-    <article className="bg-white lg:rounded-2xl lg:shadow-sm lg:border border-gray-100 overflow-hidden flex flex-col">
-      {/* HEADER */}
-      <div className="px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center overflow-hidden border border-blue-100">
+    <article className="bg-white border-b border-gray-100 pb-2 md:rounded-3xl md:border md:shadow-sm md:mb-6 transition-colors hover:bg-gray-50/30">
+      {/* 1. HEADER */}
+      <div className="flex items-start justify-between px-4 pt-4 pb-2">
+        <div className="flex gap-3">
+          <div className="h-10 w-10 rounded-full bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-100">
             {admin?.avatar_url ? (
               <img
                 src={admin.avatar_url}
@@ -108,37 +113,33 @@ export function EventCard({
                 className="h-full w-full object-cover"
               />
             ) : (
-              <span className="text-sm font-bold text-blue-600">
+              <span className="flex h-full w-full items-center justify-center text-xs font-bold text-gray-500">
                 {admin?.username?.slice(0, 2).toUpperCase() || "YFA"}
               </span>
             )}
           </div>
 
           <div className="flex flex-col">
-            <span className="text-sm font-bold text-gray-900 leading-none">
-              {admin?.username || "Youth For Animals"}
-            </span>
-            <div className="flex items-center text-xs text-gray-500 mt-1 gap-1">
-              <span>{dateStr}</span>
-              {location && (
-                <>
-                  <span>•</span>
-                  <a
-                    href={`http://googleusercontent.com/maps.google.com/?q=${encodeURIComponent(
-                      location
-                    )}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-0.5 text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
-                    onClick={(e) => e.stopPropagation()}
-                    title="View on Google Maps"
-                  >
-                    <MapPin size={10} />
-                    <span className="truncate max-w-[150px]">{location}</span>
-                  </a>
-                </>
-              )}
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-bold text-gray-900 leading-none">
+                {admin?.username || "Youth For Animals"}
+              </span>
+              <span className="text-xs text-gray-400">· {dateStr}</span>
             </div>
+            {location && (
+              <a
+                href={`http://googleusercontent.com/maps.google.com/?q=${encodeURIComponent(
+                  location
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-xs text-gray-500 mt-1 hover:text-blue-600"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MapPin size={10} />
+                <span>{location}</span>
+              </a>
+            )}
           </div>
         </div>
 
@@ -148,80 +149,55 @@ export function EventCard({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-gray-400 hover:text-gray-700"
+                className="h-8 w-8 text-gray-400 -mt-1 -mr-2"
               >
                 <MoreHorizontal className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-32">
+            <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={onEdit}>
-                <Edit className="mr-2 h-3.5 w-3.5" /> Edit
+                <Edit className="mr-2 h-4 w-4" /> Edit
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={onDelete}
-                className="text-red-600 focus:text-red-600 focus:bg-red-50"
-              >
-                <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
+              <DropdownMenuItem onClick={onDelete} className="text-red-600">
+                <Trash2 className="mr-2 h-4 w-4" /> Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         )}
       </div>
 
-      {/* CONTENT */}
-      <div className="px-4 pb-2">
+      {/* 2. TEXT CONTENT */}
+      <div className="px-4 pb-3">
         {title && (
-          <h3 className="font-bold text-gray-900 text-base mb-1">{title}</h3>
+          <h4 className="font-bold text-gray-900 mb-1 text-base">{title}</h4>
         )}
-        <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
-          {/* ✅ CLICK-TO-COLLAPSE LOGIC */}
-          {isExpanded || !shouldTruncate ? (
-            <span
-              onClick={() => {
-                if (shouldTruncate) setIsExpanded(false);
-              }}
-              className={
-                shouldTruncate ? "cursor-pointer active:opacity-70" : ""
-              }
-              title={shouldTruncate ? "Click to collapse" : undefined}
+
+        <div className="text-sm text-gray-900 leading-relaxed whitespace-pre-wrap">
+          {/* ✅ UPDATED: Clamps to 3 lines for a cleaner preview */}
+          <span className={!isExpanded ? "line-clamp-3" : ""}>
+            {renderWithHashtags(description)}
+          </span>
+
+          {/* ✅ UPDATED: "..more" logic */}
+          {isLongText && (
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="text-gray-400 text-xs font-semibold mt-1 hover:text-gray-600 block"
             >
-              {description}
-            </span>
-          ) : (
-            <>
-              {description.slice(0, MAX_LENGTH)}...
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsExpanded(true);
-                }}
-                className="text-gray-500 font-semibold hover:underline ml-1 cursor-pointer"
-              >
-                See more
-              </button>
-            </>
+              {isExpanded ? "Show less" : "...more"}
+            </button>
           )}
         </div>
       </div>
 
-      {/* MEDIA */}
+      {/* 3. MEDIA (Restored Large Size) */}
       {images.length > 0 && (
-        <div
-          className="mt-2 relative w-full aspect-[4/3] bg-gray-50 overflow-hidden group cursor-pointer"
-          onClick={() => setIsLightboxOpen(true)}
-        >
-          {/* Ambient Background */}
-          <motion.div
-            key={images[imageIndex]}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.6 }}
-            transition={{ duration: 0.5 }}
-            className="absolute inset-0 bg-cover bg-center blur-2xl scale-110"
-            style={{ backgroundImage: `url(${images[imageIndex]})` }}
-          />
-
-          {/* Animated Image Carousel */}
-          <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+        <div className="px-0 md:px-4 pb-3">
+          <div
+            // ✅ CHANGED BACK: aspect-square (1:1) makes the photo BIG again
+            className="relative w-full aspect-square bg-gray-100 md:rounded-2xl overflow-hidden cursor-pointer border-y md:border border-gray-100 shadow-sm"
+            onClick={() => setIsLightboxOpen(true)}
+          >
             <AnimatePresence initial={false} custom={direction}>
               <motion.img
                 key={page}
@@ -239,123 +215,49 @@ export function EventCard({
                 dragConstraints={{ left: 0, right: 0 }}
                 dragElastic={1}
                 onDragEnd={(e, { offset, velocity }) => {
-                  const swipe = swipePower(offset.x, velocity.x);
-                  if (swipe < -swipeConfidenceThreshold) {
-                    paginate(1);
-                  } else if (swipe > swipeConfidenceThreshold) {
-                    paginate(-1);
-                  }
+                  void e;
+                  if (Math.abs(offset.x * velocity.x) > 10000)
+                    paginate(offset.x > 0 ? -1 : 1);
                 }}
-                alt="Event content"
-                className="absolute w-full h-full object-contain z-10"
+                alt="Post"
+                className="absolute w-full h-full object-cover"
               />
             </AnimatePresence>
-          </div>
 
-          {/* Arrows */}
-          {images.length > 1 && (
-            <>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  paginate(-1);
-                }}
-                className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm hover:bg-black/60 z-20"
-              >
-                <ChevronLeft size={20} />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  paginate(1);
-                }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm hover:bg-black/60 z-20"
-              >
-                <ChevronRight size={20} />
-              </button>
-
-              <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 z-20">
-                {images.map((_, i) => (
+            {/* Pagination Dots */}
+            {images.length > 1 && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-20 bg-black/20 px-2 py-1 rounded-full backdrop-blur-sm">
+                {images.map((_, idx) => (
                   <div
-                    key={i}
+                    key={idx}
                     className={`h-1.5 rounded-full transition-all shadow-sm ${
-                      i === imageIndex ? "w-4 bg-white" : "w-1.5 bg-white/60"
+                      idx === imageIndex ? "w-4 bg-white" : "w-1.5 bg-white/60"
                     }`}
                   />
                 ))}
               </div>
-            </>
-          )}
+            )}
+          </div>
         </div>
       )}
 
-      {/* LIGHTBOX PORTAL */}
+      {/* 4. ACTION FOOTER */}
+      <div className="px-4 pb-1">{children}</div>
+
+      {/* Lightbox */}
       {isLightboxOpen &&
         createPortal(
           <div
-            className="fixed inset-0 bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm"
-            style={{ zIndex: 9999 }}
+            className="fixed inset-0 z-[9999] bg-black/95 flex items-center justify-center animate-in fade-in"
             onClick={() => setIsLightboxOpen(false)}
           >
-            <button className="absolute top-6 right-6 p-3 bg-white/10 text-white rounded-full hover:bg-white/20 transition-colors z-50">
-              <X size={28} />
+            <button className="absolute top-6 right-6 text-white p-2">
+              <X size={32} />
             </button>
-
-            <div
-              className="relative max-w-5xl w-full h-full flex items-center justify-center overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <AnimatePresence initial={false} custom={direction}>
-                <motion.img
-                  key={page}
-                  src={images[imageIndex]}
-                  custom={direction}
-                  variants={slideVariants}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  transition={{
-                    x: { type: "spring", stiffness: 300, damping: 30 },
-                    opacity: { duration: 0.2 },
-                  }}
-                  drag="x"
-                  dragConstraints={{ left: 0, right: 0 }}
-                  dragElastic={1}
-                  onDragEnd={(e, { offset, velocity }) => {
-                    const swipe = swipePower(offset.x, velocity.x);
-                    if (swipe < -swipeConfidenceThreshold) {
-                      paginate(1);
-                    } else if (swipe > swipeConfidenceThreshold) {
-                      paginate(-1);
-                    }
-                  }}
-                  className="absolute max-w-full max-h-[90vh] object-contain rounded-md shadow-2xl"
-                />
-              </AnimatePresence>
-
-              {images.length > 1 && (
-                <>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      paginate(-1);
-                    }}
-                    className="absolute left-0 lg:-left-12 top-1/2 -translate-y-1/2 p-3 text-white/70 hover:text-white transition-colors z-30"
-                  >
-                    <ChevronLeft size={48} />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      paginate(1);
-                    }}
-                    className="absolute right-0 lg:-right-12 top-1/2 -translate-y-1/2 p-3 text-white/70 hover:text-white transition-colors z-30"
-                  >
-                    <ChevronRight size={48} />
-                  </button>
-                </>
-              )}
-            </div>
+            <img
+              src={images[imageIndex]}
+              className="max-w-full max-h-[90vh] rounded-md"
+            />
           </div>,
           document.body
         )}

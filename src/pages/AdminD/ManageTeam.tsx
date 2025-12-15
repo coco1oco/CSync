@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-// ✅ FIXED: Removed missing ShadCN imports to prevent "Module not found" errors
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Search, UserCog, Loader2, X } from "lucide-react";
-import { useAuth } from "@/context/authContext";
+import { Search, UserCog, Loader2, X, ShieldCheck } from "lucide-react";
+import { toast } from "sonner"; // ✅ Added for feedback
 
 type UserRole = "user" | "admin";
 
@@ -20,7 +19,6 @@ type Profile = {
   committee?: string;
 };
 
-// ✅ FIXED: Strict typing to prevent "Argument of type..." errors
 type FormData = {
   role: UserRole;
   position: string;
@@ -28,7 +26,6 @@ type FormData = {
 };
 
 export default function ManageTeam() {
-  const { user } = useAuth();
   const [members, setMembers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -70,11 +67,13 @@ export default function ManageTeam() {
     setIsDialogOpen(true);
   };
 
+  // ✅ AUTOMATIC GROUP ASSIGNMENT LOGIC
   const handleUpdate = async () => {
     if (!selectedMember) return;
     setUpdating(true);
 
     try {
+      // 1. Update Profile Data
       const { error } = await supabase
         .from("profiles")
         .update({
@@ -86,15 +85,84 @@ export default function ManageTeam() {
 
       if (error) throw error;
 
+      // 2. AUTO-ADD TO COMMITTEE GC
+      if (formData.committee) {
+        const groupName = `${formData.committee} Committee`;
+
+        // Find or Create Group
+        let { data: commGroup } = await supabase
+          .from("conversations")
+          .select("id")
+          .eq("name", groupName)
+          .maybeSingle();
+
+        if (!commGroup) {
+          const { data: newGroup } = await supabase
+            .from("conversations")
+            .insert([{ name: groupName, is_group: true }])
+            .select()
+            .single();
+          commGroup = newGroup;
+        }
+
+        // Add User to Group
+        if (commGroup) {
+          await supabase.from("conversation_members").upsert(
+            {
+              conversation_id: commGroup.id,
+              user_id: selectedMember.id,
+              role: "member", // They are a member of this chat
+            },
+            { onConflict: "conversation_id,user_id" }
+          );
+        }
+      }
+
+      // 3. AUTO-ADD TO EXECUTIVE BOARD (If President/VP)
+      if (formData.position.toLowerCase().includes("president")) {
+        const execName = "Executive Board";
+
+        let { data: execGroup } = await supabase
+          .from("conversations")
+          .select("id")
+          .eq("name", execName)
+          .maybeSingle();
+
+        if (!execGroup) {
+          const { data: newGroup } = await supabase
+            .from("conversations")
+            .insert([{ name: execName, is_group: true }])
+            .select()
+            .single();
+          execGroup = newGroup;
+        }
+
+        if (execGroup) {
+          await supabase.from("conversation_members").upsert(
+            {
+              conversation_id: execGroup.id,
+              user_id: selectedMember.id,
+              role: "admin", // They have admin rights in this chat
+            },
+            { onConflict: "conversation_id,user_id" }
+          );
+        }
+      }
+
+      // 4. Update Local State & Close
       setMembers((prev) =>
         prev.map((m) =>
           m.id === selectedMember.id ? { ...m, ...formData } : m
         )
       );
+
+      toast.success(
+        `Updated ${selectedMember.first_name}'s role & permissions`
+      );
       setIsDialogOpen(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to update role", err);
-      alert("Failed to update member role.");
+      toast.error("Failed to update member role.");
     } finally {
       setUpdating(false);
     }
@@ -122,7 +190,7 @@ export default function ManageTeam() {
         <div>
           <h1 className="text-2xl font-bold text-blue-950">Team Management</h1>
           <p className="text-sm text-gray-500">
-            Manage roles, committees, and access permissions.
+            Promote members and assign committees.
           </p>
         </div>
         <div className="relative w-full md:w-64">
@@ -193,7 +261,7 @@ export default function ManageTeam() {
         </div>
       </div>
 
-      {/* Edit Modal (Standard Tailwind) */}
+      {/* Edit Modal */}
       {isDialogOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
@@ -210,37 +278,54 @@ export default function ManageTeam() {
             <div className="p-6 space-y-4">
               <div className="space-y-2">
                 <Label>System Role</Label>
-                <select
-                  className="w-full h-10 px-3 rounded-md border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={formData.role}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      role: e.target.value as UserRole,
-                    })
-                  }
-                >
-                  <option value="user">Member (Restricted Access)</option>
-                  <option value="admin">Admin (Full Access)</option>
-                </select>
-                <p className="text-[10px] text-gray-500">
-                  Admins can manage events, pets, and other members.
-                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, role: "user" })}
+                    className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
+                      formData.role === "user"
+                        ? "border-gray-900 bg-gray-50"
+                        : "border-gray-100 hover:border-gray-200"
+                    }`}
+                  >
+                    <span className="font-semibold text-sm">Member</span>
+                    <span className="text-[10px] text-gray-500">
+                      Standard Access
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, role: "admin" })}
+                    className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
+                      formData.role === "admin"
+                        ? "border-blue-600 bg-blue-50 text-blue-700"
+                        : "border-gray-100 hover:border-gray-200"
+                    }`}
+                  >
+                    <ShieldCheck className="w-4 h-4 mb-1" />
+                    <span className="font-semibold text-sm">Admin</span>
+                    <span className="text-[10px] opacity-80">Full Control</span>
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2">
                 <Label>Organization Position</Label>
                 <Input
-                  placeholder="e.g. Vice President"
+                  placeholder="e.g. Vice President, Head"
                   value={formData.position}
                   onChange={(e) =>
                     setFormData({ ...formData, position: e.target.value })
                   }
                 />
+                <p className="text-[10px] text-gray-400">
+                  * If "President" is in the title, they will be added to
+                  Executive Board chat.
+                </p>
               </div>
 
               <div className="space-y-2">
-                <Label>Committee</Label>
+                <Label>Committee Assignment</Label>
                 <select
                   className="w-full h-10 px-3 rounded-md border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={formData.committee}
@@ -248,15 +333,18 @@ export default function ManageTeam() {
                     setFormData({ ...formData, committee: e.target.value })
                   }
                 >
-                  <option value="">None</option>
-                  <option value="Executive Board">Executive Board</option>
+                  <option value="">None (General Member)</option>
                   <option value="Publicity">Publicity Committee</option>
                   <option value="Humane Education">
                     Humane Education Committee
                   </option>
                   <option value="Events">Events Committee</option>
                   <option value="Membership">Membership Committee</option>
+                  <option value="Finance">Finance Committee</option>
                 </select>
+                <p className="text-[10px] text-gray-400">
+                  * Assigning a committee auto-adds them to its Group Chat.
+                </p>
               </div>
             </div>
 
@@ -272,7 +360,7 @@ export default function ManageTeam() {
                 {updating ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  "Save Changes"
+                  "Save & Update Permissions"
                 )}
               </Button>
             </div>
