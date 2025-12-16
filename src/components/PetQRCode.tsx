@@ -29,12 +29,16 @@ export default function PetQRCode({ pet, ownerName, ownerContact }: PetQRCodePro
     const svgData = new XMLSerializer().serializeToString(svg);
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      console.error("Failed to get canvas context");
+      return;
+    }
     const img = new Image();
 
     img.onload = () => {
       canvas.width = img.width;
       canvas.height = img.height;
-      ctx?.drawImage(img, 0, 0);
+      ctx.drawImage(img, 0, 0);
       const pngFile = canvas.toDataURL("image/png");
 
       const downloadLink = document.createElement("a");

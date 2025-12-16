@@ -6,7 +6,7 @@ import BackIcon from '@/assets/BackButton.svg';
 import { QrCode } from 'lucide-react';
 
 export default function MenuPage() {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
@@ -47,7 +47,7 @@ export default function MenuPage() {
           Sign Out
         </Button>
       </div>
-        <BottomNavigation userRole="admin" />
+        <BottomNavigation userRole={user?.role || "user"} />
     </div>
   );
 }
