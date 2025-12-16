@@ -9,6 +9,14 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Edit2, Calendar, Syringe, CheckSquare, QrCode } from "lucide-react";
 import PetQRCode from "@/components/PetQRCode";
 
+// Helper function to get owner display name
+const getOwnerDisplayName = (user: any): string => {
+  if (user?.first_name && user?.last_name) {
+    return `${user.first_name} ${user.last_name}`;
+  }
+  return user?.username || "Owner";
+};
+
 export default function PetProfilePage() {
   const { petId } = useParams<{ petId: string }>();
   const { user } = useAuth();
@@ -175,7 +183,7 @@ export default function PetProfilePage() {
             {activeTab === "qrcode" && (
               <PetQRCode
                 pet={pet}
-                ownerName={user?.first_name && user?.last_name ? `${user.first_name} ${user.last_name}` : user?.username}
+                ownerName={getOwnerDisplayName(user)}
                 ownerContact={user?.email}
               />
             )}

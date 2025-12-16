@@ -47,7 +47,7 @@ export default function MenuPage() {
           Sign Out
         </Button>
       </div>
-        <BottomNavigation userRole={user?.role || "user"} />
+        <BottomNavigation userRole={user?.role ?? "user"} />
     </div>
   );
 }

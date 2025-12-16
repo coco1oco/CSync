@@ -78,8 +78,13 @@ export default function QRScanner({ onClose }: QRScannerProps) {
       const data = JSON.parse(decodedText);
 
       if (data.type === "pawpal-pet" && data.petId) {
+        // Validate and sanitize pet name before displaying
+        const petName = typeof data.name === 'string' 
+          ? data.name.substring(0, 50).replace(/[<>]/g, '') 
+          : 'pet';
+        
         // Navigate to pet profile
-        toast.success(`Found ${data.name}!`);
+        toast.success(`Found ${petName}!`);
         navigate(`/PetDashboard/${data.petId}`);
         onClose?.();
       } else {

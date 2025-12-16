@@ -1,6 +1,7 @@
 import { QRCodeSVG } from "qrcode.react";
 import { Download } from "lucide-react";
 import { Button } from "./ui/button";
+import { toast } from "sonner";
 import type { Pet } from "@/lib/usePets";
 
 interface PetQRCodeProps {
@@ -31,6 +32,7 @@ export default function PetQRCode({ pet, ownerName, ownerContact }: PetQRCodePro
     const ctx = canvas.getContext("2d");
     if (!ctx) {
       console.error("Failed to get canvas context");
+      toast.error("Unable to download QR code. Please try again.");
       return;
     }
     const img = new Image();
