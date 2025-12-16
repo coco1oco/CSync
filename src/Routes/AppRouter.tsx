@@ -57,6 +57,7 @@ const NotificationsPage = lazy(() =>
     default: module.NotificationsPage,
   }))
 );
+const QRScannerPage = lazy(() => import("@/pages/SharedPages/QRScannerPage"));
 // ✅ ADD THIS
 const EventDetailPage = lazy(() =>
   import("@/pages/SharedPages/EventDetailPage").then((module) => ({
@@ -250,6 +251,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoader />}>
             <MenuPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/ScanQR",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <QRScannerPage />
           </Suspense>
         ),
       },

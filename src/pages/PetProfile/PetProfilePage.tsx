@@ -6,7 +6,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/authContext";
 import { usePets } from "@/lib/usePets";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Edit2, Calendar, Syringe, CheckSquare } from "lucide-react";
+import { ArrowLeft, Edit2, Calendar, Syringe, CheckSquare, QrCode } from "lucide-react";
+import PetQRCode from "@/components/PetQRCode";
 
 export default function PetProfilePage() {
   const { petId } = useParams<{ petId: string }>();
@@ -14,7 +15,7 @@ export default function PetProfilePage() {
   const { pets, deletePet } = usePets(user?.id);
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"vaccines" | "schedule" | "tasks">(
+  const [activeTab, setActiveTab] = useState<"vaccines" | "schedule" | "tasks" | "qrcode">(
     "vaccines"
   );
 
@@ -119,39 +120,50 @@ export default function PetProfilePage() {
           </div>
 
           {/* ✅ NEW PILL-SHAPED TAB NAVIGATION */}
-          <div className="flex gap-2 mb-6 bg-gray-100 p-1 rounded-full">
+          <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-full overflow-x-auto">
             <button
               onClick={() => setActiveTab("vaccines")}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 font-medium text-sm rounded-full transition-all ${
+              className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 font-medium text-xs rounded-full transition-all whitespace-nowrap ${
                 activeTab === "vaccines"
                   ? "bg-white text-gray-900 shadow-sm"
                   : "text-gray-600 hover:text-gray-900"
               }`}
             >
-              <Syringe className="w-4 h-4" />
+              <Syringe className="w-3 h-3" />
               Vaccines
             </button>
             <button
               onClick={() => setActiveTab("schedule")}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 font-medium text-sm rounded-full transition-all ${
+              className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 font-medium text-xs rounded-full transition-all whitespace-nowrap ${
                 activeTab === "schedule"
                   ? "bg-white text-gray-900 shadow-sm"
                   : "text-gray-600 hover:text-gray-900"
               }`}
             >
-              <Calendar className="w-4 h-4" />
+              <Calendar className="w-3 h-3" />
               Schedule
             </button>
             <button
               onClick={() => setActiveTab("tasks")}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 font-medium text-sm rounded-full transition-all ${
+              className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 font-medium text-xs rounded-full transition-all whitespace-nowrap ${
                 activeTab === "tasks"
                   ? "bg-white text-gray-900 shadow-sm"
                   : "text-gray-600 hover:text-gray-900"
               }`}
             >
-              <CheckSquare className="w-4 h-4" />
+              <CheckSquare className="w-3 h-3" />
               Tasks
+            </button>
+            <button
+              onClick={() => setActiveTab("qrcode")}
+              className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 font-medium text-xs rounded-full transition-all whitespace-nowrap ${
+                activeTab === "qrcode"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              <QrCode className="w-3 h-3" />
+              QR Code
             </button>
           </div>
 
@@ -160,6 +172,13 @@ export default function PetProfilePage() {
             {activeTab === "vaccines" && <VaccinationSection petId={pet.id} />}
             {activeTab === "schedule" && <ScheduleSection petId={pet.id} />}
             {activeTab === "tasks" && <TasksSection petId={pet.id} />}
+            {activeTab === "qrcode" && (
+              <PetQRCode
+                pet={pet}
+                ownerName={user?.first_name && user?.last_name ? `${user.first_name} ${user.last_name}` : user?.username}
+                ownerContact={user?.email}
+              />
+            )}
           </div>
 
           {/* Delete Button */}
