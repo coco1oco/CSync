@@ -12,7 +12,7 @@ import { supabase } from "@/lib/supabaseClient";
 // ✅ IMPORT TOAST
 import { toast } from "sonner";
 
-import logo from "@/assets/images/Pawpal.svg";
+import logo from "@/assets/images/PawPal.svg";
 import heroBg from "@/assets/images/hero_3.jpg";
 
 // 1. Define the Zod Schema

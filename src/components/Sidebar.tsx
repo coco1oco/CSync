@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/authContext";
 import { useChat } from "@/context/ChatContext"; // ✅ IMPORTED
-import logo from "@/assets/images/Pawpal.svg";
+import logo from "@/assets/images/PawPal.svg";
 import type { UserRole } from "@/types";
 
 interface SidebarProps {

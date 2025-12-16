@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { BottomNavigation } from '@/components/BottomNavigation';
 import BackIcon from '@/assets/BackButton.svg';
+import { QrCode } from 'lucide-react';
 
 export default function MenuPage() {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
@@ -31,13 +32,22 @@ export default function MenuPage() {
             {/* Right: empty placeholder to balance layout */}
             <div className="h-8 w-8" />
       </header>
+      <div className="flex flex-col items-center gap-4 p-6">
+        <Button
+          onClick={() => navigate("/ScanQR")}
+          className="w-60 bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2 flex items-center justify-center gap-2"
+        >
+          <QrCode className="w-5 h-5" />
+          Scan QR Code
+        </Button>
         <Button
           onClick={handleSignOut}
-          className="w-60 mt-6 bg-red-600 hover:bg-red-700  text-white rounded-lg py-2"
+          className="w-60 bg-red-600 hover:bg-red-700  text-white rounded-lg py-2"
         >
           Sign Out
         </Button>
-        <BottomNavigation userRole="admin" />
+      </div>
+        <BottomNavigation userRole={user?.role ?? "user"} />
     </div>
   );
 }

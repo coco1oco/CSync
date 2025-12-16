@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Loader2, ArrowLeft, Mail } from "lucide-react";
 // UPDATED IMPORTS
-import logo from "@/assets/images/Pawpal.svg";
+import logo from "@/assets/images/PawPal.svg";
 import heroBg from "@/assets/images/hero_4.jpg";
 
 export default function ForgotPassword() {
