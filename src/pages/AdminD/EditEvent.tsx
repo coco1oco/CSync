@@ -127,7 +127,7 @@ export default function EditEvent() {
       // 1. Upload all new files concurrently
       // We map over the newFiles array and call uploadImageToCloudinary for each
       const uploadPromises = newFiles.map((file) =>
-        uploadImageToCloudinary(file)
+        uploadImageToCloudinary(file, "post")
       );
       const uploadedUrls = await Promise.all(uploadPromises);
 

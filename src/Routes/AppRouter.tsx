@@ -10,10 +10,7 @@ import { PublicRoute } from "./PublicRoute";
 import AppLayout from "@/components/AppLayout";
 import AuthLayout from "@/components/AuthLayout";
 import { Loader2 } from "lucide-react";
-// ✅ IMPORT SONNER
 import { Toaster } from "sonner";
-
-// ✅ Import the new ChatProvider
 import { ChatProvider } from "@/context/ChatContext";
 
 // --- LAZY IMPORTS ---
@@ -55,8 +52,16 @@ const EditProfilePage = lazy(
   () => import("@/pages/SharedPages/EditProfilePage")
 );
 const MessagesPage = lazy(() => import("@/pages/SharedPages/MessagesPage"));
-const NotificationsPage = lazy(
-  () => import("@/pages/SharedPages/NotificationsPage")
+const NotificationsPage = lazy(() =>
+  import("@/pages/SharedPages/NotificationsPage").then((module) => ({
+    default: module.NotificationsPage,
+  }))
+);
+// ✅ ADD THIS
+const EventDetailPage = lazy(() =>
+  import("@/pages/SharedPages/EventDetailPage").then((module) => ({
+    default: module.EventDetailPage,
+  }))
 );
 
 const PageLoader = () => (
@@ -66,9 +71,8 @@ const PageLoader = () => (
 );
 
 const router = createBrowserRouter([
-  // ... Public Routes ...
+  // ... Public Routes stay the same ...
   {
-    // ✅ WRAPPED IN PUBLIC ROUTE
     element: (
       <PublicRoute>
         <AuthLayout />
@@ -171,6 +175,15 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoader />}>
             <NotificationsPage />
+          </Suspense>
+        ),
+      },
+      // ✅ ADD THIS ROUTE for viewing a single event
+      {
+        path: "/event/:eventId",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <EventDetailPage />
           </Suspense>
         ),
       },
@@ -291,8 +304,6 @@ export default function AppRouter() {
   return (
     <AuthProvider>
       <ChatProvider>
-        {" "}
-        {/* 👈 WRAP HERE inside AuthProvider */}
         <Toaster position="top-center" richColors />
         <RouterProvider router={router} />
       </ChatProvider>

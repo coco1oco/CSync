@@ -26,15 +26,18 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
 
   const isActive = (path: string) => location.pathname === path;
 
-  // 1. Define Base Navigation Items
   const navItems = [
     { path: "/", icon: Home, label: "Home" },
     { path: "/messages", icon: MessageCircle, label: "Messages" },
 
-    // ✅ SWAP LOGIC: Show Team Management for Admins, Notifications for Members
     ...(userRole === "admin"
-      ? [{ path: "/admin/team", icon: Users, label: "Manage Team" }]
-      : [{ path: "/notifications", icon: Bell, label: "Notifications" }]),
+      ? [
+          { path: "/admin/team", icon: Users, label: "Manage Team" },
+          { path: "/notifications", icon: Bell, label: "Notifications" },
+        ]
+      : [
+          { path: "/notifications", icon: Bell, label: "Notifications" },
+        ]),
 
     {
       path: "/PetDashboard",
@@ -42,6 +45,7 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
       label: "Pet Dashboard",
     },
   ];
+
 
   const handleSignOut = async () => {
     setIsSigningOut(true);

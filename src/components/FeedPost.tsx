@@ -4,13 +4,10 @@ import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/authContext";
 import { EventCard } from "@/components/EventCard";
 import type { OutreachEvent, Comment } from "@/types";
-import {
-  Heart,
-  MessageCircle, // ✅ Restored this icon
-  Send,
-  Loader2,
-  X,
-} from "lucide-react";
+// 🔔 use the shared notification helpers (grouped + pruning)
+import { notifyLike, notifyComment } from "@/lib/NotificationService";
+
+import { Heart, MessageCircle, Send, Loader2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import FailedImageIcon from "@/assets/FailedImage.svg";
@@ -22,10 +19,10 @@ interface FeedPostProps {
   onEdit: () => void;
 }
 
+// FEED POST = Event card + like/comment footer + comments modal
 export function FeedPost({ event, isAdmin, onDelete, onEdit }: FeedPostProps) {
   const { user } = useAuth();
 
-  // State
   const [likesCount, setLikesCount] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
   const [commentsCount, setCommentsCount] = useState(0);
@@ -34,9 +31,10 @@ export function FeedPost({ event, isAdmin, onDelete, onEdit }: FeedPostProps) {
   useEffect(() => {
     fetchLikes();
     fetchCommentsCount();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --- LIKES LOGIC ---
+  // Load total likes + whether current user liked this event
   const fetchLikes = async () => {
     const { count } = await supabase
       .from("likes")
@@ -56,35 +54,48 @@ export function FeedPost({ event, isAdmin, onDelete, onEdit }: FeedPostProps) {
     }
   };
 
+  // Toggle like/unlike and create GROUPED notification on LIKE
   const toggleLike = async () => {
     if (!user) return;
 
     const previousLiked = isLiked;
     const previousCount = likesCount;
 
+    // Optimistic UI update
     setIsLiked(!isLiked);
     setLikesCount(isLiked ? likesCount - 1 : likesCount + 1);
 
     try {
       if (previousLiked) {
+        // UNLIKE: remove like (no notification needed)
         await supabase
           .from("likes")
           .delete()
           .eq("event_id", event.id)
           .eq("user_id", user.id);
       } else {
+        // LIKE: insert like row
         await supabase
           .from("likes")
           .insert([{ event_id: event.id, user_id: user.id }]);
+
+        // 🔔 Grouped like notification for event owner (admin_id)
+        if (event.admin_id && event.admin_id !== user.id) {
+          await notifyLike(
+            { id: event.id, admin_id: event.admin_id, title: event.title },
+            { id: user.id, username: user.username }
+          );
+        }
       }
     } catch (err) {
+      // Roll back optimistic UI on error
       setIsLiked(previousLiked);
       setLikesCount(previousCount);
       console.error("Like failed", err);
     }
   };
 
-  // --- COMMENTS COUNT ONLY ---
+  // Load comment count for footer
   const fetchCommentsCount = async () => {
     const { count } = await supabase
       .from("comments")
@@ -103,6 +114,7 @@ export function FeedPost({ event, isAdmin, onDelete, onEdit }: FeedPostProps) {
           onDelete={onDelete}
         />
 
+        {/* Footer: Like + Comment buttons */}
         <div className="px-4 py-3 border-t border-gray-50 flex items-center gap-6">
           <button
             onClick={toggleLike}
@@ -114,7 +126,6 @@ export function FeedPost({ event, isAdmin, onDelete, onEdit }: FeedPostProps) {
             <span>{likesCount > 0 ? likesCount : "Like"}</span>
           </button>
 
-          {/* ✅ Reverted to standard MessageCircle Icon */}
           <button
             onClick={() => setIsCommentsOpen(true)}
             className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors"
@@ -125,7 +136,7 @@ export function FeedPost({ event, isAdmin, onDelete, onEdit }: FeedPostProps) {
         </div>
       </div>
 
-      {/* COMMENTS MODAL / SHEET */}
+      {/* Comments side-sheet/modal */}
       {isCommentsOpen && (
         <CommentsModal
           event={event}
@@ -141,7 +152,7 @@ export function FeedPost({ event, isAdmin, onDelete, onEdit }: FeedPostProps) {
   );
 }
 
-// --- DEDICATED COMMENTS MODAL COMPONENT ---
+// --- COMMENTS MODAL ---
 
 interface CommentsModalProps {
   event: OutreachEvent;
@@ -165,14 +176,16 @@ function CommentsModal({
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Lock body scroll
+    // Prevent background scroll while modal is open
     document.body.style.overflow = "hidden";
     fetchComments();
     return () => {
       document.body.style.overflow = "";
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Load all comments for this event
   const fetchComments = async () => {
     setLoading(true);
     const { data } = await supabase
@@ -184,13 +197,14 @@ function CommentsModal({
     if (data) setComments(data as unknown as Comment[]);
     setLoading(false);
 
-    // Scroll to bottom on load
+    // Scroll to bottom after loading
     setTimeout(
       () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
       100
     );
   };
 
+  // Post a new comment + grouped notification for owner
   const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim() || !user) return;
@@ -212,13 +226,26 @@ function CommentsModal({
       if (error) throw error;
 
       if (data) {
+        // Update local state
         setComments((prev) => [...prev, data as any]);
         setNewComment("");
         onCommentAdded();
+
         setTimeout(
           () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
           100
         );
+
+        // 🔔 Grouped comment notification for event owner
+        if (event.admin_id && event.admin_id !== user.id) {
+          const preview = newComment.trim().slice(0, 120);
+          await notifyComment(
+            { id: event.id, admin_id: event.admin_id, title: event.title },
+            { id: user.id, username: user.username },
+            preview,
+            data.id
+          );
+        }
       }
     } catch (err) {
       console.error("Comment failed", err);
@@ -227,6 +254,7 @@ function CommentsModal({
     }
   };
 
+  // Delete a comment (optional: you can also delete its notification here)
   const handleDeleteComment = async (commentId: string) => {
     if (!confirm("Delete this comment?")) return;
     try {
@@ -238,6 +266,7 @@ function CommentsModal({
       if (!error) {
         setComments((prev) => prev.filter((c) => c.id !== commentId));
         onCommentDeleted();
+        // Optional: also delete related 'comment' notification here if you want
       }
     } catch (err) {
       console.error("Delete comment failed", err);
@@ -246,19 +275,18 @@ function CommentsModal({
 
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-end justify-center md:items-center">
-      {/* BACKDROP */}
+      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
         onClick={onClose}
       />
 
-      {/* MODAL CONTAINER */}
+      {/* Modal container */}
       <div className="relative w-full md:w-[480px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl flex flex-col max-h-[85vh] md:max-h-[600px] animate-in slide-in-from-bottom-10 fade-in duration-300">
-        {/* HEADER */}
+        {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-100 shrink-0">
           <div className="w-8" />
           <div className="flex flex-col items-center">
-            {/* Mobile Handle */}
             <div className="w-10 h-1 bg-gray-200 rounded-full md:hidden mb-2" />
             <h3 className="font-bold text-gray-900">Comments</h3>
           </div>
@@ -270,7 +298,7 @@ function CommentsModal({
           </button>
         </div>
 
-        {/* COMMENTS LIST */}
+        {/* Comments list */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {loading ? (
             <div className="flex justify-center py-10">
@@ -302,8 +330,7 @@ function CommentsModal({
                     <span className="text-[10px] text-gray-400 font-medium">
                       {new Date(comment.created_at).toLocaleDateString()}
                     </span>
-                    {(user?.id === comment.user_id ||
-                      user?.role === "admin") && (
+                    {(user?.id === comment.user_id || user?.role === "admin") && (
                       <button
                         onClick={() => handleDeleteComment(comment.id)}
                         className="text-[10px] text-red-400 hover:text-red-600 font-semibold opacity-0 group-hover:opacity-100 transition-opacity"
@@ -319,13 +346,12 @@ function CommentsModal({
           <div ref={bottomRef} />
         </div>
 
-        {/* FOOTER INPUT */}
+        {/* New comment input */}
         <div className="p-4 border-t border-gray-100 bg-white md:rounded-b-2xl">
           <form
             onSubmit={handlePostComment}
             className="flex gap-2 items-center"
           >
-            {/* ✅ UPDATED: User Profile Picture (Visible on all screens) */}
             <img
               src={user?.avatar_url || FailedImageIcon}
               alt="Me"

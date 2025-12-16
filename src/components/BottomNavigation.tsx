@@ -15,23 +15,26 @@ export function BottomNavigation({
   const isActive = (path: string): boolean => location.pathname === path;
 
   // Define the navigation items dynamically based on role
-  const navItems = [
-    { path: "/", icon: Home, label: "Home" },
-    { path: "/messages", icon: MessageCircle, label: "Messages" },
+ const navItems = [
+  { path: "/", icon: Home, label: "Home" },
+  { path: "/messages", icon: MessageCircle, label: "Messages" },
 
-    // ✅ SWAP LOGIC:
-    // If Admin -> Show "Team" management
-    // If User  -> Show "Notifications"
-    ...(userRole === "admin"
-      ? [{ path: "/admin/team", icon: Users, label: "Team" }]
-      : [{ path: "/notifications", icon: Bell, label: "Alerts" }]),
+  ...(userRole === "admin"
+    ? [
+        { path: "/admin/team", icon: Users, label: "Team" },
+        { path: "/notifications", icon: Bell, label: "Notifications" },
+      ]
+    : [
+        { path: "/notifications", icon: Bell, label: "Notifications" },
+      ]),
 
-    {
-      path: "/PetDashboard",
-      icon: PawPrint,
-      label: "Pets", // Shortened label for better mobile spacing
-    },
-  ];
+  {
+    path: "/PetDashboard",
+    icon: PawPrint,
+    label: "Pets",
+  },
+];
+
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 border-t border-gray-200 bg-white z-50 pb-safe">

@@ -69,7 +69,7 @@ export default function EditProfilePage() {
       const localPreview = URL.createObjectURL(file);
       setAvatarUrl(localPreview);
 
-      const cloudinaryUrl = await uploadImageToCloudinary(file);
+      const cloudinaryUrl = await uploadImageToCloudinary(file, "avatar");
       setAvatarUrl(cloudinaryUrl);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Upload failed";

@@ -118,7 +118,7 @@ export default function AddPetPage() {
     setPetImagePreview(preview);
     setUploading(true);
     try {
-      const cloudinaryUrl = await uploadImageToCloudinary(file);
+      const cloudinaryUrl = await uploadImageToCloudinary(file, "pet");
       setPetImageUrl(cloudinaryUrl);
       toast.success("Photo uploaded successfully!");
     } catch (error) {

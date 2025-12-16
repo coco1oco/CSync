@@ -1,3 +1,4 @@
+// CreateEvent.tsx
 import { useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
@@ -26,7 +27,6 @@ export default function CreateEvent() {
   const [description, setDescription] = useState("");
   const [showLocation, setShowLocation] = useState(false);
 
-  // ✅ UPDATED: Multi-image state
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
 
@@ -36,30 +36,24 @@ export default function CreateEvent() {
   const [avatarError, setAvatarError] = useState(false);
   const avatarUrl = user?.avatar_url || user?.user_metadata?.avatar_url;
 
-  // ✅ HANDLE MULTIPLE FILES
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const selectedFiles = Array.from(e.target.files);
 
-      // 1. Add to file list
       setImageFiles((prev) => [...prev, ...selectedFiles]);
 
-      // 2. Generate previews
       const selectedPreviews = selectedFiles.map((file) =>
         URL.createObjectURL(file)
       );
       setPreviewUrls((prev) => [...prev, ...selectedPreviews]);
     }
 
-    // Reset input to allow selecting the same file again if needed
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // ✅ REMOVE IMAGE FROM LIST
   const handleRemoveImage = (indexToRemove: number) => {
     setImageFiles((prev) => prev.filter((_, i) => i !== indexToRemove));
     setPreviewUrls((prev) => {
-      // Optional: Free memory
       URL.revokeObjectURL(prev[indexToRemove]);
       return prev.filter((_, i) => i !== indexToRemove);
     });
@@ -74,44 +68,46 @@ export default function CreateEvent() {
   };
 
   const handleSubmit = async () => {
-    if (!title.trim() || !description.trim()) return;
+  if (!title.trim() || !description.trim()) return;
 
-    setError("");
-    setLoading(true);
+  setError("");
+  setLoading(true);
 
-    try {
-      if (!user) throw new Error("You must be logged in.");
+  try {
+    if (!user) throw new Error("You must be logged in.");
 
-      // 1. Upload all images concurrently
-      const uploadPromises = imageFiles.map((file) =>
-        uploadImageToCloudinary(file)
-      );
-      const uploadedImageUrls = await Promise.all(uploadPromises);
+    // 1. Upload all images concurrently
+    const uploadPromises = imageFiles.map((file, idx) => {
+      console.log("Uploading file", idx, file.name);
+      return uploadImageToCloudinary(file, "post"); // uses posts preset
+    });
+    const uploadedImageUrls = await Promise.all(uploadPromises);
 
-      // 2. Insert into Supabase
-      const { error: insertError } = await supabase
-        .from("outreach_events")
-        .insert([
-          {
-            admin_id: user.id,
-            title,
-            location,
-            description,
-            images: uploadedImageUrls, // Save the array of URLs
-          },
-        ]);
+    // 2. Insert into Supabase with array of URLs
+    const { error: insertError } = await supabase
+      .from("outreach_events")
+      .insert([
+        {
+          admin_id: user.id,
+          title,
+          location,
+          description,
+          images: uploadedImageUrls, // e.g. ["https://res.cloudinary.com/..."]
+        },
+      ]);
 
-      if (insertError) throw insertError;
+    if (insertError) throw insertError;
 
-      setTimeout(() => {
-        navigate("/");
-      }, 800);
-    } catch (err: any) {
-      console.error("Error creating post:", err);
-      setError(err.message || "Failed to create post");
-      setLoading(false);
-    }
-  };
+    setTimeout(() => {
+      navigate("/");
+    }, 800);
+  } catch (err: any) {
+    console.error("Error creating post:", err);
+    setError(err.message || "Failed to create post");
+    setLoading(false);
+  }
+};
+
 
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center lg:p-4 isolate">
@@ -224,7 +220,6 @@ export default function CreateEvent() {
                 </div>
               )}
 
-              {/* ✅ UPDATED: Multi-image Grid Preview */}
               {previewUrls.length > 0 && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
                   {previewUrls.map((url, idx) => (
@@ -272,7 +267,6 @@ export default function CreateEvent() {
             <MapPin className="w-5 h-5" />
           </button>
 
-          {/* ✅ ALLOW MULTIPLE SELECTION */}
           <input
             ref={fileInputRef}
             type="file"
