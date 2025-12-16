@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useMemo } from "react";
 import {
   createBrowserRouter,
   RouterProvider,
@@ -301,10 +301,19 @@ const router = createBrowserRouter([
 ]);
 
 export default function AppRouter() {
+  const toastOffset = useMemo(() => {
+    if (typeof window === "undefined") return 12;
+    const raw = getComputedStyle(document.documentElement)
+      .getPropertyValue("--safe-area-inset-top")
+      .trim();
+    const insetTop = Number.parseFloat(raw) || 0;
+    return Math.ceil(insetTop + 12);
+  }, []);
+
   return (
     <AuthProvider>
       <ChatProvider>
-        <Toaster position="top-center" richColors />
+        <Toaster position="top-center" richColors offset={toastOffset} />
         <RouterProvider router={router} />
       </ChatProvider>
     </AuthProvider>

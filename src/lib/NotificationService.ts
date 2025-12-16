@@ -81,11 +81,11 @@ export async function createNotification(params: {
   // 1) Insert the notification
   const { error } = await supabase.from("notifications").insert({
     user_id: params.userId,
-    from_user_id: params.fromUserId ?? null,
+    from_user_id: params.fromUserId,
     type: params.type,
     title: params.title,
     body: params.body,
-    action_text: params.actionText ?? null,
+    action_text: params.actionText,
     data: params.data,
     is_unread: true,
   });
@@ -213,7 +213,6 @@ export async function notifyComment(
       fromUserId: actor.id,
       type: "comment",
       title: event.title ?? "New comment",
-      actionText: undefined,
       body: `${actorName} commented: ${preview}`,
       data: {
         event_id: event.id,

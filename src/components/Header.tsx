@@ -46,26 +46,20 @@ export function Header({
   };
 
   return (
-    <header className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white p-4">
-      {/* LEFT: Real Logo + App Name */}
+    // ✅ CHANGED: Added 'header-safe' class
+    // ✅ CHANGED: Removed fixed h-14 (let padding define height)
+    <header className="sticky top-0 z-50 w-full bg-white border-b border-gray-200 header-safe px-4 flex items-center justify-between transition-all">
+      {/* Your Existing Logo Code */}
       <div className="flex items-center gap-2">
-        <img
-          src={LOGO_PATH}
-          alt="PawPal Logo"
-          className="h-8 w-8 object-contain"
-        />
+        <img src={LOGO_PATH} alt="PawPal" className="h-8 w-8 object-contain" />
         <h1 className="text-xl font-bold text-gray-900">{title}</h1>
       </div>
-
-      {/* RIGHT: Profile Button */}
+      {/* Your Existing Profile Button */}
       {showProfile && (
-        <Link
-          to="/ProfilePage"
-          className="rounded-full p-1 hover:bg-gray-100 transition-colors flex items-center justify-center"
-        >
+        <Link to="/ProfilePage" className="rounded-full p-1 hover:bg-gray-100">
           {renderProfileIcon()}
         </Link>
-      )}
+      )}{" "}
     </header>
   );
 }

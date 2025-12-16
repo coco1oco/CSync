@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import ScheduleSection from "./ScheduleSection";
 import VaccinationSection from "./VaccinationSection";
 import TasksSection from "./TasksSection";
@@ -6,7 +6,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/authContext";
 import { usePets } from "@/lib/usePets";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Edit2, Trash2, Calendar, Syringe, CheckSquare } from "lucide-react";
+import { ArrowLeft, Edit2, Calendar, Syringe, CheckSquare } from "lucide-react";
 
 export default function PetProfilePage() {
   const { petId } = useParams<{ petId: string }>();
@@ -14,7 +14,9 @@ export default function PetProfilePage() {
   const { pets, deletePet } = usePets(user?.id);
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"vaccines" | "schedule" | "tasks">("vaccines");
+  const [activeTab, setActiveTab] = useState<"vaccines" | "schedule" | "tasks">(
+    "vaccines"
+  );
 
   const pet = pets.find((p) => p.id === petId);
 
@@ -93,7 +95,9 @@ export default function PetProfilePage() {
                 <p className="text-sm font-medium">{pet.sex || "N/A"}</p>
               </div>
               <div>
-                <p className="text-xs font-semibold text-gray-500">Date of Birth</p>
+                <p className="text-xs font-semibold text-gray-500">
+                  Date of Birth
+                </p>
                 <p className="text-sm font-medium">
                   {pet.dob ? new Date(pet.dob).toLocaleDateString() : "N/A"}
                 </p>
@@ -106,7 +110,9 @@ export default function PetProfilePage() {
 
             {pet.microchip_id && (
               <div className="border-t pt-4">
-                <p className="text-xs font-semibold text-gray-500">Microchip ID</p>
+                <p className="text-xs font-semibold text-gray-500">
+                  Microchip ID
+                </p>
                 <p className="text-sm font-medium">{pet.microchip_id}</p>
               </div>
             )}
