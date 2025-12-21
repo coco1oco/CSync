@@ -15,17 +15,27 @@ export default function AppLayout() {
 
   // 🔍 ROUTE DETECTION
   const isMessagesPage = location.pathname === "/messages";
-  // ✅ UPDATE: Match ALL PetDashboard sub-routes (e.g., /PetDashboard/123)
+
+  // Detect any PetDashboard route (Dashboard, Add Pet, Edit Pet, etc.)
   const isPetDashboard = location.pathname.startsWith("/PetDashboard");
 
-  // Pages that lock the window scroll and handle their own scrolling
-  const isFixedPage = isMessagesPage || isPetDashboard;
-
-  // Pages that use the full width (7xl)
+  // Detect Admin pages
   const isAdminPage =
     location.pathname.startsWith("/Admin") ||
     location.pathname.startsWith("/admin");
-  const isWidePage = isFixedPage || isAdminPage;
+
+  // --- LAYOUT CONFIGURATION ---
+
+  // 1. Fixed Page: Locks window scroll (used for Chat/Messages only)
+  // ⚠️ Removed isPetDashboard from here to fix the scroll issue.
+  const isFixedPage = isMessagesPage;
+
+  // 2. Wide Page: Uses full width (max-w-full) instead of constrained width
+  const isWidePage = isFixedPage || isAdminPage || isPetDashboard;
+
+  // 3. Edge-to-Edge: Removes AppLayout padding so the child page can control it
+  // This allows sticky headers to work correctly at the top of the screen.
+  const isEdgeToEdge = isPetDashboard;
 
   if (loading)
     return (
@@ -47,12 +57,14 @@ export default function AppLayout() {
     <div
       className={cn(
         "bg-gray-50 flex flex-col lg:flex-row",
+        // Only lock overflow if it's strictly a fixed page (like Messages)
         isFixedPage ? "h-[100dvh] overflow-hidden" : "min-h-screen"
       )}
     >
       <Sidebar userRole={userRole} />
 
       <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
+        {/* Mobile Header (Sticky) */}
         <div className="lg:hidden sticky top-0 z-40">
           <Header showProfile={true} />
         </div>
@@ -60,10 +72,14 @@ export default function AppLayout() {
         <main
           className={cn(
             "flex-1 w-full mx-auto transition-all",
-            isWidePage ? "max-w-7xl" : "max-w-2xl",
-            // If fixed, we remove window padding so the child handles it
+            // Allow full width for Dashboard/Admin to utilize the whole right side
+            isWidePage ? "max-w-full" : "max-w-2xl",
+
+            // Layout Logic
             isFixedPage
               ? "h-full flex flex-col overflow-hidden p-0"
+              : isEdgeToEdge
+              ? "p-0" // Remove padding for Dashboard to allow full-bleed backgrounds/headers
               : "px-0 pb-24 lg:pb-8 lg:px-8 lg:pt-8"
           )}
         >
