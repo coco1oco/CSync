@@ -7,6 +7,7 @@ export type ProfileUpdate = {
   bio: string;
   avatar_url: string;
   pronouns: string;
+  contact_number: string; // ✅ Added
 };
 
 export async function updateProfile(update: ProfileUpdate) {
@@ -31,19 +32,18 @@ export async function updateProfile(update: ProfileUpdate) {
   }
 
   // 2. CRITICAL FIX: Sync to Auth Metadata (Session)
-  // This ensures the avatar is available instantly and persists even if the DB is slow
   const { error: metaError } = await supabase.auth.updateUser({
     data: {
       avatar_url: update.avatar_url,
       full_name: `${update.first_name} ${update.last_name}`,
       username: update.username,
       pronouns: update.pronouns,
+      contact_number: update.contact_number, // ✅ Added sync
     },
   });
 
   if (metaError) {
     console.warn("Metadata sync warning:", metaError);
-    // We proceed anyway since the DB update succeeded
   }
 
   return data;

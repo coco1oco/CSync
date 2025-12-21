@@ -82,6 +82,13 @@ export default function SignUp() {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
+        // ✅ ADD THIS: Pass metadata to Supabase so triggers can use it
+        options: {
+          data: {
+            username: data.username,
+            // You can add other default fields here if needed
+          },
+        },
       });
 
       if (authError) throw authError;
