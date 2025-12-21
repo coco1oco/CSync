@@ -10,18 +10,18 @@ import { PublicRoute } from "./PublicRoute";
 import AppLayout from "@/components/AppLayout";
 import AuthLayout from "@/components/AuthLayout";
 import { Loader2 } from "lucide-react";
-// ✅ IMPORT SONNER
 import { Toaster } from "sonner";
-
-// ✅ Import the new ChatProvider
 import { ChatProvider } from "@/context/ChatContext";
 
 // --- LAZY IMPORTS ---
-const AdminHomePage = lazy(() =>
-  import("@/pages/AdminD/AdminHomePage").then((module) => ({
-    default: module.AdminHomePage,
+
+// ✅ UNIFIED DASHBOARD (Replaces AdminHomePage & UserHomePage)
+const UnifiedDashboard = lazy(() =>
+  import("@/pages/SharedPages/UnifiedDashboard").then((module) => ({
+    default: module.UnifiedDashboard,
   }))
 );
+
 const CreateEvent = lazy(() => import("@/pages/AdminD/CreateEvent"));
 const EditEvent = lazy(() => import("@/pages/AdminD/EditEvent"));
 const ManageTeam = lazy(() => import("@/pages/AdminD/ManageTeam"));
@@ -33,6 +33,9 @@ const AddPetPage = lazy(() => import("@/pages/PetProfile/AddPetPage"));
 const PetProfilePage = lazy(() => import("@/pages/PetProfile/PetProfilePage"));
 const PetEditProfile = lazy(() => import("@/pages/PetProfile/PetEditProfile"));
 const CampusPetsPage = lazy(() => import("@/pages/PetProfile/CampusPetsPage"));
+const PublicPetProfile = lazy(
+  () => import("@/pages/SharedPages/PublicPetProfile")
+);
 
 const Welcome = lazy(() => import("@/pages/Authentication/Welcome"));
 const SignIn = lazy(() => import("@/pages/Authentication/SignIn"));
@@ -44,11 +47,7 @@ const Unauthorized = lazy(() => import("@/pages/Authentication/Unauthorized"));
 const UpdatePassword = lazy(
   () => import("@/pages/Authentication/UpdatePassword")
 );
-const UserHomePage = lazy(() =>
-  import("@/pages/UsersD/UserHomePage").then((module) => ({
-    default: module.UserHomePage,
-  }))
-);
+
 const ProfilePage = lazy(() => import("@/pages/SharedPages/ProfilePage"));
 const MenuPage = lazy(() => import("@/pages/SharedPages/MenuPage"));
 const EditProfilePage = lazy(
@@ -68,7 +67,6 @@ const PageLoader = () => (
 const router = createBrowserRouter([
   // ... Public Routes ...
   {
-    // ✅ WRAPPED IN PUBLIC ROUTE
     element: (
       <PublicRoute>
         <AuthLayout />
@@ -123,6 +121,15 @@ const router = createBrowserRouter([
           </Suspense>
         ),
       },
+      // Public Pet Profile
+      {
+        path: "/lost-and-found/:petId",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <PublicPetProfile />
+          </Suspense>
+        ),
+      },
     ],
   },
 
@@ -134,19 +141,12 @@ const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
+      // ✅ 1. DASHBOARD ROUTES (Unified)
       {
         path: "/",
         element: (
           <Suspense fallback={<PageLoader />}>
-            <UserHomePage />
-          </Suspense>
-        ),
-      },
-      {
-        path: "/reset-password",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <UpdatePassword />
+            <UnifiedDashboard />
           </Suspense>
         ),
       },
@@ -154,7 +154,26 @@ const router = createBrowserRouter([
         path: "/UserDashboard",
         element: (
           <Suspense fallback={<PageLoader />}>
-            <UserHomePage />
+            <UnifiedDashboard />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/AdminDashboard",
+        element: (
+          <ProtectedRoute requiredRole="admin">
+            <Suspense fallback={<PageLoader />}>
+              <UnifiedDashboard />
+            </Suspense>
+          </ProtectedRoute>
+        ),
+      },
+
+      {
+        path: "/reset-password",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <UpdatePassword />
           </Suspense>
         ),
       },
@@ -175,16 +194,7 @@ const router = createBrowserRouter([
         ),
       },
 
-      {
-        path: "/AdminDashboard",
-        element: (
-          <ProtectedRoute requiredRole="admin">
-            <Suspense fallback={<PageLoader />}>
-              <AdminHomePage />
-            </Suspense>
-          </ProtectedRoute>
-        ),
-      },
+      // --- ADMIN SPECIFIC ---
       {
         path: "/admin/events/create",
         element: (
@@ -216,6 +226,7 @@ const router = createBrowserRouter([
         ),
       },
 
+      // --- SHARED / PROFILE ---
       {
         path: "/ProfilePage",
         element: (
@@ -241,7 +252,7 @@ const router = createBrowserRouter([
         ),
       },
 
-      // PET ROUTES
+      // --- PET ROUTES ---
       {
         path: "/PetDashboard",
         element: (
@@ -290,6 +301,7 @@ const router = createBrowserRouter([
 export default function AppRouter() {
   const toastOffset = useMemo(() => {
     if (typeof window === "undefined") return 12;
+    // Helper to avoid overlap with safe areas on mobile
     const raw = getComputedStyle(document.documentElement)
       .getPropertyValue("--safe-area-inset-top")
       .trim();
@@ -300,8 +312,6 @@ export default function AppRouter() {
   return (
     <AuthProvider>
       <ChatProvider>
-        {" "}
-        {/* 👈 WRAP HERE inside AuthProvider */}
         <Toaster position="top-center" richColors offset={toastOffset} />
         <RouterProvider router={router} />
       </ChatProvider>
