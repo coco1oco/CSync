@@ -10,6 +10,7 @@ export interface UserProfile {
   last_name: string | null;
   bio: string | null;
   pronouns: string | null;
+  contact_number?: string | null; // ✅ Added
 }
 
 // ✅ NEW: Comment Interface
@@ -19,7 +20,7 @@ export interface Comment {
   event_id: string;
   content: string;
   created_at: string;
-  user?: UserProfile; // We will join the profile data here
+  user?: UserProfile;
 }
 
 export interface OutreachEvent {
@@ -42,6 +43,7 @@ export type UpdateProfilePayload = {
   pronouns?: string;
   first_name?: string;
   last_name?: string;
+  contact_number?: string; // ✅ Added
 };
 
 export interface Message {
@@ -50,7 +52,7 @@ export interface Message {
   sender_id: string;
   content: string;
   created_at: string;
-  sender?: UserProfile; // We will join this
+  sender?: UserProfile;
 }
 
 export interface Conversation {

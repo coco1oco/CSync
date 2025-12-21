@@ -1,0 +1,394 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/context/authContext";
+import { FeedPost } from "@/components/FeedPost";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  WifiOff,
+  RefreshCcw,
+  LayoutGrid,
+  Plus,
+  AlertCircle,
+  Calendar,
+  ChevronRight,
+  Stethoscope,
+  BarChart3,
+  Users,
+  FileText,
+  Filter,
+  X,
+} from "lucide-react";
+import { formatDistanceToNow, isPast, addDays, isBefore } from "date-fns";
+import type { OutreachEvent } from "@/types";
+
+// --- TYPES ---
+type HealthAlert = {
+  id: string;
+  vaccine_name: string;
+  next_due_date: string;
+  pet_id: string;
+  pets: { name: string; petimage_url: string | null };
+};
+
+type AdminStats = {
+  totalPosts: number;
+  myPosts: number;
+  totalMembers: number;
+};
+
+export function UnifiedDashboard() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const isAdmin = (user as any)?.role === "admin";
+
+  // State
+  const [events, setEvents] = useState<OutreachEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Feature Specific State
+  const [alerts, setAlerts] = useState<HealthAlert[]>([]);
+  const [stats, setStats] = useState<AdminStats>({
+    totalPosts: 0,
+    myPosts: 0,
+    totalMembers: 0,
+  });
+
+  // Filters
+  const [filterMode, setFilterMode] = useState<"all" | "mine">("all");
+  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user) fetchData();
+  }, [user, filterMode]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // 1. Base Query: Fetch Events (Feed)
+      let query = supabase
+        .from("outreach_events")
+        .select("*, admin:profiles(id, username, avatar_url)")
+        .order("created_at", { ascending: false });
+
+      // Admin Filter: "My Posts" vs "All"
+      if (isAdmin && filterMode === "mine") {
+        query = query.eq("admin_id", user?.id);
+      }
+
+      const { data: eventsData, error: eventsError } = await query;
+      if (eventsError) throw eventsError;
+      setEvents((eventsData as OutreachEvent[]) || []);
+
+      // 2. Parallel Data Fetching based on Role
+      if (isAdmin) {
+        // --- ADMIN: Fetch Stats ---
+        const [postsCount, myCount, usersCount] = await Promise.all([
+          supabase
+            .from("outreach_events")
+            .select("id", { count: "exact", head: true }),
+          supabase
+            .from("outreach_events")
+            .select("id", { count: "exact", head: true })
+            .eq("admin_id", user?.id),
+          supabase
+            .from("profiles")
+            .select("id", { count: "exact", head: true }),
+        ]);
+        setStats({
+          totalPosts: postsCount.count || 0,
+          myPosts: myCount.count || 0,
+          totalMembers: usersCount.count || 0,
+        });
+      } else {
+        // --- USER: Fetch Health Alerts ---
+        const { data: vaxData } = await supabase
+          .from("vaccinations")
+          .select(
+            `id, vaccine_name, next_due_date, pet_id, pets (name, petimage_url)`
+          )
+          .eq("owner_id", user?.id)
+          .neq("status", "completed")
+          .order("next_due_date", { ascending: true });
+
+        // Filter urgent logic
+        const rawAlerts = (vaxData as any[]) || [];
+        const cutoff = addDays(new Date(), 30);
+        const urgent = rawAlerts.filter(
+          (a) =>
+            isPast(new Date(a.next_due_date)) ||
+            isBefore(new Date(a.next_due_date), cutoff)
+        );
+        setAlerts(urgent);
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Failed to load dashboard data.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteEventId) return;
+    const { error } = await supabase
+      .from("outreach_events")
+      .delete()
+      .eq("id", deleteEventId);
+    if (!error) {
+      setEvents((prev) => prev.filter((e) => e.id !== deleteEventId));
+      setDeleteEventId(null);
+      // Update stats locally
+      if (isAdmin)
+        setStats((prev) => ({
+          ...prev,
+          totalPosts: prev.totalPosts - 1,
+          myPosts: prev.myPosts - 1,
+        }));
+    }
+  };
+
+  const filteredEvents = activeTag
+    ? events.filter((e) =>
+        e.description?.toLowerCase().includes(activeTag.toLowerCase())
+      )
+    : events;
+
+  return (
+    <div className="w-full max-w-xl mx-auto pb-24 px-0 md:px-4">
+      {/* --- HEADER --- */}
+      <div className="sticky top-0 z-30 bg-gray-50/95 backdrop-blur-sm py-4 px-4 flex items-center justify-between border-b border-gray-100 md:border-none">
+        <div>
+          <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2">
+            {isAdmin ? "Admin Dashboard" : "Dashboard"}
+          </h1>
+          <p className="text-xs text-gray-500 font-medium">
+            Welcome back, {user?.first_name || "Guest"}!
+          </p>
+        </div>
+        {/* User Action: Add Pet */}
+        {!isAdmin && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="rounded-full h-8 text-xs gap-1"
+            onClick={() => navigate("/PetDashboard/new")}
+          >
+            <Plus className="w-3 h-3" /> Add Pet
+          </Button>
+        )}
+        {/* Admin Action: Create Post */}
+        {isAdmin && (
+          <Button
+            size="sm"
+            className="rounded-full h-8 text-xs gap-1 bg-blue-600 hover:bg-blue-700"
+            onClick={() => navigate("/admin/events/create")}
+          >
+            <Plus className="w-3 h-3" /> New Post
+          </Button>
+        )}
+      </div>
+
+      {/* --- DYNAMIC WIDGET AREA --- */}
+      <div className="px-4 mt-4 mb-6">
+        {loading ? (
+          <Skeleton className="w-full h-32 rounded-2xl" />
+        ) : isAdmin ? (
+          /* 👑 ADMIN WIDGETS */
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex flex-col items-center text-center">
+              <div className="p-2 bg-blue-50 text-blue-600 rounded-full mb-1">
+                <FileText size={18} />
+              </div>
+              <span className="text-xl font-bold text-gray-900">
+                {stats.totalPosts}
+              </span>
+              <span className="text-[10px] text-gray-400 uppercase font-bold">
+                Total Posts
+              </span>
+            </div>
+            <div className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex flex-col items-center text-center">
+              <div className="p-2 bg-purple-50 text-purple-600 rounded-full mb-1">
+                <BarChart3 size={18} />
+              </div>
+              <span className="text-xl font-bold text-gray-900">
+                {stats.myPosts}
+              </span>
+              <span className="text-[10px] text-gray-400 uppercase font-bold">
+                My Posts
+              </span>
+            </div>
+            <div className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex flex-col items-center text-center">
+              <div className="p-2 bg-green-50 text-green-600 rounded-full mb-1">
+                <Users size={18} />
+              </div>
+              <span className="text-xl font-bold text-gray-900">
+                {stats.totalMembers}
+              </span>
+              <span className="text-[10px] text-gray-400 uppercase font-bold">
+                Members
+              </span>
+            </div>
+          </div>
+        ) : /* 🐾 USER WIDGETS (Health Alerts) */
+        alerts.length > 0 ? (
+          <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide snap-x">
+            {alerts.map((alert) => (
+              <div
+                key={alert.id}
+                onClick={() => navigate(`/PetDashboard/${alert.pet_id}`)}
+                className="snap-center shrink-0 w-64 p-3 rounded-2xl border bg-white border-gray-200 shadow-sm"
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <img
+                    src={alert.pets.petimage_url || "/default-pet.png"}
+                    className="w-10 h-10 rounded-full bg-gray-200 object-cover"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold truncate">
+                      {alert.pets.name}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {alert.vaccine_name}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-xs font-semibold px-2 py-1 bg-orange-50 text-orange-700 rounded-lg inline-flex items-center gap-1">
+                  <Calendar className="w-3 h-3" /> Due{" "}
+                  {formatDistanceToNow(new Date(alert.next_due_date), {
+                    addSuffix: true,
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-full text-blue-600">
+              <Stethoscope className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-blue-900">All caught up!</p>
+              <p className="text-xs text-blue-700">No pending vaccines.</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* --- FEED CONTROLS --- */}
+      <div className="mx-4 mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-bold text-gray-900">Community Feed</h2>
+
+        {/* Admin Filter Toggle */}
+        {isAdmin && (
+          <div className="bg-white border border-gray-200 p-0.5 rounded-lg flex text-xs font-medium">
+            <button
+              onClick={() => setFilterMode("all")}
+              className={`px-3 py-1.5 rounded-md transition-all ${
+                filterMode === "all"
+                  ? "bg-gray-100 text-gray-900 shadow-sm"
+                  : "text-gray-500"
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setFilterMode("mine")}
+              className={`px-3 py-1.5 rounded-md transition-all ${
+                filterMode === "mine"
+                  ? "bg-gray-100 text-gray-900 shadow-sm"
+                  : "text-gray-500"
+              }`}
+            >
+              My Posts
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Tag Filter Banner */}
+      {activeTag && (
+        <div className="mx-4 mb-4 flex items-center justify-between bg-blue-600 text-white p-2.5 px-4 rounded-xl shadow-md">
+          <span className="text-xs font-bold">Filter: {activeTag}</span>
+          <button
+            onClick={() => setActiveTag(null)}
+            className="text-blue-100 hover:text-white bg-blue-700 p-0.5 rounded-full"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* --- FEED LIST --- */}
+      <div className="space-y-6">
+        {loading ? (
+          [1, 2].map((i) => (
+            <div
+              key={i}
+              className="mx-4 bg-white rounded-3xl p-5 shadow-sm border border-gray-100 space-y-4"
+            >
+              <div className="flex items-center gap-3">
+                <Skeleton className="w-10 h-10 rounded-full" />
+                <div className="space-y-2 flex-1">
+                  <Skeleton className="w-32 h-4" />
+                  <Skeleton className="w-20 h-3" />
+                </div>
+              </div>
+              <Skeleton className="w-full aspect-[4/3] rounded-2xl" />
+            </div>
+          ))
+        ) : filteredEvents.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center mx-4">
+            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm border border-gray-100">
+              <LayoutGrid className="w-8 h-8 text-gray-300" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900">No posts found</h3>
+          </div>
+        ) : (
+          filteredEvents.map((event) => (
+            <FeedPost
+              key={event.id}
+              event={event}
+              isAdmin={isAdmin}
+              onEdit={() => navigate(`/admin/events/edit/${event.id}`)}
+              onDelete={() => setDeleteEventId(event.id)}
+              onTagClick={(tag) => {
+                setActiveTag(tag);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+            />
+          ))
+        )}
+      </div>
+
+      {/* Delete Modal */}
+      {deleteEventId && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl">
+            <h2 className="text-lg font-bold text-gray-900 mb-2">
+              Delete Post?
+            </h2>
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => setDeleteEventId(null)}
+                className="flex-1 py-3 rounded-xl bg-gray-100 text-gray-700 font-bold hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

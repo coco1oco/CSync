@@ -20,6 +20,7 @@ export default function EditProfilePage() {
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [pronouns, setPronouns] = useState("");
+  const [contactNumber, setContactNumber] = useState(""); // ✅ New State
 
   const [pronounsError, setPronounsError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -42,6 +43,7 @@ export default function EditProfilePage() {
       setBio(user.bio || "");
       setAvatarUrl(user.avatar_url || "");
       setPronouns(user.pronouns || "");
+      setContactNumber(user.contact_number || ""); // ✅ Load it
     }
   }, [user]);
 
@@ -97,6 +99,7 @@ export default function EditProfilePage() {
         bio,
         avatar_url: avatarUrl,
         pronouns,
+        contact_number: contactNumber.trim(), // ✅ Send to API
       });
 
       await refreshProfile();
@@ -109,7 +112,6 @@ export default function EditProfilePage() {
   };
 
   return (
-    // ✅ FIX: Removed negative margins (-mt-4) and added proper spacing
     <div className="min-h-screen bg-white flex flex-col relative pb-20 mt-2">
       {/* === HEADER === */}
       <header className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 bg-white/95 backdrop-blur-md border-b border-gray-100">
@@ -133,7 +135,7 @@ export default function EditProfilePage() {
         </Button>
       </header>
 
-      {/* === BANNER (Blue Area) === */}
+      {/* === BANNER === */}
       <div className="h-32 bg-blue-100 w-full shrink-0" />
 
       {/* === CONTENT CONTAINER === */}
@@ -146,7 +148,6 @@ export default function EditProfilePage() {
               alt="Avatar"
               className="w-full h-full object-cover"
             />
-            {/* Upload Overlay */}
             <div
               className="absolute inset-0 bg-black/30 flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
               onClick={() => document.getElementById("avatarInput")?.click()}
@@ -154,8 +155,6 @@ export default function EditProfilePage() {
               <Camera className="w-8 h-8 text-white" />
             </div>
           </div>
-
-          {/* Change Photo Input */}
           <input
             id="avatarInput"
             type="file"
@@ -230,7 +229,24 @@ export default function EditProfilePage() {
             </div>
           </div>
 
-          {/* Row 3: Bio */}
+          {/* ✅ NEW: Contact Number */}
+          <div className="space-y-1">
+            <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+              Contact Number
+            </Label>
+            <Input
+              value={contactNumber}
+              onChange={(e) => setContactNumber(e.target.value)}
+              className="h-10 border-x-0 border-t-0 border-b border-gray-200 rounded-none px-0 focus-visible:ring-0 focus-visible:border-blue-500 transition-colors bg-transparent font-medium text-base"
+              placeholder="09XX-XXX-XXXX"
+            />
+            <p className="text-[10px] text-gray-400">
+              * This number will be shown publicly if someone scans your pet's
+              QR code.
+            </p>
+          </div>
+
+          {/* Bio */}
           <div className="space-y-1">
             <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
               Bio

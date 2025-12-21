@@ -5,12 +5,27 @@ import { Header } from "./Header";
 import { useAuth } from "@/context/authContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function AppLayout() {
   const { user, loading } = useAuth();
   const location = useLocation();
 
   const userRole = (user as any)?.role || "member";
+
+  // 🔍 ROUTE DETECTION
+  const isMessagesPage = location.pathname === "/messages";
+  // ✅ UPDATE: Match ALL PetDashboard sub-routes (e.g., /PetDashboard/123)
+  const isPetDashboard = location.pathname.startsWith("/PetDashboard");
+
+  // Pages that lock the window scroll and handle their own scrolling
+  const isFixedPage = isMessagesPage || isPetDashboard;
+
+  // Pages that use the full width (7xl)
+  const isAdminPage =
+    location.pathname.startsWith("/Admin") ||
+    location.pathname.startsWith("/admin");
+  const isWidePage = isFixedPage || isAdminPage;
 
   if (loading)
     return (
@@ -21,9 +36,6 @@ export default function AppLayout() {
 
   if (!user) return <Navigate to="/SignIn" replace />;
 
-  // 🛡️ SECURITY CHECK: FORCE PROFILE COMPLETION
-  // If user is missing their name, AND they are not already on the Edit page,
-  // force them to go there.
   const isProfileIncomplete = !user.first_name || !user.last_name;
   const isOnEditPage = location.pathname === "/ProfilePage/Edit";
 
@@ -32,19 +44,29 @@ export default function AppLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row">
-      {/* SIDEBAR (Desktop) */}
+    <div
+      className={cn(
+        "bg-gray-50 flex flex-col lg:flex-row",
+        isFixedPage ? "h-[100dvh] overflow-hidden" : "min-h-screen"
+      )}
+    >
       <Sidebar userRole={userRole} />
 
-      {/* MAIN CONTENT WRAPPER */}
       <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
-        {/* HEADER (Mobile) */}
         <div className="lg:hidden sticky top-0 z-40">
           <Header showProfile={true} />
         </div>
 
-        {/* MAIN SCROLLABLE AREA */}
-        <main className="flex-1 px-0 pb-24 lg:pb-8 lg:px-8 lg:pt-8 w-full max-w-2xl mx-auto">
+        <main
+          className={cn(
+            "flex-1 w-full mx-auto transition-all",
+            isWidePage ? "max-w-7xl" : "max-w-2xl",
+            // If fixed, we remove window padding so the child handles it
+            isFixedPage
+              ? "h-full flex flex-col overflow-hidden p-0"
+              : "px-0 pb-24 lg:pb-8 lg:px-8 lg:pt-8"
+          )}
+        >
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
@@ -60,8 +82,7 @@ export default function AppLayout() {
         </main>
       </div>
 
-      {/* BOTTOM NAV (Mobile) */}
-      <div className="lg:hidden">
+      <div className="lg:hidden z-50">
         <BottomNavigation userRole={userRole} />
       </div>
     </div>
