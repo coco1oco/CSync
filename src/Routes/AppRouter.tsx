@@ -15,17 +15,19 @@ import { ChatProvider } from "@/context/ChatContext";
 
 // --- LAZY IMPORTS ---
 
-// ✅ UNIFIED DASHBOARD (Replaces AdminHomePage & UserHomePage)
+// ✅ UNIFIED DASHBOARD
 const UnifiedDashboard = lazy(() =>
   import("@/pages/SharedPages/UnifiedDashboard").then((module) => ({
     default: module.UnifiedDashboard,
   }))
 );
 
+// Admin Pages
 const CreateEvent = lazy(() => import("@/pages/AdminD/CreateEvent"));
 const EditEvent = lazy(() => import("@/pages/AdminD/EditEvent"));
 const ManageTeam = lazy(() => import("@/pages/AdminD/ManageTeam"));
 
+// Pet Pages
 const MainPetProfilePage = lazy(
   () => import("@/pages/PetProfile/MainPetProfilePage")
 );
@@ -33,10 +35,13 @@ const AddPetPage = lazy(() => import("@/pages/PetProfile/AddPetPage"));
 const PetProfilePage = lazy(() => import("@/pages/PetProfile/PetProfilePage"));
 const PetEditProfile = lazy(() => import("@/pages/PetProfile/PetEditProfile"));
 const CampusPetsPage = lazy(() => import("@/pages/PetProfile/CampusPetsPage"));
+
+// ✅ PUBLIC PET PROFILE (For QR Codes)
 const PublicPetProfile = lazy(
   () => import("@/pages/SharedPages/PublicPetProfile")
 );
 
+// Auth Pages
 const Welcome = lazy(() => import("@/pages/Authentication/Welcome"));
 const SignIn = lazy(() => import("@/pages/Authentication/SignIn"));
 const SignUp = lazy(() => import("@/pages/Authentication/SignUp"));
@@ -48,6 +53,7 @@ const UpdatePassword = lazy(
   () => import("@/pages/Authentication/UpdatePassword")
 );
 
+// Shared Pages
 const ProfilePage = lazy(() => import("@/pages/SharedPages/ProfilePage"));
 const MenuPage = lazy(() => import("@/pages/SharedPages/MenuPage"));
 const EditProfilePage = lazy(
@@ -58,6 +64,7 @@ const NotificationsPage = lazy(
   () => import("@/pages/SharedPages/NotificationsPage")
 );
 
+// Loading Spinner
 const PageLoader = () => (
   <div className="flex h-screen w-full items-center justify-center bg-gray-50">
     <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -65,7 +72,21 @@ const PageLoader = () => (
 );
 
 const router = createBrowserRouter([
-  // ... Public Routes ...
+  // -------------------------------------------------------------------------
+  // 1. TRULY PUBLIC ROUTES (Accessible by ANYONE - Guest or Logged In)
+  // -------------------------------------------------------------------------
+  {
+    path: "/lost-and-found/:petId",
+    element: (
+      <Suspense fallback={<PageLoader />}>
+        <PublicPetProfile />
+      </Suspense>
+    ),
+  },
+
+  // -------------------------------------------------------------------------
+  // 2. GUEST ONLY ROUTES (Redirects to Dashboard if already logged in)
+  // -------------------------------------------------------------------------
   {
     element: (
       <PublicRoute>
@@ -106,14 +127,6 @@ const router = createBrowserRouter([
         ),
       },
       {
-        path: "/reset-password",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <UpdatePassword />
-          </Suspense>
-        ),
-      },
-      {
         path: "/unauthorized",
         element: (
           <Suspense fallback={<PageLoader />}>
@@ -121,19 +134,12 @@ const router = createBrowserRouter([
           </Suspense>
         ),
       },
-      // Public Pet Profile
-      {
-        path: "/lost-and-found/:petId",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <PublicPetProfile />
-          </Suspense>
-        ),
-      },
     ],
   },
 
-  // --- PROTECTED ROUTES ---
+  // -------------------------------------------------------------------------
+  // 3. PROTECTED ROUTES (Requires Login)
+  // -------------------------------------------------------------------------
   {
     element: (
       <ProtectedRoute>
@@ -141,7 +147,7 @@ const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      // ✅ 1. DASHBOARD ROUTES (Unified)
+      // Unified Dashboard
       {
         path: "/",
         element: (
@@ -169,6 +175,7 @@ const router = createBrowserRouter([
         ),
       },
 
+      // Account & Settings
       {
         path: "/reset-password",
         element: (
@@ -194,7 +201,7 @@ const router = createBrowserRouter([
         ),
       },
 
-      // --- ADMIN SPECIFIC ---
+      // Admin Specific
       {
         path: "/admin/events/create",
         element: (
@@ -226,7 +233,7 @@ const router = createBrowserRouter([
         ),
       },
 
-      // --- SHARED / PROFILE ---
+      // Shared / Profile
       {
         path: "/ProfilePage",
         element: (
@@ -252,7 +259,7 @@ const router = createBrowserRouter([
         ),
       },
 
-      // --- PET ROUTES ---
+      // Pet Routes
       {
         path: "/PetDashboard",
         element: (
@@ -295,6 +302,10 @@ const router = createBrowserRouter([
       },
     ],
   },
+
+  // -------------------------------------------------------------------------
+  // 4. CATCH ALL
+  // -------------------------------------------------------------------------
   { path: "*", element: <Navigate to="/welcome" replace /> },
 ]);
 

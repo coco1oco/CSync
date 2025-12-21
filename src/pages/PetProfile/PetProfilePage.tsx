@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import QRCode from "react-qr-code"; // ✅ Make sure you installed this: npm install react-qr-code
+import QRCode from "react-qr-code";
 import { useAuth } from "@/context/authContext";
-import { usePets } from "@/lib/usePets";
+import { usePets } from "@/lib/usePets"; // Ensure this path is correct
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Sub-sections
 import ScheduleSection from "./ScheduleSection";
@@ -33,34 +34,45 @@ import {
 export default function PetProfilePage() {
   const { petId } = useParams<{ petId: string }>();
   const { user } = useAuth();
-  const { pets, deletePet } = usePets(user?.id);
+
+  // ✅ FIX 1: Destructure 'loading' from usePets
+  const { pets, deletePet, loading: petsLoading } = usePets(user?.id);
   const navigate = useNavigate();
 
-  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"vaccines" | "schedule" | "tasks">(
     "vaccines"
   );
   const [showQR, setShowQR] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  // 1. Loading / Error States
-  if (!pets.length && !petId) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-      </div>
-    );
+  // ✅ FIX 2: Handle Loading State FIRST
+  // If usePets is still fetching, show the spinner.
+  // Inside PetProfilePage function...
+
+  if (petsLoading) {
+    return <PetProfileSkeleton />; // 🟢 Use the skeleton instead of the spinner div
   }
 
+  // ✅ FIX 3: Find the pet only AFTER loading is done
   const pet = pets.find((p) => p.id === petId);
 
+  // If loading is done but pet is still undefined, THEN show Not Found
   if (!pet) {
     return (
       <div className="h-full flex flex-col items-center justify-center bg-gray-50">
-        <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mb-4">
-          <Dog className="text-gray-400 w-8 h-8" />
+        <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center mb-6">
+          <Dog className="text-gray-400 w-10 h-10" />
         </div>
-        <p className="text-gray-500 font-medium mb-4">Pet not found</p>
-        <Button onClick={() => navigate("/PetDashboard")} variant="outline">
+        <h2 className="text-xl font-bold text-gray-900 mb-2">Pet Not Found</h2>
+        <p className="text-gray-500 max-w-xs text-center mb-8">
+          This pet may have been deleted or you don't have permission to view
+          it.
+        </p>
+        <Button
+          onClick={() => navigate("/PetDashboard")}
+          variant="outline"
+          className="px-8"
+        >
           Back to Dashboard
         </Button>
       </div>
@@ -73,9 +85,9 @@ export default function PetProfilePage() {
         `Are you sure you want to remove ${pet.name}? This cannot be undone.`
       )
     ) {
-      setLoading(true);
+      setIsDeleting(true);
       await deletePet(pet.id);
-      setLoading(false);
+      setIsDeleting(false);
       navigate("/PetDashboard");
     }
   };
@@ -229,11 +241,11 @@ export default function PetProfilePage() {
           {/* Delete Button */}
           <Button
             onClick={handleDelete}
-            disabled={loading}
+            disabled={isDeleting}
             variant="ghost"
             className="w-full text-red-500 hover:text-red-600 hover:bg-red-50 rounded-xl h-10"
           >
-            {loading ? (
+            {isDeleting ? (
               <Loader2 className="animate-spin w-4 h-4" />
             ) : (
               <>
@@ -360,6 +372,39 @@ export default function PetProfilePage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+function PetProfileSkeleton() {
+  return (
+    <div className="h-full w-full flex flex-col lg:flex-row bg-gray-50 lg:p-6 gap-6">
+      {/* Left Panel Skeleton */}
+      <div className="w-full lg:w-96 flex flex-col gap-4">
+        <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 h-96 flex flex-col items-center pt-10">
+          <Skeleton className="w-32 h-32 rounded-full mb-4" /> {/* Avatar */}
+          <Skeleton className="w-48 h-8 mb-2" /> {/* Name */}
+          <Skeleton className="w-24 h-4 mb-8" /> {/* Breed */}
+          <div className="w-full space-y-4 px-4">
+            <Skeleton className="w-full h-6" />
+            <Skeleton className="w-full h-6" />
+            <Skeleton className="w-full h-6" />
+          </div>
+        </div>
+      </div>
+
+      {/* Right Panel Skeleton */}
+      <div className="flex-1 bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
+        <div className="flex gap-4 mb-8 border-b pb-4">
+          <Skeleton className="w-32 h-10 rounded-full" />
+          <Skeleton className="w-32 h-10 rounded-full" />
+          <Skeleton className="w-32 h-10 rounded-full" />
+        </div>
+        <div className="space-y-4">
+          <Skeleton className="w-full h-24 rounded-xl" />
+          <Skeleton className="w-full h-24 rounded-xl" />
+          <Skeleton className="w-full h-24 rounded-xl" />
+        </div>
+      </div>
     </div>
   );
 }
