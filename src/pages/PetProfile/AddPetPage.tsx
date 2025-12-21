@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom"; // ✅ Import useSearchParams
 import { useAuth } from "@/context/authContext";
 import { usePets } from "@/lib/usePets";
@@ -105,7 +105,7 @@ export default function AddPetPage() {
     }
   };
 
-  const handlePetImageChange = async (
+  const handlePetImageChange = useCallback(async (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = e.target.files?.[0];
@@ -122,7 +122,7 @@ export default function AddPetPage() {
       toast.error("Failed to upload image. Please try again.");
     }
     setUploading(false);
-  };
+  }, []);
 
   const handleRemoveImage = () => {
     setPetImageUrl(null);
@@ -163,9 +163,9 @@ export default function AddPetPage() {
       } else {
         toast.error("Failed to save pet. Check console for errors.");
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Error adding pet:", err);
-      toast.error(err.message || "Failed to add pet");
+      toast.error(err instanceof Error ? err.message : "Failed to add pet");
     } finally {
       setLoading(false);
     }

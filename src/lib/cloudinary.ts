@@ -1,9 +1,17 @@
-const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+let cloudName: string | undefined;
+try {
+  cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+} catch (error) {
+  console.error('Error accessing Cloudinary cloud name:', error);
+}
 
 export async function uploadImageToCloudinary(
   file: File,
   preset: "avatar" | "pet" | "post" = "post"
 ): Promise<string> {
+  if (!cloudName) {
+    throw new Error("Cloudinary cloud name is not configured");
+  }
   if (!file.type.startsWith("image/")) {
     throw new Error("Please select a valid image file");
   }
@@ -17,7 +25,15 @@ export async function uploadImageToCloudinary(
     post: import.meta.env.VITE_CLOUDINARY_POSTURL,
   } as const;
 
-  const uploadPreset = presetMap[preset];
+  let uploadPreset: string;
+  try {
+    uploadPreset = presetMap[preset];
+    if (!uploadPreset) {
+      throw new Error(`Upload preset not configured for: ${preset}`);
+    }
+  } catch (error) {
+    throw new Error(`Failed to get upload preset: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 
   const formData = new FormData();
   formData.append("file", file);
@@ -25,12 +41,22 @@ export async function uploadImageToCloudinary(
 
   console.log("upload_preset being sent:", uploadPreset);
 
-  const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-    { method: "POST", body: formData }
-  );
+  let res: Response;
+  try {
+    res = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+      { method: "POST", body: formData }
+    );
+  } catch (error) {
+    throw new Error(`Network error: ${error instanceof Error ? error.message : 'Failed to connect'}`);
+  }
 
-  const data = await res.json();
+  let data: any;
+  try {
+    data = await res.json();
+  } catch (error) {
+    throw new Error('Failed to parse response from Cloudinary');
+  }
   console.log("Cloudinary response:", data);
 
   if (!res.ok) {

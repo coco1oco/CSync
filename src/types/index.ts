@@ -26,9 +26,9 @@ export interface OutreachEvent {
   id: string;
   admin_id: string;
   title: string;
-  location: string;
+  location?: string;
   description: string;
-  images: string[];
+  images?: string[];
   created_at: string;
   updated_at: string;
   admin?: UserProfile;
@@ -45,12 +45,12 @@ export type UpdateProfilePayload = {
 };
 
 export interface Message {
-  id: number;
+  id: string;
   conversation_id: string;
   sender_id: string;
   content: string;
   created_at: string;
-  sender?: UserProfile; // We will join this
+  sender?: UserProfile;
 }
 
 export interface Conversation {

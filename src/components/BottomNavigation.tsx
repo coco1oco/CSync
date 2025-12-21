@@ -7,6 +7,10 @@ interface BottomNavigationProps {
   userRole: UserRole | null;
 }
 
+/**
+ * Bottom navigation bar component that displays role-based navigation items.
+ * Shows unread message count badge when applicable.
+ */
 export function BottomNavigation({
   userRole,
 }: Readonly<BottomNavigationProps>) {
@@ -17,25 +21,21 @@ export function BottomNavigation({
   const isActive = (path: string): boolean => location.pathname === path;
 
   // Define the navigation items dynamically based on role
- const navItems = [
-  { path: "/", icon: Home, label: "Home" },
-  { path: "/messages", icon: MessageCircle, label: "Messages" },
-
-  ...(userRole === "admin"
-    ? [
-        { path: "/admin/team", icon: Users, label: "Team" },
-        { path: "/notifications", icon: Bell, label: "Notifications" },
-      ]
-    : [
-        { path: "/notifications", icon: Bell, label: "Notifications" },
-      ]),
-
-  {
-    path: "/PetDashboard",
-    icon: PawPrint,
-    label: "Pets",
-  },
-];
+  const navItems =
+    userRole === "admin"
+      ? [
+          { path: "/AdminDashboard", icon: Home, label: "Admin" },
+          { path: "/messages", icon: MessageCircle, label: "Messages" },
+          { path: "/admin/team", icon: Users, label: "Team" },
+          { path: "/notifications", icon: Bell, label: "Notifications" },
+          { path: "/PetDashboard", icon: PawPrint, label: "Pets" },
+        ]
+      : [
+          { path: "/", icon: Home, label: "Home" },
+          { path: "/messages", icon: MessageCircle, label: "Messages" },
+          { path: "/notifications", icon: Bell, label: "Notifications" },
+          { path: "/PetDashboard", icon: PawPrint, label: "Pets" },
+        ];
 
 
   return (
@@ -55,7 +55,7 @@ export function BottomNavigation({
             <div className="relative">
               <Icon size={24} strokeWidth={isActive(path) ? 2.5 : 2} />
 
-              {/* ✅ BADGE LOGIC */}
+              {/* Display unread message count badge (max 9+) */}
               {label === "Messages" && unreadCount > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold px-1 py-0.5 rounded-full min-w-[16px] flex items-center justify-center border border-white">
                   {unreadCount > 9 ? "9+" : unreadCount}

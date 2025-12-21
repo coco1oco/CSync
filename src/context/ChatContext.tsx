@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { useAuth } from "./authContext";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -19,7 +19,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   const [unreadCount, setUnreadCount] = useState(0);
 
   // ✅ OPTIMIZED: Fetches total count in ONE request using the SQL function
-  const fetchUnreadCount = async () => {
+  const fetchUnreadCount = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -36,7 +36,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (err) {
       console.error("Unexpected error in chat context:", err);
     }
-  };
+  }, [user]);
 
   // ✅ REALTIME LISTENER
   useEffect(() => {

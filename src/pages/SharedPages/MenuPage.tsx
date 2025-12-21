@@ -10,10 +10,12 @@ export default function MenuPage() {
 
   const handleSignOut = async () => {
     try {
-      await signOut(); // Call the signOut function from AuthContext
-      navigate("/Welcome"); // Redirect to SignIn page
+      await signOut();
+      navigate("/Welcome");
     } catch (error) {
       console.error("Error signing out:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to sign out. Please try again.";
+      alert(errorMessage);
     }
   };
 

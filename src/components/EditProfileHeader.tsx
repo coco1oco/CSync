@@ -1,5 +1,5 @@
 import { useAuth } from "@/context/authContext";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import BackIcon from "@/assets/BackButton.svg";
 import FailedImageIcon from "@/assets/FailedImage.svg";
@@ -52,7 +52,7 @@ export default function EditProfilePage() {
     }
   };
 
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -72,7 +72,7 @@ export default function EditProfilePage() {
     } finally {
       setIsUploadingImage(false);
     }
-  };
+  }, [user?.avatar_url]);
 
   const handleSave = async () => {
     if (pronounsError) {

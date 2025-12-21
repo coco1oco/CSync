@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/authContext";
 import { usePets } from "@/lib/usePets";
@@ -94,7 +94,7 @@ export default function PetEditProfile() {
     }));
   };
 
-  const uploadImage = async (file: File): Promise<string | null> => {
+  const uploadImage = useCallback(async (file: File): Promise<string | null> => {
     try {
       const fileName = `${user?.id}/${petId}/${Date.now()}-${file.name}`;
       const { data, error } = await supabase.storage
@@ -108,14 +108,14 @@ export default function PetEditProfile() {
         .getPublicUrl(data.path);
 
       return publicData.publicUrl;
-    } catch (err: any) {
+    } catch (err) {
       console.error("Error uploading image:", err);
       setError("Failed to upload image");
       return null;
     }
-  };
+  }, [user?.id, petId]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
@@ -160,13 +160,13 @@ export default function PetEditProfile() {
       setTimeout(() => {
         navigate(`/PetDashboard/${petId}`);
       }, 1500);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Error updating pet:", err);
-      setError(err.message || "Failed to update pet profile");
+      setError(err instanceof Error ? err.message : "Failed to update pet profile");
     } finally {
       setLoading(false);
     }
-  };
+  }, [formData, imageFile, petId, user?.id, navigate, uploadImage]);
 
   if (!pet) {
     return (

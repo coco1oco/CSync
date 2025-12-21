@@ -28,25 +28,21 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
 
   const isActive = (path: string) => location.pathname === path;
 
-  const navItems = [
-    { path: "/", icon: Home, label: "Home" },
-    { path: "/messages", icon: MessageCircle, label: "Messages" },
-
-    ...(userRole === "admin"
+  const navItems =
+    userRole === "admin"
       ? [
+          { path: "/AdminDashboard", icon: Home, label: "Admin Home" },
+          { path: "/messages", icon: MessageCircle, label: "Messages" },
           { path: "/admin/team", icon: Users, label: "Manage Team" },
           { path: "/notifications", icon: Bell, label: "Notifications" },
+          { path: "/PetDashboard", icon: PawPrint, label: "Pet Dashboard" },
         ]
       : [
+          { path: "/", icon: Home, label: "Home" },
+          { path: "/messages", icon: MessageCircle, label: "Messages" },
           { path: "/notifications", icon: Bell, label: "Notifications" },
-        ]),
-
-    {
-      path: "/PetDashboard",
-      icon: PawPrint,
-      label: "Pet Dashboard",
-    },
-  ];
+          { path: "/PetDashboard", icon: PawPrint, label: "Pet Dashboard" },
+        ];
 
 
   const handleSignOut = async () => {

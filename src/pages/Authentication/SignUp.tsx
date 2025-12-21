@@ -87,25 +87,24 @@ export default function SignUp() {
       if (authError) throw authError;
 
       const createdUser = authData.user;
+      if (!createdUser) throw new Error("User creation failed");
 
-      if (createdUser) {
-        // Create Profile Entry
-        const { error: profileError } = await supabase.from("profiles").upsert([
-          {
-            id: createdUser.id,
-            email: data.email,
-            username: data.username,
-          },
-        ]);
+      // Create Profile Entry
+      const { error: profileError } = await supabase.from("profiles").upsert([
+        {
+          id: createdUser.id,
+          email: data.email,
+          username: data.username,
+        },
+      ]);
 
-        if (profileError) throw profileError;
-      }
+      if (profileError) throw profileError;
 
       // Success! AuthContext will update, PublicRoute will see the user,
       // and AppRouter will automatically flip them to the Dashboard.
-    } catch (err: any) {
+    } catch (err) {
       console.error("SignUp Error:", err);
-      setServerError(err.message || "An error occurred during sign up");
+      setServerError(err instanceof Error ? err.message : "An error occurred during sign up");
     }
   };
 

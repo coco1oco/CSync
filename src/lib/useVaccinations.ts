@@ -26,7 +26,9 @@ export function useVaccinations(petId: string | undefined, userId: string | unde
       return;
     }
 
-    fetchVaccinations();
+    fetchVaccinations().catch((err) => {
+      console.error('Error in fetchVaccinations:', err);
+    });
   }, [petId, userId]);
 
   const fetchVaccinations = async () => {
@@ -42,22 +44,27 @@ export function useVaccinations(petId: string | undefined, userId: string | unde
       if (fetchError) throw fetchError;
 
       const vaccinesWithStatus = (data || []).map((vac) => {
-        const dueDate = new Date(vac.next_due_date);
-        const today = new Date();
-        let status = vac.status;
+        try {
+          const dueDate = new Date(vac.next_due_date);
+          const today = new Date();
+          let status = vac.status;
 
-        if (vac.status !== "completed" && dueDate < today) {
-          status = "overdue";
+          if (vac.status !== "completed" && dueDate < today) {
+            status = "overdue";
+          }
+
+          return { ...vac, status };
+        } catch (error) {
+          console.error('Error processing vaccination:', error);
+          return vac;
         }
-
-        return { ...vac, status };
       });
 
       setVaccinations(vaccinesWithStatus);
       setError(null);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Error fetching vaccinations:", err);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : 'Failed to fetch vaccinations');
     } finally {
       setLoading(false);
     }
@@ -79,11 +86,12 @@ export function useVaccinations(petId: string | undefined, userId: string | unde
         .select();
 
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error('No data returned from insert');
       setVaccinations([...vaccinations, data[0]]);
       return data[0];
-    } catch (err: any) {
+    } catch (err) {
       console.error("Error adding vaccination:", err);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : 'Failed to add vaccination');
       return null;
     }
   };
@@ -100,11 +108,12 @@ export function useVaccinations(petId: string | undefined, userId: string | unde
         .select();
 
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error('No data returned from update');
       setVaccinations(vaccinations.map((v) => (v.id === id ? data[0] : v)));
       return data[0];
-    } catch (err: any) {
+    } catch (err) {
       console.error("Error updating vaccination:", err);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : 'Failed to update vaccination');
       return null;
     }
   };
@@ -116,9 +125,9 @@ export function useVaccinations(petId: string | undefined, userId: string | unde
       if (error) throw error;
       setVaccinations(vaccinations.filter((v) => v.id !== id));
       return true;
-    } catch (err: any) {
+    } catch (err) {
       console.error("Error deleting vaccination:", err);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : 'Failed to delete vaccination');
       return false;
     }
   };

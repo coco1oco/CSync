@@ -40,11 +40,11 @@ export default function CreateEvent() {
     if (e.target.files && e.target.files.length > 0) {
       const selectedFiles = Array.from(e.target.files);
 
-      setImageFiles((prev) => [...prev, ...selectedFiles]);
-
       const selectedPreviews = selectedFiles.map((file) =>
         URL.createObjectURL(file)
       );
+      
+      setImageFiles((prev) => [...prev, ...selectedFiles]);
       setPreviewUrls((prev) => [...prev, ...selectedPreviews]);
     }
 
@@ -98,12 +98,14 @@ export default function CreateEvent() {
 
     if (insertError) throw insertError;
 
+    // Force a page refresh to show the new post
     setTimeout(() => {
-      navigate("/");
+      navigate("/", { replace: true });
+      window.location.reload();
     }, 800);
-  } catch (err: any) {
+  } catch (err) {
     console.error("Error creating post:", err);
-    setError(err.message || "Failed to create post");
+    setError(err instanceof Error ? err.message : "Failed to create post");
     setLoading(false);
   }
 };

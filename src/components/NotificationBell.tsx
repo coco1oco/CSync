@@ -17,17 +17,20 @@ export function NotificationBell() {
   }, [user?.id]);
 
   async function fetchUnreadCount() {
-    const { count, error } = await supabase
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user?.id)
-      .eq('is_unread', true);
+    try {
+      if (!user?.id) return;
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('is_unread', true);
 
-    if (error) {
+      if (error) throw error;
+      setUnreadCount(count || 0);
+    } catch (error) {
       console.error('Error fetching unread count:', error);
-      return;
+      setUnreadCount(0);
     }
-    setUnreadCount(count || 0);
   }
 
   function subscribe() {

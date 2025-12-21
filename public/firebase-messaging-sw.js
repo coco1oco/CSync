@@ -1,24 +1,38 @@
 importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js');
 
-const firebaseConfig = {
-  apiKey: 'AIzaSyACR7SWj9jwsDHBv5823MgiZEcf-_v-CV8',
-  authDomain: 'pawpal-227be.firebaseapp.com',
-  projectId: 'pawpal-227be',
-  storageBucket: 'pawpal-227be.firebasestorage.app',
-  messagingSenderId: '406637646338',
-  appId: '1:406637646338:web:79f8e60a9cc7572b668d1b',
-};
-
-firebase.initializeApp(firebaseConfig);
-const messaging = firebase.messaging();
-
-messaging.onBackgroundMessage((payload) => {
-  const title = payload.notification?.title || 'PawPals';
-  const options = {
-    body: payload.notification?.body || '',
-    icon: '/favicon.ico',
-    data: payload.data || {},
-  };
-  self.registration.showNotification(title, options);
+self.addEventListener('message', (event) => {
+  if (!event.origin || event.origin !== self.location.origin) {
+    console.warn('Rejected message from untrusted origin:', event.origin);
+    return;
+  }
+  if (event.data && event.data.type === 'FIREBASE_CONFIG') {
+    initializeFirebase(event.data.config);
+  }
 });
+
+function initializeFirebase(firebaseConfig) {
+  try {
+    if (!firebaseConfig) {
+      throw new Error('Firebase config is required');
+    }
+    firebase.initializeApp(firebaseConfig);
+    const messaging = firebase.messaging();
+
+  messaging.onBackgroundMessage((payload) => {
+    try {
+      const title = payload.notification?.title || 'PawPals';
+      const options = {
+        body: payload.notification?.body || '',
+        icon: '/favicon.ico',
+        data: payload.data || {},
+      };
+      self.registration.showNotification(title, options);
+    } catch (error) {
+      console.error('Error showing notification:', error);
+    }
+  });
+  } catch (error) {
+    console.error('Firebase initialization failed:', error);
+  }
+}

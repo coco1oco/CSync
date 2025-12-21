@@ -27,7 +27,7 @@ export function useSchedules(petId: string | undefined, userId: string | undefin
       return;
     }
 
-    fetchSchedules();
+    fetchSchedules().catch((err) => console.error('Error in fetchSchedules:', err));
   }, [petId, userId]);
 
   const fetchSchedules = async () => {
@@ -64,6 +64,7 @@ export function useSchedules(petId: string | undefined, userId: string | undefin
         .select();
 
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error('No data returned from insert');
       setSchedules([...schedules, data[0]]);
       return data[0];
     } catch (err: any) {
@@ -85,7 +86,7 @@ export function useSchedules(petId: string | undefined, userId: string | undefin
         .select();
 
       if (error) throw error;
-      setSchedules(schedules.map((s) => (s.id === id ? data[0] : s)));
+      setSchedules((prev) => prev.map((s) => (s.id === id ? data[0] : s)));
       return data[0];
     } catch (err: any) {
       console.error("Error updating schedule:", err);
@@ -99,7 +100,7 @@ export function useSchedules(petId: string | undefined, userId: string | undefin
       const { error } = await supabase.from("schedules").delete().eq("id", id);
 
       if (error) throw error;
-      setSchedules(schedules.filter((s) => s.id !== id));
+      setSchedules((prev) => prev.filter((s) => s.id !== id));
       return true;
     } catch (err: any) {
       console.error("Error deleting schedule:", err);

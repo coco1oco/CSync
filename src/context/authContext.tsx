@@ -6,6 +6,7 @@ import React, {
   useMemo,
 } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { requestNotificationPermission } from "@/lib/NotificationService";
 
 type UserProfile = {
   id: string;
@@ -134,6 +135,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
           if (mounted) {
             setUser({ ...instantUser, ...(dbProfile || {}) });
+            
+            // Request notification permission and save FCM token
+            requestNotificationPermission().then(token => {
+              if (token) {
+                supabase.from('fcm_tokens').upsert({ 
+                  user_id: session.user.id, 
+                  token 
+                });
+              }
+            });
           }
         }
       } catch (error) {

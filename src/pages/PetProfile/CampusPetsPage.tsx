@@ -6,7 +6,7 @@ import { Calendar, Dog } from "lucide-react";
 export default function CampusPetsPage() {
   const { user } = useAuth();
   // ✅ Fetching "campus" mode pets
-  const { pets, loading } = usePets(user?.id, "campus");
+  const { pets, loading, error } = usePets(user?.id, "campus");
   const navigate = useNavigate();
 
   if (loading) {
@@ -14,6 +14,15 @@ export default function CampusPetsPage() {
       <div className="w-full h-96 flex flex-col items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
         <p className="text-gray-500 font-medium">Loading CvSU Dogs...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="w-full h-96 flex flex-col items-center justify-center">
+        <div className="text-red-600 mb-2 text-lg font-semibold">Error loading campus dogs</div>
+        <p className="text-gray-500">{error}</p>
       </div>
     );
   }

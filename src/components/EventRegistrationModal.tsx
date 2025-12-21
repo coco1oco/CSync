@@ -29,13 +29,20 @@ export function EventRegistrationModal({
   useEffect(() => {
     const fetchPets = async () => {
       if (!user) return;
-      const { data } = await supabase
-        .from("pets")
-        .select("id, name, species, petimage_url")
-        .eq("owner_id", user.id);
+      try {
+        const { data, error } = await supabase
+          .from("pets")
+          .select("id, name, species, petimage_url")
+          .eq("owner_id", user.id);
 
-      if (data) setPets(data);
-      setLoading(false);
+        if (error) throw error;
+        if (data) setPets(data);
+      } catch (error) {
+        console.error('Error fetching pets:', error);
+        toast.error('Failed to load pets');
+      } finally {
+        setLoading(false);
+      }
     };
     fetchPets();
   }, [user]);

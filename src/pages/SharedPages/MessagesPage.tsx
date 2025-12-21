@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "@/context/authContext";
 import { useChat } from "@/context/ChatContext";
 import { supabase } from "@/lib/supabaseClient";
@@ -118,7 +118,7 @@ export default function MessagesPage() {
               }
             }
             const newMsg = { ...payload.new, sender: senderData } as any;
-            setMessages((p) => [...p, newMsg]);
+            setMessages((prev) => [...prev, newMsg]);
             scrollToBottom();
           }
         }
@@ -137,7 +137,7 @@ export default function MessagesPage() {
     );
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
+  const handleSendMessage = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !activeRoom || !user) return;
     const content = newMessage.trim();
@@ -160,12 +160,17 @@ export default function MessagesPage() {
     setMessages((p) => [...p, optimisticMsg]);
     scrollToBottom();
 
-    await supabase
-      .from("messages")
-      .insert([
-        { conversation_id: activeRoom.id, sender_id: user.id, content },
-      ]);
-  };
+    try {
+      await supabase
+        .from("messages")
+        .insert([
+          { conversation_id: activeRoom.id, sender_id: user.id, content },
+        ]);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast.error('Failed to send message');
+    }
+  }, [newMessage, activeRoom, user]);
 
   // 3. START DM LOGIC
   const handleSearchUsers = async (query: string) => {

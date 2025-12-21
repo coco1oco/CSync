@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { MoreHorizontal, Edit, Trash2, MapPin, X } from "lucide-react";
@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { OutreachEvent } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
+import { formatRelativeTime } from "@/lib/utils";
 
 interface EventCardProps {
   event: OutreachEvent;
@@ -59,15 +60,11 @@ export function EventCard({
     setPage([page + newDirection, newDirection]);
   };
 
-  const dateStr = new Date(created_at).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
+  const dateStr = formatRelativeTime(created_at);
 
-  // ✅ Adjusted limit so "Show more" appears for medium-length posts too
   const isLongText = description && description.length > 150;
 
-  const renderWithHashtags = (text: string) => {
+  const renderWithHashtags = useCallback((text: string) => {
     if (!text) return null;
     const parts = text.split(/(#[\w]+)/g);
     return parts.map((part, index) => {
@@ -87,7 +84,7 @@ export function EventCard({
       }
       return part;
     });
-  };
+  }, [onTagClick]);
 
   useEffect(() => {
     if (isLightboxOpen) {
@@ -111,6 +108,7 @@ export function EventCard({
                 src={admin.avatar_url}
                 alt={admin.username}
                 className="h-full w-full object-cover"
+                loading="lazy" // Lazy load avatar
               />
             ) : (
               <span className="flex h-full w-full items-center justify-center text-xs font-bold text-gray-500">
@@ -173,12 +171,10 @@ export function EventCard({
         )}
 
         <div className="text-sm text-gray-900 leading-relaxed whitespace-pre-wrap">
-          {/* ✅ UPDATED: Clamps to 3 lines for a cleaner preview */}
           <span className={!isExpanded ? "line-clamp-3" : ""}>
             {renderWithHashtags(description)}
           </span>
 
-          {/* ✅ UPDATED: "..more" logic */}
           {isLongText && (
             <button
               onClick={() => setIsExpanded(!isExpanded)}
@@ -190,11 +186,10 @@ export function EventCard({
         </div>
       </div>
 
-      {/* 3. MEDIA (Restored Large Size) */}
+      {/* 3. MEDIA (Lazy Loaded) */}
       {images.length > 0 && (
         <div className="px-0 md:px-4 pb-3">
           <div
-            // ✅ CHANGED BACK: aspect-square (1:1) makes the photo BIG again
             className="relative w-full aspect-square bg-gray-100 md:rounded-2xl overflow-hidden cursor-pointer border-y md:border border-gray-100 shadow-sm"
             onClick={() => setIsLightboxOpen(true)}
           >
@@ -214,13 +209,16 @@ export function EventCard({
                 drag="x"
                 dragConstraints={{ left: 0, right: 0 }}
                 dragElastic={1}
-                onDragEnd={(e, { offset, velocity }) => {
-                  void e;
-                  if (Math.abs(offset.x * velocity.x) > 10000)
+                onDragEnd={(_e, { offset, velocity }) => {
+                  const swipe = offset.x * velocity.x;
+                  if (Math.abs(swipe) > 10000) {
                     paginate(offset.x > 0 ? -1 : 1);
+                  }
                 }}
                 alt="Post"
                 className="absolute w-full h-full object-cover"
+                loading="lazy" // ⚡ CRITICAL OPTIMIZATION: Lazy load the main image
+                decoding="async" // Helps with smoother image decoding
               />
             </AnimatePresence>
 
@@ -257,6 +255,7 @@ export function EventCard({
             <img
               src={images[imageIndex]}
               className="max-w-full max-h-[90vh] rounded-md"
+              alt="Lightbox view"
             />
           </div>,
           document.body

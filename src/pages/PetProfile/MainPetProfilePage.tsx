@@ -14,7 +14,7 @@ export default function MainPetProfilePage() {
 
   // ✅ 2. FETCH DATA BASED ON TAB
   // The hook automatically refetches when 'activeTab' changes
-  const { pets, loading } = usePets(user?.id, activeTab);
+  const { pets, loading, error } = usePets(user?.id, activeTab);
 
   const isAdmin = user?.role === "admin";
 
@@ -24,6 +24,18 @@ export default function MainPetProfilePage() {
         <div className="flex flex-col items-center justify-center h-[60vh]">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
           <p className="text-gray-500 font-medium">Loading pets...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="w-full min-h-screen bg-gray-50 pb-24">
+        <div className="flex flex-col items-center justify-center h-[60vh]">
+          <Dog className="w-12 h-12 text-red-300 mb-4" />
+          <p className="text-red-600 font-medium">Failed to load pets</p>
+          <p className="text-sm text-gray-500 mt-2">{error}</p>
         </div>
       </div>
     );

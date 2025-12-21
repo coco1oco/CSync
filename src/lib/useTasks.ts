@@ -27,7 +27,7 @@ export function useTasks(petId: string | undefined, userId: string | undefined) 
       return;
     }
 
-    fetchTasks();
+    fetchTasks().catch((err) => console.error('Error in fetchTasks:', err));
   }, [petId, userId]);
 
   const fetchTasks = async () => {
@@ -64,6 +64,7 @@ export function useTasks(petId: string | undefined, userId: string | undefined) 
         .select();
 
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error('No data returned from insert');
       setTasks([...tasks, data[0]]);
       return data[0];
     } catch (err: any) {

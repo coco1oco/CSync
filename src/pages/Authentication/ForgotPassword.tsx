@@ -35,8 +35,9 @@ export default function ForgotPassword() {
 
       if (supabaseError) throw supabaseError;
       setMessage("If an account exists, we sent a reset link to your email.");
-    } catch (err: any) {
-      setError(err?.message ?? "An unexpected error occurred");
+      setEmail("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred");
     } finally {
       setLoading(false);
     }

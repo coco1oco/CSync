@@ -11,7 +11,8 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker
       .register('/firebase-messaging-sw.js')
       .then((registration) => {
-        console.log('Service Worker registered:', registration.scope);
+        const sanitizedScope = String(registration.scope).replace(/[\r\n]/g, ' ');
+        console.log('Service Worker registered:', sanitizedScope);
       })
       .catch((error) => {
         console.error('Service Worker registration failed:', error);
@@ -19,10 +20,19 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <>
-      <AppRouter />
-    </>
-  </React.StrictMode>
-)
+// Setup foreground notification handler
+setupForegroundNotificationHandler();
+
+try {
+  const rootElement = document.getElementById("root");
+  if (!rootElement) throw new Error('Root element not found');
+  ReactDOM.createRoot(rootElement).render(
+    <React.StrictMode>
+      <>
+        <AppRouter />
+      </>
+    </React.StrictMode>
+  );
+} catch (error) {
+  console.error('Failed to render app:', error);
+}

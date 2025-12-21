@@ -97,17 +97,18 @@ export default function ManageTeam() {
           .maybeSingle();
 
         if (!commGroup) {
-          const { data: newGroup } = await supabase
+          const { data: newGroup, error: createError } = await supabase
             .from("conversations")
             .insert([{ name: groupName, is_group: true }])
             .select()
             .single();
+          if (createError) throw createError;
           commGroup = newGroup;
         }
 
         // Add User to Group
         if (commGroup) {
-          await supabase.from("conversation_members").upsert(
+          const { error: upsertError } = await supabase.from("conversation_members").upsert(
             {
               conversation_id: commGroup.id,
               user_id: selectedMember.id,
@@ -115,6 +116,7 @@ export default function ManageTeam() {
             },
             { onConflict: "conversation_id,user_id" }
           );
+          if (upsertError) throw upsertError;
         }
       }
 
@@ -129,16 +131,17 @@ export default function ManageTeam() {
           .maybeSingle();
 
         if (!execGroup) {
-          const { data: newGroup } = await supabase
+          const { data: newGroup, error: createError } = await supabase
             .from("conversations")
             .insert([{ name: execName, is_group: true }])
             .select()
             .single();
+          if (createError) throw createError;
           execGroup = newGroup;
         }
 
         if (execGroup) {
-          await supabase.from("conversation_members").upsert(
+          const { error: upsertError } = await supabase.from("conversation_members").upsert(
             {
               conversation_id: execGroup.id,
               user_id: selectedMember.id,
@@ -146,6 +149,7 @@ export default function ManageTeam() {
             },
             { onConflict: "conversation_id,user_id" }
           );
+          if (upsertError) throw upsertError;
         }
       }
 
@@ -160,9 +164,9 @@ export default function ManageTeam() {
         `Updated ${selectedMember.first_name}'s role & permissions`
       );
       setIsDialogOpen(false);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to update role", err);
-      toast.error("Failed to update member role.");
+      toast.error(err instanceof Error ? err.message : "Failed to update member role.");
     } finally {
       setUpdating(false);
     }

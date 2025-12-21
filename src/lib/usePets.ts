@@ -51,7 +51,8 @@ export function usePets(
 
       if (fetchError) {
         setError(fetchError.message);
-        console.error("Error fetching pets:", fetchError);
+        const sanitizedError = JSON.stringify(fetchError).replace(/[\r\n]/g, ' ');
+        console.error("Error fetching pets:", sanitizedError);
       } else {
         setPets((data as Pet[]) || []);
       }

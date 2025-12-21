@@ -83,7 +83,7 @@ export default function TasksSection({ petId }: TasksSectionProps) {
         urgency: formData.urgency,
         requires_immediate_attention: formData.requires_immediate_attention,
         pet_id: petId,
-      } as any);
+      });
     } else {
       await addTask({
         pet_id: petId,
@@ -156,7 +156,13 @@ export default function TasksSection({ petId }: TasksSectionProps) {
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex items-start gap-2 flex-1">
                     <button
-                      onClick={() => toggleTaskComplete(task.id, true)}
+                      onClick={async () => {
+                        try {
+                          await toggleTaskComplete(task.id, true);
+                        } catch (error) {
+                          console.error('Error completing task:', error);
+                        }
+                      }}
                       className="p-1 hover:bg-green-100 rounded-lg transition mt-1 flex-shrink-0"
                     >
                       <Check className="w-4 h-4 text-gray-400 hover:text-green-600" />
@@ -178,7 +184,13 @@ export default function TasksSection({ petId }: TasksSectionProps) {
                       <Edit2 className="w-4 h-4 text-blue-600" />
                     </button>
                     <button
-                      onClick={() => handleDelete(task.id)}
+                      onClick={async () => {
+                        try {
+                          await handleDelete(task.id);
+                        } catch (error) {
+                          console.error('Error deleting task:', error);
+                        }
+                      }}
                       className="p-1 hover:bg-red-100 rounded-lg transition"
                     >
                       <Trash2 className="w-4 h-4 text-red-600" />
@@ -225,7 +237,13 @@ export default function TasksSection({ petId }: TasksSectionProps) {
                 <div className="flex justify-between items-start">
                   <div className="flex items-start gap-2 flex-1">
                     <button
-                      onClick={() => toggleTaskComplete(task.id, false)}
+                      onClick={() => {
+                        try {
+                          toggleTaskComplete(task.id, false);
+                        } catch (error) {
+                          console.error('Error uncompleting task:', error);
+                        }
+                      }}
                       className="p-1 hover:bg-gray-200 rounded-lg transition mt-1 flex-shrink-0"
                     >
                       <Check className="w-4 h-4 text-green-600" />
@@ -237,7 +255,13 @@ export default function TasksSection({ petId }: TasksSectionProps) {
                     </div>
                   </div>
                   <button
-                    onClick={() => handleDelete(task.id)}
+                    onClick={() => {
+                      try {
+                        handleDelete(task.id);
+                      } catch (error) {
+                        console.error('Error deleting task:', error);
+                      }
+                    }}
                     className="p-1 hover:bg-red-100 rounded-lg transition flex-shrink-0"
                   >
                     <Trash2 className="w-4 h-4 text-red-600" />

@@ -43,6 +43,7 @@ export default function EditEvent() {
   useEffect(() => {
     const fetchPost = async () => {
       try {
+        if (!id) throw new Error('Event ID is required');
         const { data, error } = await supabase
           .from("outreach_events")
           .select("*")
@@ -75,20 +76,19 @@ export default function EditEvent() {
 
   // ✅ HANDLE MULTIPLE FILE SELECTION
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const selectedFiles = Array.from(e.target.files);
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-      // 1. Add to file list
-      setNewFiles((prev) => [...prev, ...selectedFiles]);
+    const selectedFiles = Array.from(files);
+    const selectedPreviews: string[] = [];
 
-      // 2. Generate previews
-      const selectedPreviews = selectedFiles.map((file) =>
-        URL.createObjectURL(file)
-      );
-      setNewPreviews((prev) => [...prev, ...selectedPreviews]);
+    for (const file of selectedFiles) {
+      selectedPreviews.push(URL.createObjectURL(file));
     }
 
-    // Reset input so you can select the same file again if needed
+    setNewFiles((prev) => [...prev, ...selectedFiles]);
+    setNewPreviews((prev) => [...prev, ...selectedPreviews]);
+
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -127,7 +127,10 @@ export default function EditEvent() {
       // 1. Upload all new files concurrently
       // We map over the newFiles array and call uploadImageToCloudinary for each
       const uploadPromises = newFiles.map((file) =>
-        uploadImageToCloudinary(file, "post")
+        uploadImageToCloudinary(file, "post").catch((error) => {
+          console.error('Failed to upload image:', error);
+          throw error;
+        })
       );
       const uploadedUrls = await Promise.all(uploadPromises);
 
@@ -147,12 +150,11 @@ export default function EditEvent() {
 
       if (updateError) throw updateError;
 
-      setTimeout(() => {
-        navigate("/");
-      }, 800);
+      navigate("/");
     } catch (err: any) {
       console.error("Error updating post:", err);
       setError(err.message || "Failed to update post");
+    } finally {
       setLoading(false);
     }
   };

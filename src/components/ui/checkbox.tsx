@@ -10,6 +10,7 @@ function Checkbox({
   className,
   ...props
 }: React.ComponentProps<typeof CheckboxPrimitive.Root>) {
+  try {
   return (
     <CheckboxPrimitive.Root
       data-slot="checkbox"
@@ -27,6 +28,10 @@ function Checkbox({
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
   )
+  } catch (error) {
+    console.error('Error rendering Checkbox:', error);
+    return null;
+  }
 }
 
 export { Checkbox }

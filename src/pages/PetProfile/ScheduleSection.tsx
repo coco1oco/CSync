@@ -75,7 +75,7 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
         vet_name: formData.vet_name || undefined,
         status: formData.status,
         pet_id: petId,
-      } as any);
+      });
     } else {
       await addSchedule({
         pet_id: petId,
@@ -122,7 +122,7 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
                             : schedule.status === "completed"
                             ? "cancelled"
                             : "pending";
-                        handleStatusChange(schedule.id, nextStatus as any);
+                        handleStatusChange(schedule.id, nextStatus);
                       }}
                     >
                       {schedule.status.charAt(0).toUpperCase() + schedule.status.slice(1)}
@@ -245,7 +245,7 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
             <label className="text-sm font-medium block mb-1">Status</label>
             <select
               value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value as "pending" | "completed" | "cancelled" })}
               className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
             >
               <option value="pending">Pending</option>

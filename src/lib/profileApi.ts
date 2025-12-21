@@ -42,8 +42,7 @@ export async function updateProfile(update: ProfileUpdate) {
   });
 
   if (metaError) {
-    console.warn("Metadata sync warning:", metaError);
-    // We proceed anyway since the DB update succeeded
+    console.warn("Metadata sync warning:", JSON.stringify({ code: metaError.code, status: metaError.status }));
   }
 
   return data;

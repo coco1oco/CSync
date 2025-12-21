@@ -31,9 +31,15 @@ export default function PetProfilePage() {
   const handleDelete = async () => {
     if (window.confirm("Are you sure you want to delete this pet?")) {
       setLoading(true);
-      await deletePet(pet.id);
-      setLoading(false);
-      navigate("/PetDashboard");
+      try {
+        await deletePet(pet.id);
+        navigate("/PetDashboard");
+      } catch (err) {
+        console.error("Failed to delete pet:", err);
+        alert("Failed to delete pet. Please try again.");
+      } finally {
+        setLoading(false);
+      }
     }
   };
 

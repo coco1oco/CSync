@@ -56,32 +56,41 @@ export default function VaccinationSection({ petId }: VaccinationSectionProps) {
       return;
     }
 
-    if (editingId) {
-      await updateVaccination(editingId, {
-        vaccine_name: formData.vaccine_name,
-        last_date: formData.last_date,
-        next_due_date: formData.next_due_date,
-        vet_name: formData.vet_name || undefined,
-        notes: formData.notes || undefined,
-        pet_id: petId,
-      } as any);
-    } else {
-      await addVaccination({
-        pet_id: petId,
-        vaccine_name: formData.vaccine_name,
-        last_date: formData.last_date,
-        next_due_date: formData.next_due_date,
-        vet_name: formData.vet_name || undefined,
-        notes: formData.notes || undefined,
-      });
+    try {
+      if (editingId) {
+        await updateVaccination(editingId, {
+          vaccine_name: formData.vaccine_name,
+          last_date: formData.last_date,
+          next_due_date: formData.next_due_date,
+          vet_name: formData.vet_name || undefined,
+          notes: formData.notes || undefined,
+          pet_id: petId,
+        } as any);
+      } else {
+        await addVaccination({
+          pet_id: petId,
+          vaccine_name: formData.vaccine_name,
+          last_date: formData.last_date,
+          next_due_date: formData.next_due_date,
+          vet_name: formData.vet_name || undefined,
+          notes: formData.notes || undefined,
+        });
+      }
+      handleReset();
+    } catch (error) {
+      console.error("Failed to save vaccination:", error);
+      alert("Failed to save vaccination. Please try again.");
     }
-
-    handleReset();
   };
 
   const handleDelete = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this vaccination record?")) {
-      await deleteVaccination(id);
+      try {
+        await deleteVaccination(id);
+      } catch (error) {
+        console.error("Failed to delete vaccination:", error);
+        alert("Failed to delete vaccination. Please try again.");
+      }
     }
   };
 

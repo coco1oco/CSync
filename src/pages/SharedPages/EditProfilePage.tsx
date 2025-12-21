@@ -65,8 +65,8 @@ export default function EditProfilePage() {
 
     try {
       setError(null);
-      setIsUploadingImage(true);
       const localPreview = URL.createObjectURL(file);
+      setIsUploadingImage(true);
       setAvatarUrl(localPreview);
 
       const cloudinaryUrl = await uploadImageToCloudinary(file, "avatar");

@@ -22,19 +22,24 @@ export default function UpdatePassword() {
     setError("");
     setMessage("");
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
-
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters");
-      return;
-    }
-
-    setLoading(true);
-
     try {
+      if (!password || !confirmPassword) {
+        setError("Please fill in all fields");
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        setError("Passwords do not match");
+        return;
+      }
+
+      if (password.length < 8) {
+        setError("Password must be at least 8 characters");
+        return;
+      }
+
+      setLoading(true);
+
       const { error } = await supabase.auth.updateUser({
         password: password,
       });
@@ -43,12 +48,12 @@ export default function UpdatePassword() {
 
       setMessage("Password updated successfully!");
 
-      // Redirect to home/feed after a short delay
       setTimeout(() => {
         navigate("/");
       }, 2000);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      console.error("Password update error:", err);
+      setError(err instanceof Error ? err.message : "Failed to update password");
     } finally {
       setLoading(false);
     }
