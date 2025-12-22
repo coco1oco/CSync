@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import type { UserRole } from "@/types";
 import { Home, MessageCircle, Bell, PawPrint, Users } from "lucide-react";
-import { useChat } from "@/context/ChatContext"; // ✅ IMPORTED
+import { useChat } from "@/context/ChatContext";
 
 interface BottomNavigationProps {
   userRole: UserRole | null;
@@ -12,9 +12,12 @@ export function BottomNavigation({
 }: Readonly<BottomNavigationProps>) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { unreadCount } = useChat(); // ✅ GET COUNT
+  const { unreadCount } = useChat();
 
   const isActive = (path: string): boolean => location.pathname === path;
+
+  // ✅ NEW LOGIC: Hide badge if we are already on the messages page
+  const isOnMessagesPage = location.pathname === "/messages";
 
   const navItems = [
     { path: "/", icon: Home, label: "Home" },
@@ -46,8 +49,8 @@ export function BottomNavigation({
             <div className="relative">
               <Icon size={24} strokeWidth={isActive(path) ? 2.5 : 2} />
 
-              {/* ✅ BADGE LOGIC */}
-              {label === "Messages" && unreadCount > 0 && (
+              {/* ✅ SMART BADGE: Only show if unread > 0 AND we are NOT on the messages page */}
+              {label === "Messages" && unreadCount > 0 && !isOnMessagesPage && (
                 <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold px-1 py-0.5 rounded-full min-w-[16px] flex items-center justify-center border border-white">
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
