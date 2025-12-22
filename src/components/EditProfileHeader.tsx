@@ -94,12 +94,13 @@ export default function EditProfilePage() {
       await updateProfile({
         first_name: firstName.trim(),
         last_name: lastName.trim(),
-        username,
-        bio,
+        username: username.trim(),
+        bio: bio,
         avatar_url: avatarUrl,
-        pronouns,
+        pronouns: pronouns,
+        // 👇 ADD THIS LINE:
+        contact_number: user?.contact_number || "",
       });
-
       // 3. CRITICAL: Force the app to re-fetch user data so the Header updates
       await refreshProfile();
 

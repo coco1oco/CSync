@@ -4,7 +4,6 @@ import { useAuth } from "@/context/authContext";
 import { usePets } from "@/lib/usePets";
 import { supabase } from "@/lib/supabaseClient";
 import {
-  Calendar,
   Plus,
   Dog,
   PawPrint,
