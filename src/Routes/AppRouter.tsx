@@ -61,7 +61,9 @@ const EditProfilePage = lazy(
 );
 const MessagesPage = lazy(() => import("@/pages/SharedPages/MessagesPage"));
 const NotificationsPage = lazy(
-  () => import("@/pages/SharedPages/NotificationsPage")
+  () => import("@/pages/SharedPages/NotificationsPage").then((module) => ({
+    default: module.NotificationsPage,
+  }))
 );
 
 // Loading Spinner

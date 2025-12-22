@@ -61,7 +61,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     userId: string,
     sessionUser: any,
     retries = 1
-  ) => {
+  ): Promise<any> => {
+   // inside fetchProfileSafe function...
+
     try {
       const fetchPromise = supabase
         .from("profiles")
@@ -70,48 +72,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         .maybeSingle();
 
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Profile fetch timeout")), 20000)
+        setTimeout(() => reject(new Error("Profile fetch timeout")), 5000)
       );
 
       const result: any = await Promise.race([fetchPromise, timeoutPromise]);
 
-      if (result.error) throw result.error;
+      // ✅ FIX IS HERE: Do not throw 'result.error' directly.
+      if (result.error) {
+        throw new Error(result.error.message || "Failed to fetch profile");
+      }
 
       const db = result.data;
-      const meta = sessionUser.user_metadata || {};
-
-      if (db) {
-        const needsSync =
-          db.role !== meta.role ||
-          db.avatar_url !== meta.avatar_url ||
-          db.username !== meta.username ||
-          db.first_name !== meta.first_name;
-
-        if (needsSync) {
-          console.log("♻️ Syncing full profile to session cache...");
-          supabase.auth.updateUser({
-            data: {
-              role: db.role,
-              avatar_url: db.avatar_url,
-              username: db.username,
-              first_name: db.first_name,
-              last_name: db.last_name,
-              pronouns: db.pronouns,
-              bio: db.bio,
-            },
-          });
-        }
-      }
-
+      // ... rest of your success logic ...
+      
       return result.data || null;
-    } catch (err) {
+
+    } catch (err: any) {
+      // ✅ FIX IS HERE: Retry logic must be safe
       if (retries > 0) {
-        console.log(`Profile fetch failed, retrying...`);
+        console.warn(`Profile fetch failed, retrying... (${retries} left)`);
         return fetchProfileSafe(userId, sessionUser, retries - 1);
       }
+
+      // Fallback for admins
       if (sessionUser?.email && ADMIN_EMAILS.includes(sessionUser.email)) {
         return { role: "admin" };
       }
+      
+      // ✅ FIX IS HERE: Log the error safely
+      console.error("Profile fetch gave up:", err.message || "Unknown error");
       return null;
     }
   };
@@ -127,18 +116,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
         if (session?.user) {
           const instantUser = getUserFromSession(session.user);
+          if (mounted) {
+            setUser(instantUser);
+            setLoading(false); // Unblock UI immediately
+          }
+
+          // Fetch detailed profile in background
           const dbProfile = await fetchProfileSafe(
             session.user.id,
             session.user
           );
 
-          if (mounted) {
-            setUser({ ...instantUser, ...(dbProfile || {}) });
+          if (mounted && dbProfile) {
+            setUser((prev) => ({ 
+                ...instantUser, 
+                ...(prev || {}), 
+                ...dbProfile 
+            }));
           }
+        } else {
+          if (mounted) setLoading(false);
         }
       } catch (error) {
         console.error("Session check error:", error);
-      } finally {
         if (mounted) setLoading(false);
       }
     };
@@ -153,12 +153,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (event === "SIGNED_IN" && session?.user) {
         const instantUser = getUserFromSession(session.user);
         setUser(instantUser);
+        setLoading(false);
 
         const dbProfile = await fetchProfileSafe(session.user.id, session.user);
         if (mounted && dbProfile) {
-          setUser((prev) => ({ ...prev, ...instantUser, ...dbProfile }));
+          setUser((prev) => ({ 
+              ...instantUser, 
+              ...(prev || {}), 
+              ...dbProfile 
+          }));
         }
-        setLoading(false);
       } else if (event === "SIGNED_OUT") {
         setUser(null);
         setLoading(false);
@@ -191,7 +195,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // ✅ Optimization: Memoize the value to prevent unnecessary re-renders in consumers
   const value = useMemo(
     () => ({ user, loading, signOut, refreshProfile }),
     [user, loading]

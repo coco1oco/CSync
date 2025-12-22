@@ -2,26 +2,51 @@ import { getToken, onMessage } from "firebase/messaging";
 import { messaging } from "../lib/firebase";
 import { supabase } from "../lib/supabaseClient";
 
+// --- Types ---
+
+/** Allowed notification types (keep in sync with DB CHECK constraint). */
+export type NotificationType =
+  | "message"
+  | "reaction"
+  | "comment"
+  | "pet_task"
+  | "schedule"
+  | "vaccination";
+
+/** Simple shapes so we don't depend heavily on your types file */
+type SimpleEvent = { id: string; admin_id: string | null; title: string | null };
+type SimpleActor = { id: string; username?: string | null };
+
+// --- Permission & Token Management ---
+
 /**
  * Ask the browser for permission to show notifications
  * and return the FCM token if permission is granted.
  */
 export async function requestNotificationPermission(): Promise<string | null> {
   // If the browser does not support Notification API, stop
-  if (!("Notification" in window)) return null;
-
-  // If already granted, just get the token
-  if (Notification.permission === "granted") {
-    return await getFCMToken();
+  if (!("Notification" in window)) {
+    console.log("This browser does not support desktop notification");
+    return null;
   }
 
-  // If not decided yet, ask the user
-  if (Notification.permission !== "denied") {
-    const permission = await Notification.requestPermission();
-    if (permission === "granted") return await getFCMToken();
+  try {
+    // If already granted, just get the token
+    if (Notification.permission === "granted") {
+      return await getFCMToken();
+    }
+
+    // If not decided yet, ask the user
+    if (Notification.permission !== "denied") {
+      const permission = await Notification.requestPermission();
+      if (permission === "granted") {
+        return await getFCMToken();
+      }
+    }
+  } catch (err) {
+    console.error("Error requesting notification permission:", err);
   }
 
-  // Permission denied or not granted
   return null;
 }
 
@@ -29,10 +54,19 @@ export async function requestNotificationPermission(): Promise<string | null> {
  * Get the FCM registration token for this device/browser.
  */
 async function getFCMToken(): Promise<string | null> {
-  const token = await getToken(messaging, {
-    vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
-  });
-  return token || null;
+  try {
+    if (!import.meta.env.VITE_FIREBASE_VAPID_KEY) {
+      console.warn("VITE_FIREBASE_VAPID_KEY is missing in .env file!");
+      return null;
+    }
+    const token = await getToken(messaging, {
+      vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
+    });
+    return token || null;
+  } catch (error) {
+    console.error("Error retrieving FCM token:", error);
+    return null;
+  }
 }
 
 /**
@@ -42,6 +76,7 @@ async function getFCMToken(): Promise<string | null> {
  */
 export function setupForegroundNotificationHandler() {
   onMessage(messaging, (payload) => {
+    // console.log("Foreground message received:", payload);
     window.dispatchEvent(
       new CustomEvent("fcm-notification", {
         detail: {
@@ -54,16 +89,7 @@ export function setupForegroundNotificationHandler() {
   });
 }
 
-/**
- * Allowed notification types (keep in sync with DB CHECK constraint).
- */
-export type NotificationType =
-  | "message"
-  | "reaction"
-  | "comment"
-  | "pet_task"
-  | "schedule"
-  | "vaccination";
+// --- Database Helpers ---
 
 /**
  * Base helper: create a notification row in the DB for a specific user,
@@ -94,14 +120,17 @@ export async function createNotification(params: {
 
   // 2) Prune old notifications for this user:
   //    keep only the latest 100 and delete anything older.
-  await supabase.rpc("prune_old_notifications", {
+  //    Ensure you have created this RPC function in Supabase.
+  const { error: rpcError } = await supabase.rpc("prune_old_notifications", {
     p_user_id: params.userId,
   });
+
+  if (rpcError) {
+    console.error("Failed to prune notifications:", rpcError);
+  }
 }
 
-/** Simple shapes so we don't depend heavily on your types file */
-type SimpleEvent = { id: string; admin_id: string | null; title: string | null };
-type SimpleActor = { id: string; username?: string | null };
+// --- Business Logic: Grouping Notifications ---
 
 /**
  * Group LIKE notifications for the same event:
@@ -109,6 +138,7 @@ type SimpleActor = { id: string; username?: string | null };
  * - If there is one, update it to "X and N others liked your post".
  */
 export async function notifyLike(event: SimpleEvent, actor: SimpleActor) {
+  // Don't notify if the admin is the one liking their own post, or if no admin exists
   if (!event.admin_id || event.admin_id === actor.id) return;
 
   // 1) Try to find the latest 'reaction' notification for this event
@@ -125,7 +155,7 @@ export async function notifyLike(event: SimpleEvent, actor: SimpleActor) {
   const actorName = actor.username ?? "Someone";
 
   if (!existing) {
-    // 2) No existing notification → create a fresh one
+    // 2) No existing notification -> create a fresh one
     await createNotification({
       userId: event.admin_id,
       fromUserId: actor.id,
@@ -142,7 +172,7 @@ export async function notifyLike(event: SimpleEvent, actor: SimpleActor) {
     return;
   }
 
-  // 3) Existing notification → update it
+  // 3) Existing notification -> update it
   const existingActors = Array.isArray((existing as any).data?.actors)
     ? [...(existing as any).data.actors]
     : [];
@@ -167,7 +197,7 @@ export async function notifyLike(event: SimpleEvent, actor: SimpleActor) {
     .update({
       title: event.title ?? "New likes",
       action_text: null,
-      body, // "Alex and 3 others liked your post"
+      body, // e.g. "Alex and 3 others liked your post"
       data: {
         ...(existing as any).data,
         actors: existingActors,
@@ -175,7 +205,7 @@ export async function notifyLike(event: SimpleEvent, actor: SimpleActor) {
         link: `/event/${event.id}`,
       },
       is_unread: true,
-      read_at: null,
+      read_at: null, // Mark as unread again so it pops up
     })
     .eq("id", existing.id);
 }
@@ -191,6 +221,7 @@ export async function notifyComment(
   preview: string,   // short text of the latest comment
   commentId: string  // id of the latest comment
 ) {
+  // Don't notify if the admin is the one commenting on their own post
   if (!event.admin_id || event.admin_id === actor.id) return;
 
   // 1) Try to find the latest 'comment' notification for this event
@@ -207,7 +238,7 @@ export async function notifyComment(
   const actorName = actor.username ?? "Someone";
 
   if (!existing) {
-    // 2) No existing notification → create a fresh one
+    // 2) No existing notification -> create a fresh one
     await createNotification({
       userId: event.admin_id,
       fromUserId: actor.id,
@@ -225,7 +256,7 @@ export async function notifyComment(
     return;
   }
 
-  // 3) Existing notification → update it
+  // 3) Existing notification -> update it
   const existingActors = Array.isArray((existing as any).data?.actors)
     ? [...(existing as any).data.actors]
     : [];
@@ -250,7 +281,7 @@ export async function notifyComment(
     .update({
       title: event.title ?? "New comments",
       action_text: null,
-      body, // "Alex and 3 others commented on your post"
+      body, 
       data: {
         ...(existing as any).data,
         actors: existingActors,
