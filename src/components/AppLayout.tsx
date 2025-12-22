@@ -27,14 +27,12 @@ export default function AppLayout() {
   // --- LAYOUT CONFIGURATION ---
 
   // 1. Fixed Page: Locks window scroll (used for Chat/Messages only)
-  // ⚠️ Removed isPetDashboard from here to fix the scroll issue.
   const isFixedPage = isMessagesPage;
 
   // 2. Wide Page: Uses full width (max-w-full) instead of constrained width
   const isWidePage = isFixedPage || isAdminPage || isPetDashboard;
 
   // 3. Edge-to-Edge: Removes AppLayout padding so the child page can control it
-  // This allows sticky headers to work correctly at the top of the screen.
   const isEdgeToEdge = isPetDashboard;
 
   if (loading)
@@ -64,10 +62,12 @@ export default function AppLayout() {
       <Sidebar userRole={userRole} />
 
       <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
-        {/* Mobile Header (Sticky) */}
-        <div className="lg:hidden sticky top-0 z-40">
-          <Header showProfile={true} />
-        </div>
+        {/* Mobile Header (Sticky) - HIDDEN ON MESSAGES PAGE */}
+        {!isFixedPage && (
+          <div className="lg:hidden sticky top-0 z-40">
+            <Header showProfile={true} />
+          </div>
+        )}
 
         <main
           className={cn(
@@ -79,7 +79,7 @@ export default function AppLayout() {
             isFixedPage
               ? "h-full flex flex-col overflow-hidden p-0"
               : isEdgeToEdge
-              ? "p-0" // Remove padding for Dashboard to allow full-bleed backgrounds/headers
+              ? "p-0" // Remove padding for Dashboard
               : "px-0 pb-24 lg:pb-8 lg:px-8 lg:pt-8"
           )}
         >

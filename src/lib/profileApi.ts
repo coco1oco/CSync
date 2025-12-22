@@ -7,7 +7,7 @@ export type ProfileUpdate = {
   bio: string;
   avatar_url: string;
   pronouns: string;
-  contact_number: string; // ✅ Added
+  contact_number: string;
 };
 
 export async function updateProfile(update: ProfileUpdate) {
@@ -20,31 +20,32 @@ export async function updateProfile(update: ProfileUpdate) {
     throw authError ?? new Error("No user session");
   }
 
-  // 1. Update the 'profiles' table (Database)
+  // 1. Update Database
   const { data, error } = await supabase
     .from("profiles")
     .update(update)
-    .eq("id", user.id);
+    .eq("id", user.id)
+    .select()
+    .single();
 
   if (error) {
     console.error("Supabase error:", error);
     throw new Error(`Failed to update profile: ${error.message}`);
   }
 
-  // 2. CRITICAL FIX: Sync to Auth Metadata (Session)
+  // 2. Sync to Session Metadata
   const { error: metaError } = await supabase.auth.updateUser({
     data: {
       avatar_url: update.avatar_url,
       full_name: `${update.first_name} ${update.last_name}`,
       username: update.username,
       pronouns: update.pronouns,
-      contact_number: update.contact_number, // ✅ Added sync
+      contact_number: update.contact_number,
+      bio: update.bio,
     },
   });
 
-  if (metaError) {
-    console.warn("Metadata sync warning:", metaError);
-  }
+  if (metaError) console.warn("Metadata sync warning:", metaError);
 
   return data;
 }

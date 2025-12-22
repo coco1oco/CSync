@@ -7,14 +7,20 @@ import React, {
 } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
+// Define strict types to match your other files
+type UserRole = "user" | "admin";
+
 type UserProfile = {
   id: string;
   email: string;
   username?: string;
   avatar_url?: string;
-  role?: "user" | "admin";
+  role?: UserRole;
   first_name?: string;
   last_name?: string;
+  bio?: string;
+  contact_number?: string;
+  pronouns?: string;
   [key: string]: any;
 };
 
@@ -40,8 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const ADMIN_EMAILS = ["kmirafelix@gmail.com", "admin@pawpal.com"];
-
+  // Helper: Extract basic metadata from the session
   const getUserFromSession = (sessionUser: any): UserProfile => {
     const meta = sessionUser.user_metadata || {};
     return {
@@ -53,7 +58,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       first_name: meta.full_name?.split(" ")[0] || meta.first_name,
       last_name: meta.full_name?.split(" ")[1] || meta.last_name,
       pronouns: meta.pronouns,
-      role: meta.role || "user",
+      contact_number: meta.contact_number,
+      bio: meta.bio,
+      // Default to "user" if role is missing in metadata
+      role: (meta.role as UserRole) || "user",
     };
   };
 
@@ -81,15 +89,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       const meta = sessionUser.user_metadata || {};
 
       if (db) {
+        // Sync critical fields from DB to Session Metadata if they differ
         const needsSync =
           db.role !== meta.role ||
           db.avatar_url !== meta.avatar_url ||
           db.username !== meta.username ||
-          db.first_name !== meta.first_name;
+          db.first_name !== meta.first_name ||
+          db.contact_number !== meta.contact_number;
 
         if (needsSync) {
           console.log("♻️ Syncing full profile to session cache...");
-          supabase.auth.updateUser({
+          await supabase.auth.updateUser({
             data: {
               role: db.role,
               avatar_url: db.avatar_url,
@@ -98,6 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
               last_name: db.last_name,
               pronouns: db.pronouns,
               bio: db.bio,
+              contact_number: db.contact_number,
             },
           });
         }
@@ -109,9 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         console.log(`Profile fetch failed, retrying...`);
         return fetchProfileSafe(userId, sessionUser, retries - 1);
       }
-      if (sessionUser?.email && ADMIN_EMAILS.includes(sessionUser.email)) {
-        return { role: "admin" };
-      }
+      // REMOVED: The hardcoded fallback block
       return null;
     }
   };
@@ -127,13 +136,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
         if (session?.user) {
           const instantUser = getUserFromSession(session.user);
+          if (mounted) setUser(instantUser);
+
           const dbProfile = await fetchProfileSafe(
             session.user.id,
             session.user
           );
 
           if (mounted) {
-            setUser({ ...instantUser, ...(dbProfile || {}) });
+            setUser((prev) => ({
+              ...(prev || instantUser),
+              ...(dbProfile || {}),
+            }));
           }
         }
       } catch (error) {
@@ -162,6 +176,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       } else if (event === "SIGNED_OUT") {
         setUser(null);
         setLoading(false);
+      } else if (event === "USER_UPDATED" && session?.user) {
+        const instantUser = getUserFromSession(session.user);
+        setUser((prev) => ({ ...prev, ...instantUser }));
       }
     });
 
@@ -191,7 +208,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // ✅ Optimization: Memoize the value to prevent unnecessary re-renders in consumers
   const value = useMemo(
     () => ({ user, loading, signOut, refreshProfile }),
     [user, loading]

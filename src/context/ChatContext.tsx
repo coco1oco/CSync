@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { useAuth } from "./authContext";
 import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "./authContext";
 
-interface ChatContextType {
+type ChatContextType = {
   unreadCount: number;
   refreshUnreadCount: () => Promise<void>;
-}
+};
 
 const ChatContext = createContext<ChatContextType>({
   unreadCount: 0,
@@ -14,41 +14,54 @@ const ChatContext = createContext<ChatContextType>({
 
 export const useChat = () => useContext(ChatContext);
 
-export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
+export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const { user } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // ✅ OPTIMIZED: Fetches total count in ONE request using the SQL function
-  const fetchUnreadCount = async () => {
+  const refreshUnreadCount = async () => {
     if (!user) return;
 
-    try {
-      const { data, error } = await supabase.rpc("get_total_unread_count", {
-        current_user_id: user.id,
-      });
+    // ✅ LOGIC FIX: Only count messages where YOU are a member,
+    // it is NOT read, and you are NOT the sender.
 
-      if (error) {
-        console.error("Error fetching unread count:", error);
-        return;
-      }
+    // 1. Get all conversations you are part of
+    const { data: myConvs } = await supabase
+      .from("conversation_members")
+      .select("conversation_id, last_read_at")
+      .eq("user_id", user.id);
 
-      setUnreadCount(data || 0);
-    } catch (err) {
-      console.error("Unexpected error in chat context:", err);
+    if (!myConvs || myConvs.length === 0) {
+      setUnreadCount(0);
+      return;
     }
+
+    // 2. Count unread messages in those conversations
+    let totalUnread = 0;
+
+    for (const conv of myConvs) {
+      const { count } = await supabase
+        .from("messages")
+        .select("*", { count: "exact", head: true })
+        .eq("conversation_id", conv.conversation_id)
+        .gt("created_at", conv.last_read_at) // Newer than last read
+        .neq("sender_id", user.id); // ✅ IGNORE YOUR OWN MESSAGES
+
+      totalUnread += count || 0;
+    }
+
+    setUnreadCount(totalUnread);
   };
 
-  // ✅ REALTIME LISTENER
   useEffect(() => {
     if (!user) return;
 
-    // Initial fetch
-    fetchUnreadCount();
+    refreshUnreadCount();
 
-    // Subscribe to ANY new message insertion in the database
-    // This ensures that if someone messages a group you are in, the badge updates immediately.
+    // ✅ REALTIME FIX: Don't increment if YOU sent the message
     const channel = supabase
-      .channel("global-unread-counter")
+      .channel("global-chat-count")
       .on(
         "postgres_changes",
         {
@@ -56,9 +69,21 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
           schema: "public",
           table: "messages",
         },
-        () => {
-          // When a message comes in, re-run the count function
-          fetchUnreadCount();
+        async (payload) => {
+          // If WE sent it, ignore.
+          if (payload.new.sender_id === user.id) return;
+
+          // Check if this message belongs to one of our conversations
+          const { data: isMember } = await supabase
+            .from("conversation_members")
+            .select("conversation_id")
+            .eq("conversation_id", payload.new.conversation_id)
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+          if (isMember) {
+            setUnreadCount((prev) => prev + 1);
+          }
         }
       )
       .subscribe();
@@ -69,9 +94,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   }, [user]);
 
   return (
-    <ChatContext.Provider
-      value={{ unreadCount, refreshUnreadCount: fetchUnreadCount }}
-    >
+    <ChatContext.Provider value={{ unreadCount, refreshUnreadCount }}>
       {children}
     </ChatContext.Provider>
   );
