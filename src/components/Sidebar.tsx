@@ -28,12 +28,20 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
 
   const isActive = (path: string) => location.pathname === path;
 
+  // Placeholder: Replace with real notification count logic for admins
+  const adminNotificationCount = userRole === "admin" ? 3 : 0; // TODO: Replace with real data
+
   const navItems = [
     { path: "/", icon: Home, label: "Home" },
     { path: "/messages", icon: MessageCircle, label: "Messages" },
     ...(userRole === "admin"
-      ? [{ path: "/admin/team", icon: Users, label: "Manage Team" }]
-      : [{ path: "/notifications", icon: Bell, label: "Notifications" }]),
+      ? [
+          { path: "/admin/team", icon: Users, label: "Manage Team" },
+          { path: "/notifications", icon: Bell, label: "Notifications", adminNotificationCount },
+        ]
+      : [
+          { path: "/notifications", icon: Bell, label: "Notifications" },
+        ]),
     {
       path: "/PetDashboard",
       icon: PawPrint,
@@ -82,6 +90,10 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] flex items-center justify-center border-2 border-white shadow-sm">
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
+                )}
+                {/* Admin notification badge */}
+                {item.label === "Notifications" && userRole === "admin" && ((item.adminNotificationCount ?? 0) > 0) && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 w-2 h-2 rounded-full border-2 border-white shadow-sm"></span>
                 )}
               </div>
               {item.label}
