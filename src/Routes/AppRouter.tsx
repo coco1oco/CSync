@@ -14,11 +14,15 @@ import { Toaster } from "sonner";
 import { ChatProvider } from "@/context/ChatContext";
 
 // --- LAZY IMPORTS ---
-const AdminHomePage = lazy(() =>
-  import("@/pages/AdminD/AdminHomePage").then((module) => ({
-    default: module.AdminHomePage,
+
+// ✅ UNIFIED DASHBOARD
+const UnifiedDashboard = lazy(() =>
+  import("@/pages/SharedPages/UnifiedDashboard").then((module) => ({
+    default: module.UnifiedDashboard,
   }))
 );
+
+// Admin Pages
 const CreateEvent = lazy(() => import("@/pages/AdminD/CreateEvent"));
 const EditEvent = lazy(() => import("@/pages/AdminD/EditEvent"));
 const ManageTeam = lazy(() => import("@/pages/AdminD/ManageTeam"));
@@ -41,11 +45,7 @@ const Unauthorized = lazy(() => import("@/pages/Authentication/Unauthorized"));
 const UpdatePassword = lazy(
   () => import("@/pages/Authentication/UpdatePassword")
 );
-const UserHomePage = lazy(() =>
-  import("@/pages/UsersD/UserHomePage").then((module) => ({
-    default: module.UserHomePage,
-  }))
-);
+
 const ProfilePage = lazy(() => import("@/pages/SharedPages/ProfilePage"));
 const MenuPage = lazy(() => import("@/pages/SharedPages/MenuPage"));
 const EditProfilePage = lazy(
@@ -142,7 +142,7 @@ const router = createBrowserRouter([
         path: "/",
         element: (
           <Suspense fallback={<PageLoader />}>
-            <UserHomePage />
+            <UnifiedDashboard />
           </Suspense>
         ),
       },
@@ -151,14 +151,6 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoader />}>
             <UpdatePassword />
-          </Suspense>
-        ),
-      },
-      {
-        path: "/UserDashboard",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <UserHomePage />
           </Suspense>
         ),
       },
@@ -188,16 +180,7 @@ const router = createBrowserRouter([
         ),
       },
 
-      {
-        path: "/AdminDashboard",
-        element: (
-          <ProtectedRoute requiredRole="admin">
-            <Suspense fallback={<PageLoader />}>
-              <AdminHomePage />
-            </Suspense>
-          </ProtectedRoute>
-        ),
-      },
+
       {
         path: "/admin/events/create",
         element: (
