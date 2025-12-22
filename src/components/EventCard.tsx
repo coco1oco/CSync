@@ -11,6 +11,30 @@ import {
 import type { OutreachEvent } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
 
+// Helper function to format relative time
+const formatRelativeTime = (dateString: string) => {
+  const now = new Date();
+  const date = new Date(dateString);
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  // Show relative time for less than 1 month
+  if (diffInSeconds < 2629746) {
+    if (diffInSeconds < 60) return `${diffInSeconds}s`;
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d`;
+    return `${Math.floor(diffInSeconds / 604800)}w`;
+  }
+  
+  // Show year if more than 1 year old
+  if (diffInSeconds >= 31556952) {
+    return `${Math.floor(diffInSeconds / 31556952)}y`;
+  }
+  
+  // Show actual date for 1 month to 1 year (e.g., "Sep 2")
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+
 interface EventCardProps {
   event: OutreachEvent;
   isAdmin: boolean;
@@ -59,10 +83,7 @@ export function EventCard({
     setPage([page + newDirection, newDirection]);
   };
 
-  const dateStr = new Date(created_at).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
+  const dateStr = formatRelativeTime(created_at);
 
   // ✅ Adjusted limit so "Show more" appears for medium-length posts too
   const isLongText = description && description.length > 150;
