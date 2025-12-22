@@ -6,18 +6,13 @@ import { FeedPost } from "@/components/FeedPost";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  WifiOff,
-  RefreshCcw,
   LayoutGrid,
   Plus,
-  AlertCircle,
   Calendar,
-  ChevronRight,
   Stethoscope,
   BarChart3,
   Users,
   FileText,
-  Filter,
   X,
 } from "lucide-react";
 import { formatDistanceToNow, isPast, addDays, isBefore } from "date-fns";
@@ -46,7 +41,6 @@ export function UnifiedDashboard() {
   // State
   const [events, setEvents] = useState<OutreachEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   // Feature Specific State
   const [alerts, setAlerts] = useState<HealthAlert[]>([]);
@@ -67,7 +61,7 @@ export function UnifiedDashboard() {
 
   const fetchData = async () => {
     setLoading(true);
-    setError(null);
+    // 🔴 REMOVED: setError(null);
     try {
       // 1. Base Query: Fetch Events (Feed)
       let query = supabase
@@ -127,7 +121,7 @@ export function UnifiedDashboard() {
       }
     } catch (err) {
       console.error(err);
-      setError("Failed to load dashboard data.");
+      // 🔴 REMOVED: setError("Failed to load dashboard data.");
     } finally {
       setLoading(false);
     }

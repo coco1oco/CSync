@@ -7,7 +7,6 @@ import {
   Mail,
   ShieldCheck,
   AlertTriangle,
-  MapPin,
   Bone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
