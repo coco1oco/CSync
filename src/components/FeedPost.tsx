@@ -18,6 +18,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import FailedImageIcon from "@/assets/FailedImage.svg";
+// ✅ IMPORT NOTIFICATION HELPERS
+import { notifyLike, notifyComment } from "@/lib/NotificationService";
 
 interface FeedPostProps {
   event: OutreachEvent;
@@ -79,9 +81,21 @@ export function FeedPost({
           .eq("event_id", event.id)
           .eq("user_id", user.id);
       } else {
-        await supabase
+        const { error } = await supabase
           .from("likes")
           .insert([{ event_id: event.id, user_id: user.id }]);
+          
+        if (error) throw error;
+
+        // ✅ TRIGGER LIKE NOTIFICATION
+        try {
+          await notifyLike(
+            { id: event.id, admin_id: event.admin_id, title: event.title },
+            { id: user.id, username: user.username }
+          );
+        } catch (notifError) {
+          console.error("Failed to send like notification:", notifError);
+        }
       }
     } catch (err) {
       setIsLiked(previousLiked);
@@ -372,9 +386,25 @@ function CommentsModal({
       () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
       100
     );
-    const { error } = await supabase
+    const { data: newCommentData, error } = await supabase
       .from("comments")
-      .insert([{ event_id: event.id, user_id: user.id, content: content }]);
+      .insert([{ event_id: event.id, user_id: user.id, content: content }])
+      .select()
+      .single();
+
+    if (!error && newCommentData) {
+      // ✅ TRIGGER COMMENT NOTIFICATION
+      try {
+        await notifyComment(
+          { id: event.id, admin_id: event.admin_id, title: event.title },
+          { id: user.id, username: user.username },
+          content.substring(0, 50), // Preview
+          newCommentData.id
+        );
+      } catch (notifError) {
+        console.error("Failed to send comment notification:", notifError);
+      }
+    }
     if (error) {
       console.error("Failed to post comment", error);
       setComments((prev) => prev.filter((c) => c.id !== tempId));
