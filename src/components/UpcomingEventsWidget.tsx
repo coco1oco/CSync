@@ -2,16 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/authContext";
 import { format } from "date-fns";
-import {
-  Calendar,
-  MapPin,
-  Loader2,
-  Ticket,
-  ChevronRight,
-  PawPrint,
-} from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import FailedImageIcon from "@/assets/FailedImage.svg";
+import { MapPin, Loader2, Ticket, ChevronRight, PawPrint } from "lucide-react";
 
 type MyEvent = {
   registration_id: string;
@@ -34,7 +25,6 @@ type MyEvent = {
 
 export function UpcomingEventsWidget() {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [events, setEvents] = useState<MyEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
