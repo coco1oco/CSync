@@ -25,14 +25,14 @@ const formatRelativeTime = (dateString: string) => {
     if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d`;
     return `${Math.floor(diffInSeconds / 604800)}w`;
   }
-  
+
   // Show year if more than 1 year old
   if (diffInSeconds >= 31556952) {
     return `${Math.floor(diffInSeconds / 31556952)}y`;
   }
-  
+
   // Show actual date for 1 month to 1 year (e.g., "Sep 2")
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 };
 
 interface EventCardProps {
@@ -66,29 +66,28 @@ export function EventCard({
   onDelete,
   onTagClick,
   children,
-  customUsername, 
+  customUsername,
   customAvatar,
 }: Readonly<EventCardProps>) {
   const [[page, direction], setPage] = useState([0, 0]);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
-  // Using "as any" is a quick way to bypass the type error if you haven't 
-// updated your OutreachEvent interface yet.
-  // Inside EventCard.tsx
-// displayName and displayAvatar will no longer have red underlines!
-// Using (event as any) will remove the red underlines and fix the display mismatch
-// Priority: 1. Manual Prop, 2. Database Join, 3. Default Fallback
-  const displayName = customUsername || (event as any).profiles?.username || "Youth For Animals";
-  const displayAvatar = customAvatar || (event as any).profiles?.avatar_url || "/public/PawPal.png";
 
-  const {
-    title,
-    location,
-    description,
-    images = [],
-    admin,
-    created_at,
-  } = event;
+  // ✅ FIX: Check 'admin' first (from Dashboard fetch), then 'profiles' (standard join)
+  const displayName =
+    customUsername ||
+    (event as any).admin?.username ||
+    (event as any).profiles?.username ||
+    "Youth For Animals";
+
+  const displayAvatar =
+    customAvatar ||
+    (event as any).admin?.avatar_url ||
+    (event as any).profiles?.avatar_url ||
+    "/PawPal.png";
+
+  const { title, location, description, images = [], created_at } = event;
+
   const imageIndex = Math.abs(page % images.length);
 
   const paginate = (newDirection: number) => {
@@ -97,7 +96,7 @@ export function EventCard({
 
   const dateStr = formatRelativeTime(created_at);
 
-  // ✅ Adjusted limit so "Show more" appears for medium-length posts too
+  // Adjusted limit so "Show more" appears for medium-length posts too
   const isLongText = description && description.length > 150;
 
   const renderWithHashtags = (text: string) => {
@@ -139,23 +138,20 @@ export function EventCard({
       <div className="flex items-start justify-between px-4 pt-4 pb-2">
         <div className="flex gap-3">
           <div className="h-10 w-10 rounded-full bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-100">
-          {customAvatar ? (
-              <img
-                src={customAvatar}
-                alt={customUsername || "Avatar"}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <span className="flex h-full w-full items-center justify-center text-xs font-bold text-gray-500">
-                {(customUsername?.slice(0, 2).toUpperCase()) || "YFA"}
-              </span>
-            )}
+            <img
+              src={displayAvatar}
+              alt={displayName}
+              className="h-full w-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = "/PawPal.png";
+              }}
+            />
           </div>
 
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
               <span className="text-sm font-bold text-gray-900 leading-none">
-                {customUsername || "Youth For Animals"}
+                {displayName}
               </span>
               <span className="text-xs text-gray-400">· {dateStr}</span>
             </div>
@@ -206,12 +202,10 @@ export function EventCard({
         )}
 
         <div className="text-sm text-gray-900 leading-relaxed whitespace-pre-wrap">
-          {/* ✅ UPDATED: Clamps to 3 lines for a cleaner preview */}
           <span className={!isExpanded ? "line-clamp-3" : ""}>
             {renderWithHashtags(description)}
           </span>
 
-          {/* ✅ UPDATED: "..more" logic */}
           {isLongText && (
             <button
               onClick={() => setIsExpanded(!isExpanded)}
@@ -223,11 +217,10 @@ export function EventCard({
         </div>
       </div>
 
-      {/* 3. MEDIA (Restored Large Size) */}
+      {/* 3. MEDIA */}
       {images.length > 0 && (
         <div className="px-0 md:px-4 pb-3">
           <div
-            // ✅ CHANGED BACK: aspect-square (1:1) makes the photo BIG again
             className="relative w-full aspect-square bg-gray-100 md:rounded-2xl overflow-hidden cursor-pointer border-y md:border border-gray-100 shadow-sm"
             onClick={() => setIsLightboxOpen(true)}
           >
@@ -290,6 +283,7 @@ export function EventCard({
             <img
               src={images[imageIndex]}
               className="max-w-full max-h-[90vh] rounded-md"
+              alt="Lightbox"
             />
           </div>,
           document.body
