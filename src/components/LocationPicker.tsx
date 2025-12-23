@@ -104,8 +104,6 @@ export function LocationPicker({
       fullAddress = fullAddress.replace(mainName + ", ", "");
     }
 
-    const finalString = `${mainName}, ${fullAddress}`; // Storing both allows better context
-
     // Actually, storing just the clean string is usually better for UI:
     setQuery(place.display_name); // Or use finalString if you prefer formatted
     onChange(place.display_name);

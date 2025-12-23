@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
-// 1. UPDATE: Import useSearchParams
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/authContext";
 import { EventCard } from "@/components/EventCard";
-import { OfficialEventCard } from "@/components/OfficialEventCard"; // ✅ IMPORT NEW CARD
+import { OfficialEventCard } from "@/components/OfficialEventCard";
 import { EventRegistrationModal } from "@/components/EventRegistrationModal";
 import {
   notifyLike,
@@ -63,11 +62,10 @@ export function FeedPost({
   onDelete,
   onEdit,
   onTagClick,
-  customUsername, // 👈 Destructure here
+  customUsername,
   customAvatar,
 }: FeedPostProps) {
   const { user } = useAuth();
-  // 2. UPDATE: Read URL params for Deep Linking
   const [searchParams] = useSearchParams();
   const highlightCommentId = searchParams.get("comment_id");
   const actionType = searchParams.get("action");
@@ -80,7 +78,7 @@ export function FeedPost({
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
-  const [, setIsLoading] = useState(true);
+  const [, setIsLoading] = useState(true); // Empty destructure to suppress unused var warning
   const [, setError] = useState<string | null>(null);
 
   // State for visual effect on Like
@@ -109,20 +107,17 @@ export function FeedPost({
     loadInitialData();
   }, [event.id]);
 
-  // 3. UPDATE: Effect to handle Deep Links (Open Modal or Animate)
+  // Deep Linking Effect
   useEffect(() => {
-    // If URL has ?comment_id=..., automatically open comments
     if (highlightCommentId) {
       setIsCommentsOpen(true);
     }
-    // If URL has ?action=like, trigger animation
     if (actionType === "like") {
       setTriggerLikeAnim(true);
       setTimeout(() => setTriggerLikeAnim(false), 2000);
     }
   }, [highlightCommentId, actionType]);
 
-  // ... (Keep existing fetchLikes, toggleLike, fetchCommentsCount, checkRegistration logic exactly the same) ...
   const fetchLikes = async () => {
     try {
       const { count } = await supabase
@@ -217,7 +212,6 @@ export function FeedPost({
 
   // --- RENDER ---
 
-  // 🎨 OPTION A: OFFICIAL EVENT CARD (Luma Style)
   if (isOfficialEvent) {
     return (
       <>
@@ -238,7 +232,6 @@ export function FeedPost({
                 ? new Date(event.event_date).toLocaleDateString()
                 : undefined
             }
-            // ✅ NEW: Pass the type so the modal knows whether to ask for pets
             eventType={event.event_type}
             onClose={() => setIsRegistrationOpen(false)}
             onSuccess={() => setIsRegistered(true)}
@@ -248,7 +241,6 @@ export function FeedPost({
     );
   }
 
-  // 📝 OPTION B: STANDARD SOCIAL POST (Facebook Style)
   return (
     <>
       <div className="mb-4">
@@ -258,21 +250,17 @@ export function FeedPost({
           onEdit={onEdit}
           onDelete={onDelete}
           onTagClick={onTagClick}
-          // 🔥 Pass them down to the EventCard
           customUsername={customUsername}
           customAvatar={customAvatar}
         >
-          {/* Action Bar for Standard Posts */}
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-4">
-              {/* Event Like Button */}
               <button
                 onClick={toggleLike}
                 disabled={isLiking}
                 className="flex items-center gap-1.5 group transition-all focus:outline-none disabled:opacity-50"
               >
                 <Heart
-                  // 4. UPDATE: Add bounce animation if triggered via notification
                   className={`w-6 h-6 transition-transform group-active:scale-90 ${
                     isLiked || triggerLikeAnim
                       ? "fill-red-500 text-red-500"
@@ -287,7 +275,6 @@ export function FeedPost({
                 )}
               </button>
 
-              {/* Comment Button */}
               <button
                 onClick={() => setIsCommentsOpen(true)}
                 className="flex items-center gap-1.5 group transition-all focus:outline-none"
@@ -316,7 +303,6 @@ export function FeedPost({
           onCommentDeleted={() =>
             setCommentsCount((prev) => Math.max(0, prev - 1))
           }
-          // 5. UPDATE: Pass highlight ID
           highlightId={highlightCommentId}
         />
       )}
@@ -324,16 +310,15 @@ export function FeedPost({
   );
 }
 
-// ... (Keep CommentsModal Component at bottom as is) ...
+// --- Comments Modal Component ---
 
-// ... (CommentsModal Logic remains unchanged below)
 interface CommentsModalProps {
   event: OutreachEvent;
   user: any;
   onClose: () => void;
   onCommentAdded: () => void;
   onCommentDeleted: () => void;
-  highlightId?: string | null; // 6. UPDATE: Prop for highlighting
+  highlightId?: string | null;
 }
 
 function CommentsModal({
@@ -348,7 +333,6 @@ function CommentsModal({
   const [newComment, setNewComment] = useState("");
   const [activeReplyId, setActiveReplyId] = useState<string | null>(null);
 
-  // 1. SMART TARGETING STATE: Remembers exactly who you clicked
   const [replyTarget, setReplyTarget] = useState<CommentWithExtras | null>(
     null
   );
@@ -361,69 +345,61 @@ function CommentsModal({
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // ✅ MOVED: Define this BEFORE useEffect so it can be called inside
+  const fetchComments = async () => {
+    setLoading(true);
+    try {
+      // Using explicit foreign key syntax if required by Supabase setup
+      const { data, error } = await supabase
+        .from("comments")
+        .select(
+          "*, user:profiles!comments_user_profile_fkey(id, username, avatar_url)"
+        )
+        .eq("event_id", event.id)
+        .order("created_at", { ascending: true });
+
+      if (error) {
+        // Fallback to simple join if the explicit key fails
+        console.warn("Explicit FK join failed, trying implicit...", error);
+        const { data: retryData, error: retryError } = await supabase
+          .from("comments")
+          .select("*, user:profiles(id, username, avatar_url)")
+          .eq("event_id", event.id)
+          .order("created_at", { ascending: true });
+
+        if (retryError) throw retryError;
+
+        if (retryData) {
+          const formatted = retryData.map((c) => ({
+            ...c,
+            likes_count: 0,
+            is_liked_by_user: false,
+          }));
+          setComments(formatted as unknown as CommentWithExtras[]);
+        }
+      } else if (data) {
+        const formatted = data.map((c) => ({
+          ...c,
+          likes_count: 0,
+          is_liked_by_user: false,
+        }));
+        setComments(formatted as unknown as CommentWithExtras[]);
+      }
+    } catch (err) {
+      console.error("Fetch comments failed:", err);
+      setComments([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     const originalHtmlOverflow = document.documentElement.style.overflow;
     const originalBodyOverflow = document.body.style.overflow;
     document.documentElement.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
 
-    const fetchComments = async () => {
-      setLoading(true);
-      const joined = await supabase
-        .from("comments")
-        .select("*, user:profiles(id, username, avatar_url)")
-        .eq("event_id", event.id)
-        .order("created_at", { ascending: true })
-        .limit(50);
-
-      if (!joined.error && joined.data) {
-        setComments(joined.data as unknown as Comment[]);
-        setLoading(false);
-        setTimeout(() => bottomRef.current?.scrollIntoView(), 100);
-        return;
-      }
-
-      // Fallback
-      const base = await supabase
-        .from("comments")
-        .select("id, user_id, event_id, content, created_at")
-        .eq("event_id", event.id)
-        .order("created_at", { ascending: true })
-        .limit(50);
-
-      if (base.error) {
-        setComments([]);
-        setLoading(false);
-        return;
-      }
-
-      const rows = (base.data ?? []) as Array<any>;
-      const userIds = Array.from(
-        new Set(rows.map((c) => c.user_id).filter(Boolean))
-      );
-
-      const profilesRes = userIds.length
-        ? await supabase
-            .from("profiles")
-            .select("id, username, avatar_url")
-            .in("id", userIds)
-        : { data: [] };
-
-      const profileById = new Map(
-        (((profilesRes as any).data ?? []) as Array<any>).map((p) => [p.id, p])
-      );
-
-      setComments(
-        rows.map((c) => ({
-          ...c,
-          user: profileById.get(c.user_id),
-        })) as unknown as Comment[]
-      );
-
-      setLoading(false);
-      setTimeout(() => bottomRef.current?.scrollIntoView(), 100);
-    };
-
+    // ✅ CALL THE FUNCTION HERE
     fetchComments();
 
     const channel = supabase
@@ -446,6 +422,8 @@ function CommentsModal({
           const newMsg = {
             ...payload.new,
             user: userData,
+            likes_count: 0,
+            is_liked_by_user: false,
           } as CommentWithExtras;
           setComments((prev) => [...prev, newMsg]);
           onCommentAdded();
@@ -460,14 +438,12 @@ function CommentsModal({
     };
   }, [event.id]);
 
-  // 7. UPDATE: Effect to Scroll & Highlight specific comment
+  // Effect to Scroll & Highlight specific comment
   useEffect(() => {
     if (highlightId && !loading && comments.length > 0) {
-      // Small timeout to ensure rendering
       setTimeout(() => {
         const element = document.getElementById(`comment-${highlightId}`);
         if (element) {
-          // If it's a reply, ensure parent is expanded
           const comment = comments.find((c) => c.id === highlightId);
           if (comment?.parent_comment_id) {
             setExpandedComments((prev) =>
@@ -477,7 +453,6 @@ function CommentsModal({
 
           element.scrollIntoView({ behavior: "smooth", block: "center" });
 
-          // Add highlight animation
           element.classList.add(
             "bg-yellow-50",
             "ring-2",
@@ -498,36 +473,6 @@ function CommentsModal({
     }
   }, [loading, comments, highlightId]);
 
-  const fetchComments = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("comments")
-        .select(
-          "*, user:profiles!comments_user_profile_fkey(id, username, avatar_url)"
-        )
-        .eq("event_id", event.id)
-        .order("created_at", { ascending: true });
-
-      if (error) {
-        console.error("Error fetching comments:", error);
-        setComments([]);
-      } else if (data) {
-        const formatted = data.map((c) => ({
-          ...c,
-          likes_count: 0,
-          is_liked_by_user: false,
-        }));
-        setComments(formatted as unknown as CommentWithExtras[]);
-      }
-    } catch (err) {
-      console.error("Fetch comments failed:", err);
-      setComments([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const toggleReplies = (commentId: string) => {
     setExpandedComments((prev) => {
       const next = new Set(prev);
@@ -540,22 +485,14 @@ function CommentsModal({
     });
   };
 
-  // --- 2. UPDATED: THE INSTAGRAM LOGIC (Auto-fill + Save Target) ---
   const handleReplyClick = (comment: CommentWithExtras) => {
     const targetUsername = comment.user?.username || "user";
-    // A. INSTAGRAM STYLE: Auto-fill the text input
     setNewComment(`@${targetUsername} `);
-
-    // B. SMART TARGETING: Remember this specific user object in the background
     setReplyTarget(comment);
-
-    // C. DATABASE STRUCTURE: Keep the thread flat
     setActiveReplyId(comment.parent_comment_id || comment.id);
-
     inputRef.current?.focus();
   };
 
-  // --- 3. UPDATED: SUBMIT LOGIC (Smart Notification Routing) ---
   const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim() || !user) return;
@@ -577,6 +514,8 @@ function CommentsModal({
         username: user.username,
         avatar_url: user.avatar_url,
       },
+      likes_count: 0,
+      is_liked_by_user: false,
     };
 
     setComments((prev) => [...prev, optimisticComment]);
@@ -609,27 +548,22 @@ function CommentsModal({
       setComments((prev) => prev.filter((c) => c.id !== tempId));
     } else if (insertedData) {
       setActiveReplyId(null);
-      setReplyTarget(null); // Reset target
+      setReplyTarget(null);
 
-      // We will track who got a "Reply" alert so we don't send them a "Mention" alert too.
       const notifiedUserIds: string[] = [];
 
-      // --- LOGIC A: HANDLE REPLIES (The Smart Target) ---
       if (replyTarget) {
-        // Notify the specific person we clicked (User B), not the Main Commenter (User A)
         if (replyTarget.user_id !== user.id) {
           await notifyReply(
             { id: event.id, admin_id: event.admin_id, title: event.title },
             { id: user.id, username: user.username },
             content,
-            replyTarget.user_id, // <--- Target the specific user
+            replyTarget.user_id,
             insertedData.id
           );
-          notifiedUserIds.push(replyTarget.user_id); // Add to exclusion list
+          notifiedUserIds.push(replyTarget.user_id);
         }
       } else {
-        // --- LOGIC B: HANDLE MAIN COMMENT ---
-        // If no reply target, it's a root comment. Notify Admin.
         if (event.admin_id && event.admin_id !== user.id) {
           await notifyComment(
             { id: event.id, admin_id: event.admin_id, title: event.title },
@@ -640,14 +574,12 @@ function CommentsModal({
         }
       }
 
-      // --- LOGIC C: HANDLE MENTIONS ---
-      // Pass the exclusion list to prevent duplicates
       await notifyMentions(
         { id: event.id, admin_id: event.admin_id, title: event.title },
         { id: user.id, username: user.username },
         content,
         insertedData.id,
-        notifiedUserIds // <--- The Deduplication Magic
+        notifiedUserIds
       );
     }
   };
@@ -909,14 +841,13 @@ function CommentItem({
           .from("comment_likes")
           .insert([{ comment_id: comment.id, user_id: user.id }]);
 
-        // 9. UPDATE: Pass comment ID to notification
         if (comment.user_id !== user.id) {
           await notifyCommentLike(
             { id: event.id, admin_id: event.admin_id, title: event.title },
             { id: user.id, username: user.username },
             comment.user_id,
             comment.content,
-            comment.id // Pass ID
+            comment.id
           );
         }
       }
@@ -937,7 +868,6 @@ function CommentItem({
   };
 
   return (
-    // 10. UPDATE: Add ID to div for scrolling
     <div
       id={`comment-${comment.id}`}
       className={`flex gap-3 group animate-in fade-in slide-in-from-bottom-2 duration-300 ${
