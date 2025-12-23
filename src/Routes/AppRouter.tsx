@@ -26,6 +26,13 @@ const UnifiedDashboard = lazy(() =>
 const CreateEvent = lazy(() => import("@/pages/AdminD/CreateEvent"));
 const EditEvent = lazy(() => import("@/pages/AdminD/EditEvent"));
 const ManageTeam = lazy(() => import("@/pages/AdminD/ManageTeam"));
+const CreateOfficialEvent = lazy(
+  () => import("@/pages/AdminD/CreateOfficialEvent")
+);
+const ManageEventsPage = lazy(() => import("@/pages/AdminD/ManageEventsPage"));
+const EditOfficialEvent = lazy(
+  () => import("@/pages/AdminD/EditOfficialEvent")
+);
 
 // Pet Pages
 const MainPetProfilePage = lazy(
@@ -170,6 +177,36 @@ const router = createBrowserRouter([
           <ProtectedRoute requiredRole="admin">
             <Suspense fallback={<PageLoader />}>
               <UnifiedDashboard />
+            </Suspense>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/admin/events/new-official",
+        element: (
+          <ProtectedRoute requiredRole="admin">
+            <Suspense fallback={<PageLoader />}>
+              <CreateOfficialEvent />
+            </Suspense>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/admin/events/manage",
+        element: (
+          <ProtectedRoute requiredRole="admin">
+            <Suspense fallback={<PageLoader />}>
+              <ManageEventsPage />
+            </Suspense>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/admin/events/edit-official/:id",
+        element: (
+          <ProtectedRoute requiredRole="admin">
+            <Suspense fallback={<PageLoader />}>
+              <EditOfficialEvent />
             </Suspense>
           </ProtectedRoute>
         ),

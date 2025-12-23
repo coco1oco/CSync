@@ -116,6 +116,21 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
           <span>{isSigningOut ? "Signing Out..." : "Sign Out"}</span>
         </button>
       </div>
+      <div className="p-4 border-t border-gray-100">
+        <div className="flex items-center gap-3 opacity-60 hover:opacity-100 transition-opacity">
+          <img
+            src="/Paws2.jpg" // You'll need to add this image to public/
+            alt="PAWS Logo"
+            className="w-8 h-8 grayscale"
+          />
+          <div>
+            <p className="text-[10px] uppercase font-bold text-gray-400">
+              Affiliated with
+            </p>
+            <p className="text-xs font-bold text-gray-700">PAWS Philippines</p>
+          </div>
+        </div>
+      </div>
     </aside>
   );
 }
