@@ -7,31 +7,26 @@ import { useAuth } from "@/context/authContext";
 import { EventCard } from "@/components/EventCard";
 import { OfficialEventCard } from "@/components/OfficialEventCard"; // ✅ IMPORT NEW CARD
 import { EventRegistrationModal } from "@/components/EventRegistrationModal";
-<<<<<<< HEAD
-import type { OutreachEvent, Comment } from "@/types";
-import { Heart, MessageCircle, Trash2, Send, Loader2, X } from "lucide-react";
-=======
-import { 
-  notifyLike, 
-  notifyComment, 
-  notifyReply, 
-  notifyMentions, 
-  notifyCommentLike 
+import {
+  notifyLike,
+  notifyComment,
+  notifyReply,
+  notifyMentions,
+  notifyCommentLike,
 } from "@/lib/NotificationService";
-import { 
-  Loader2, 
-  X, 
-  Send, 
-  Reply, 
-  Heart, 
-  MessageCircle, 
-  CalendarCheck, 
-  CheckCircle2, 
-  Trash2, 
-  MoreHorizontal, 
-  Edit 
+import {
+  Loader2,
+  X,
+  Send,
+  Reply,
+  Heart,
+  MessageCircle,
+  CalendarCheck,
+  CheckCircle2,
+  Trash2,
+  MoreHorizontal,
+  Edit,
 } from "lucide-react";
->>>>>>> PawPal-v0.2
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -89,7 +84,7 @@ export function FeedPost({
   const [isRegistered, setIsRegistered] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // State for visual effect on Like
   const [triggerLikeAnim, setTriggerLikeAnim] = useState(false);
 
@@ -98,12 +93,6 @@ export function FeedPost({
   const isOfficialEvent = officialTypes.includes(event.event_type || "");
 
   useEffect(() => {
-<<<<<<< HEAD
-    fetchLikes();
-    fetchCommentsCount();
-    if (isOfficialEvent) checkRegistration();
-  }, []);
-=======
     const loadInitialData = async () => {
       setIsLoading(true);
       setError(null);
@@ -111,7 +100,7 @@ export function FeedPost({
         await Promise.all([
           fetchLikes(),
           fetchCommentsCount(),
-          checkRegistration()
+          checkRegistration(),
         ]);
       } catch (err) {
         setError("Failed to load post data");
@@ -126,7 +115,7 @@ export function FeedPost({
   useEffect(() => {
     // If URL has ?comment_id=..., automatically open comments
     if (highlightCommentId) {
-       setIsCommentsOpen(true);
+      setIsCommentsOpen(true);
     }
     // If URL has ?action=like, trigger animation
     if (actionType === "like") {
@@ -134,7 +123,6 @@ export function FeedPost({
       setTimeout(() => setTriggerLikeAnim(false), 2000);
     }
   }, [highlightCommentId, actionType]);
->>>>>>> PawPal-v0.2
 
   // ... (Keep existing fetchLikes, toggleLike, fetchCommentsCount, checkRegistration logic exactly the same) ...
   const fetchLikes = async () => {
@@ -163,7 +151,7 @@ export function FeedPost({
 
   const toggleLike = async () => {
     if (!user || isLiking) return;
-    
+
     setIsLiking(true);
     const previousLiked = isLiked;
     setIsLiked(!isLiked);
@@ -181,12 +169,12 @@ export function FeedPost({
           .from("likes")
           .insert([{ event_id: event.id, user_id: user.id }]);
         if (error) throw error;
-        
+
         if (event.admin_id !== user.id) {
-            await notifyLike(
-              { id: event.id, admin_id: event.admin_id, title: event.title },
-              { id: user.id, username: user.username }
-            );
+          await notifyLike(
+            { id: event.id, admin_id: event.admin_id, title: event.title },
+            { id: user.id, username: user.username }
+          );
         }
       }
     } catch (err) {
@@ -276,10 +264,7 @@ export function FeedPost({
           customUsername={customUsername}
           customAvatar={customAvatar}
         >
-<<<<<<< HEAD
           {/* Action Bar for Standard Posts */}
-=======
->>>>>>> PawPal-v0.2
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-4">
               {/* Event Like Button */}
@@ -320,27 +305,6 @@ export function FeedPost({
                 )}
               </button>
             </div>
-<<<<<<< HEAD
-=======
-
-            {/* Registration Button */}
-            {!isAdmin &&
-              (isRegistered ? (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 text-xs font-bold rounded-full border border-green-200">
-                  <CheckCircle2 size={14} />
-                  <span>Going</span>
-                </div>
-              ) : (
-                <Button
-                  size="sm"
-                  onClick={() => setIsRegistrationOpen(true)}
-                  className="h-8 rounded-full bg-black hover:bg-gray-800 text-white text-xs font-bold px-4 shadow-sm"
-                >
-                  <CalendarCheck className="w-3.5 h-3.5 mr-1.5" />
-                  Register
-                </Button>
-              ))}
->>>>>>> PawPal-v0.2
           </div>
         </EventCard>
       </div>
@@ -351,23 +315,20 @@ export function FeedPost({
           user={user}
           onClose={() => setIsCommentsOpen(false)}
           onCommentAdded={() => setCommentsCount((prev) => prev + 1)}
-          onCommentDeleted={() => setCommentsCount((prev) => Math.max(0, prev - 1))}
+          onCommentDeleted={() =>
+            setCommentsCount((prev) => Math.max(0, prev - 1))
+          }
           // 5. UPDATE: Pass highlight ID
-          highlightId={highlightCommentId} 
+          highlightId={highlightCommentId}
         />
       )}
     </>
   );
 }
 
-<<<<<<< HEAD
 // ... (Keep CommentsModal Component at bottom as is) ...
 
 // ... (CommentsModal Logic remains unchanged below)
-=======
-// --- Comments Modal Component ---
-
->>>>>>> PawPal-v0.2
 interface CommentsModalProps {
   event: OutreachEvent;
   user: any;
@@ -388,12 +349,16 @@ function CommentsModal({
   const [comments, setComments] = useState<CommentWithExtras[]>([]);
   const [newComment, setNewComment] = useState("");
   const [activeReplyId, setActiveReplyId] = useState<string | null>(null);
-  
+
   // 1. SMART TARGETING STATE: Remembers exactly who you clicked
-  const [replyTarget, setReplyTarget] = useState<CommentWithExtras | null>(null);
+  const [replyTarget, setReplyTarget] = useState<CommentWithExtras | null>(
+    null
+  );
 
   const [loading, setLoading] = useState(true);
-  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(
+    new Set()
+  );
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -404,7 +369,6 @@ function CommentsModal({
     document.documentElement.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
 
-<<<<<<< HEAD
     const fetchComments = async () => {
       setLoading(true);
       const joined = await supabase
@@ -462,21 +426,31 @@ function CommentsModal({
       setTimeout(() => bottomRef.current?.scrollIntoView(), 100);
     };
 
-=======
->>>>>>> PawPal-v0.2
     fetchComments();
 
     const channel = supabase
       .channel(`comments-${event.id}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "comments", filter: `event_id=eq.${event.id}` },
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "comments",
+          filter: `event_id=eq.${event.id}`,
+        },
         async (payload) => {
-           if (payload.new.user_id === user?.id) return;
-           const { data: userData } = await supabase.from("profiles").select("id, username, avatar_url").eq("id", payload.new.user_id).single();
-           const newMsg = { ...payload.new, user: userData } as CommentWithExtras;
-           setComments((prev) => [...prev, newMsg]);
-           onCommentAdded();
+          if (payload.new.user_id === user?.id) return;
+          const { data: userData } = await supabase
+            .from("profiles")
+            .select("id, username, avatar_url")
+            .eq("id", payload.new.user_id)
+            .single();
+          const newMsg = {
+            ...payload.new,
+            user: userData,
+          } as CommentWithExtras;
+          setComments((prev) => [...prev, newMsg]);
+          onCommentAdded();
         }
       )
       .subscribe();
@@ -496,17 +470,29 @@ function CommentsModal({
         const element = document.getElementById(`comment-${highlightId}`);
         if (element) {
           // If it's a reply, ensure parent is expanded
-          const comment = comments.find(c => c.id === highlightId);
+          const comment = comments.find((c) => c.id === highlightId);
           if (comment?.parent_comment_id) {
-            setExpandedComments(prev => new Set(prev).add(comment.parent_comment_id!));
+            setExpandedComments((prev) =>
+              new Set(prev).add(comment.parent_comment_id!)
+            );
           }
 
           element.scrollIntoView({ behavior: "smooth", block: "center" });
-          
+
           // Add highlight animation
-          element.classList.add("bg-yellow-50", "ring-2", "ring-yellow-100", "rounded-lg");
+          element.classList.add(
+            "bg-yellow-50",
+            "ring-2",
+            "ring-yellow-100",
+            "rounded-lg"
+          );
           setTimeout(() => {
-            element.classList.remove("bg-yellow-50", "ring-2", "ring-yellow-100", "rounded-lg");
+            element.classList.remove(
+              "bg-yellow-50",
+              "ring-2",
+              "ring-yellow-100",
+              "rounded-lg"
+            );
             element.classList.add("transition-all", "duration-1000");
           }, 3000);
         }
@@ -519,7 +505,9 @@ function CommentsModal({
     try {
       const { data, error } = await supabase
         .from("comments")
-        .select("*, user:profiles!comments_user_profile_fkey(id, username, avatar_url)") 
+        .select(
+          "*, user:profiles!comments_user_profile_fkey(id, username, avatar_url)"
+        )
         .eq("event_id", event.id)
         .order("created_at", { ascending: true });
 
@@ -527,10 +515,10 @@ function CommentsModal({
         console.error("Error fetching comments:", error);
         setComments([]);
       } else if (data) {
-        const formatted = data.map(c => ({
-            ...c, 
-            likes_count: 0, 
-            is_liked_by_user: false 
+        const formatted = data.map((c) => ({
+          ...c,
+          likes_count: 0,
+          is_liked_by_user: false,
         }));
         setComments(formatted as unknown as CommentWithExtras[]);
       }
@@ -543,14 +531,14 @@ function CommentsModal({
   };
 
   const toggleReplies = (commentId: string) => {
-    setExpandedComments(prev => {
-        const next = new Set(prev);
-        if (next.has(commentId)) {
-            next.delete(commentId);
-        } else {
-            next.add(commentId);
-        }
-        return next;
+    setExpandedComments((prev) => {
+      const next = new Set(prev);
+      if (next.has(commentId)) {
+        next.delete(commentId);
+      } else {
+        next.add(commentId);
+      }
+      return next;
     });
   };
 
@@ -559,13 +547,13 @@ function CommentsModal({
     const targetUsername = comment.user?.username || "user";
     // A. INSTAGRAM STYLE: Auto-fill the text input
     setNewComment(`@${targetUsername} `);
-    
+
     // B. SMART TARGETING: Remember this specific user object in the background
     setReplyTarget(comment);
 
     // C. DATABASE STRUCTURE: Keep the thread flat
-    setActiveReplyId(comment.parent_comment_id || comment.id); 
-    
+    setActiveReplyId(comment.parent_comment_id || comment.id);
+
     inputRef.current?.focus();
   };
 
@@ -576,16 +564,9 @@ function CommentsModal({
     const content = newComment.trim();
     setNewComment("");
 
-<<<<<<< HEAD
-    const tempId =
-      typeof crypto !== "undefined" &&
-      typeof (crypto as any).randomUUID === "function"
-        ? (crypto as any).randomUUID()
-        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-=======
-    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
->>>>>>> PawPal-v0.2
+    const tempId = `temp-${Date.now()}-${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
     const optimisticComment: any = {
       id: tempId,
       event_id: event.id,
@@ -593,67 +574,71 @@ function CommentsModal({
       content: content,
       created_at: new Date().toISOString(),
       parent_comment_id: activeReplyId,
-      user: { id: user.id, username: user.username, avatar_url: user.avatar_url },
+      user: {
+        id: user.id,
+        username: user.username,
+        avatar_url: user.avatar_url,
+      },
     };
 
     setComments((prev) => [...prev, optimisticComment]);
     onCommentAdded();
-    
+
     if (activeReplyId) {
-        setExpandedComments(prev => new Set(prev).add(activeReplyId));
+      setExpandedComments((prev) => new Set(prev).add(activeReplyId));
     }
 
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    setTimeout(
+      () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
+      100
+    );
 
     const { data: insertedData, error } = await supabase
       .from("comments")
-      .insert([{ 
-          event_id: event.id, 
-          user_id: user.id, 
+      .insert([
+        {
+          event_id: event.id,
+          user_id: user.id,
           content: content,
-          parent_comment_id: activeReplyId
-      }])
+          parent_comment_id: activeReplyId,
+        },
+      ])
       .select("id")
       .single();
 
     if (error) {
-<<<<<<< HEAD
-      setComments((prev) => prev.filter((c) => c.id !== tempId));
-      onCommentDeleted();
-      alert("Failed to post comment");
-=======
       console.error(error);
       setComments((prev) => prev.filter((c) => c.id !== tempId));
     } else if (insertedData) {
       setActiveReplyId(null);
       setReplyTarget(null); // Reset target
-      
+
       // We will track who got a "Reply" alert so we don't send them a "Mention" alert too.
       const notifiedUserIds: string[] = [];
-      
+
       // --- LOGIC A: HANDLE REPLIES (The Smart Target) ---
       if (replyTarget) {
         // Notify the specific person we clicked (User B), not the Main Commenter (User A)
         if (replyTarget.user_id !== user.id) {
-           await notifyReply(
-             { id: event.id, admin_id: event.admin_id, title: event.title },
-             { id: user.id, username: user.username },
-             content,
-             replyTarget.user_id, // <--- Target the specific user
-             insertedData.id
-           );
-           notifiedUserIds.push(replyTarget.user_id); // Add to exclusion list
+          await notifyReply(
+            { id: event.id, admin_id: event.admin_id, title: event.title },
+            { id: user.id, username: user.username },
+            content,
+            replyTarget.user_id, // <--- Target the specific user
+            insertedData.id
+          );
+          notifiedUserIds.push(replyTarget.user_id); // Add to exclusion list
         }
       } else {
         // --- LOGIC B: HANDLE MAIN COMMENT ---
         // If no reply target, it's a root comment. Notify Admin.
         if (event.admin_id && event.admin_id !== user.id) {
-            await notifyComment(
-                { id: event.id, admin_id: event.admin_id, title: event.title },
-                { id: user.id, username: user.username },
-                content,
-                insertedData.id
-            );
+          await notifyComment(
+            { id: event.id, admin_id: event.admin_id, title: event.title },
+            { id: user.id, username: user.username },
+            content,
+            insertedData.id
+          );
         }
       }
 
@@ -670,18 +655,17 @@ function CommentsModal({
   };
 
   const handleEditComment = async (commentId: string, newContent: string) => {
-    setComments((prev) => 
-        prev.map((c) => c.id === commentId ? { ...c, content: newContent } : c)
+    setComments((prev) =>
+      prev.map((c) => (c.id === commentId ? { ...c, content: newContent } : c))
     );
 
     const { error } = await supabase
-        .from("comments")
-        .update({ content: newContent })
-        .eq("id", commentId);
+      .from("comments")
+      .update({ content: newContent })
+      .eq("id", commentId);
 
     if (error) {
-        console.error("Failed to edit comment:", error);
->>>>>>> PawPal-v0.2
+      console.error("Failed to edit comment:", error);
     }
   };
 
@@ -694,7 +678,7 @@ function CommentsModal({
 
   const repliesByParent = useMemo(() => {
     const map = new Map<string, CommentWithExtras[]>();
-    comments.forEach(comment => {
+    comments.forEach((comment) => {
       if (comment.parent_comment_id) {
         const existing = map.get(comment.parent_comment_id) || [];
         map.set(comment.parent_comment_id, [...existing, comment]);
@@ -703,13 +687,13 @@ function CommentsModal({
     return map;
   }, [comments]);
 
-  const rootComments = comments.filter(c => !c.parent_comment_id);
+  const rootComments = comments.filter((c) => !c.parent_comment_id);
   const getReplies = (parentId: string) => repliesByParent.get(parentId) || [];
 
   const renderCommentRow = (comment: CommentWithExtras, isReply = false) => (
     <CommentItem
       key={comment.id}
-      event={event} 
+      event={event}
       comment={comment}
       user={user}
       onDelete={handleDeleteComment}
@@ -721,14 +705,19 @@ function CommentsModal({
 
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-end justify-center md:items-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose} />
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+        onClick={onClose}
+      />
       <div className="relative w-full md:w-[480px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl flex flex-col max-h-[85vh] md:max-h-[600px] animate-in slide-in-from-bottom-10 fade-in duration-300">
-        
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-100 shrink-0">
           <div className="w-8" />
           <h3 className="font-bold text-gray-900">Comments</h3>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          >
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
@@ -745,33 +734,35 @@ function CommentsModal({
             </div>
           ) : (
             rootComments.map((comment) => {
-                const replies = getReplies(comment.id);
-                const hasReplies = replies.length > 0;
-                const isExpanded = expandedComments.has(comment.id);
+              const replies = getReplies(comment.id);
+              const hasReplies = replies.length > 0;
+              const isExpanded = expandedComments.has(comment.id);
 
-                return (
-                    <div key={comment.id}>
-                        {renderCommentRow(comment)}
+              return (
+                <div key={comment.id}>
+                  {renderCommentRow(comment)}
 
-                        {hasReplies && (
-                            <div className="ml-14 mt-2 flex items-center">
-                                <div className="w-8 h-[1px] bg-gray-300 mr-2"></div>
-                                <button 
-                                    onClick={() => toggleReplies(comment.id)}
-                                    className="text-[11px] font-semibold text-gray-500 hover:text-gray-800"
-                                >
-                                    {isExpanded ? "Hide replies" : `View replies (${replies.length})`}
-                                </button>
-                            </div>
-                        )}
-
-                        {isExpanded && (
-                            <div className="mb-2">
-                                {replies.map(reply => renderCommentRow(reply, true))}
-                            </div>
-                        )}
+                  {hasReplies && (
+                    <div className="ml-14 mt-2 flex items-center">
+                      <div className="w-8 h-[1px] bg-gray-300 mr-2"></div>
+                      <button
+                        onClick={() => toggleReplies(comment.id)}
+                        className="text-[11px] font-semibold text-gray-500 hover:text-gray-800"
+                      >
+                        {isExpanded
+                          ? "Hide replies"
+                          : `View replies (${replies.length})`}
+                      </button>
                     </div>
-                );
+                  )}
+
+                  {isExpanded && (
+                    <div className="mb-2">
+                      {replies.map((reply) => renderCommentRow(reply, true))}
+                    </div>
+                  )}
+                </div>
+              );
             })
           )}
           <div ref={bottomRef} />
@@ -781,11 +772,19 @@ function CommentsModal({
         <div className="p-4 border-t border-gray-100 bg-white md:rounded-b-2xl">
           {activeReplyId && (
             <div className="text-xs text-gray-400 mb-2 ml-4 flex justify-between items-center">
-                <span>Replying to comment...</span>
-                <button onClick={() => setActiveReplyId(null)} className="mr-2 hover:text-gray-600"><X size={12}/></button>
+              <span>Replying to comment...</span>
+              <button
+                onClick={() => setActiveReplyId(null)}
+                className="mr-2 hover:text-gray-600"
+              >
+                <X size={12} />
+              </button>
             </div>
           )}
-          <form onSubmit={handlePostComment} className="flex gap-2 items-center">
+          <form
+            onSubmit={handlePostComment}
+            className="flex gap-2 items-center"
+          >
             <img
               src={user?.avatar_url || FailedImageIcon}
               alt="Me"
@@ -832,26 +831,34 @@ const formatRelativeTime = (dateString: string) => {
   if (diffInSeconds >= 31556952) {
     return `${Math.floor(diffInSeconds / 31556952)}y`;
   }
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 };
 
 // --- Individual Comment Item Component ---
 
 interface CommentItemProps {
-  event: OutreachEvent; 
+  event: OutreachEvent;
   comment: CommentWithExtras;
   user: any;
   onDelete: (id: string) => void;
   onReply: (comment: CommentWithExtras) => void;
   onEdit: (id: string, newContent: string) => void;
-  isReply?: boolean; 
+  isReply?: boolean;
 }
 
-function CommentItem({ event, comment, user, onDelete, onReply, onEdit, isReply = false }: CommentItemProps) {
+function CommentItem({
+  event,
+  comment,
+  user,
+  onDelete,
+  onReply,
+  onEdit,
+  isReply = false,
+}: CommentItemProps) {
   const [likesCount, setLikesCount] = useState(comment.likes_count || 0);
   const [isLiked, setIsLiked] = useState(comment.is_liked_by_user || false);
   const [isLiking, setIsLiking] = useState(false);
-  
+
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
 
@@ -865,7 +872,7 @@ function CommentItem({ event, comment, user, onDelete, onReply, onEdit, isReply 
         .from("comment_likes")
         .select("*", { count: "exact", head: true })
         .eq("comment_id", comment.id);
-        
+
       setLikesCount(count || 0);
 
       if (user) {
@@ -884,11 +891,11 @@ function CommentItem({ event, comment, user, onDelete, onReply, onEdit, isReply 
 
   const toggleCommentLike = async () => {
     if (!user || isLiking) return;
-    
+
     setIsLiking(true);
     const previousLiked = isLiked;
     const previousCount = likesCount;
-    
+
     setIsLiked(!isLiked);
     setLikesCount(previousLiked ? likesCount - 1 : likesCount + 1);
 
@@ -906,13 +913,13 @@ function CommentItem({ event, comment, user, onDelete, onReply, onEdit, isReply 
 
         // 9. UPDATE: Pass comment ID to notification
         if (comment.user_id !== user.id) {
-           await notifyCommentLike(
-             { id: event.id, admin_id: event.admin_id, title: event.title },
-             { id: user.id, username: user.username },
-             comment.user_id,
-             comment.content,
-             comment.id // Pass ID
-           );
+          await notifyCommentLike(
+            { id: event.id, admin_id: event.admin_id, title: event.title },
+            { id: user.id, username: user.username },
+            comment.user_id,
+            comment.content,
+            comment.id // Pass ID
+          );
         }
       }
     } catch (err) {
@@ -926,21 +933,25 @@ function CommentItem({ event, comment, user, onDelete, onReply, onEdit, isReply 
 
   const handleSaveEdit = () => {
     if (editContent.trim() !== "") {
-        onEdit(comment.id, editContent);
-        setIsEditing(false);
+      onEdit(comment.id, editContent);
+      setIsEditing(false);
     }
   };
 
   return (
     // 10. UPDATE: Add ID to div for scrolling
-    <div 
-      id={`comment-${comment.id}`} 
-      className={`flex gap-3 group animate-in fade-in slide-in-from-bottom-2 duration-300 ${isReply ? "ml-11 mt-3" : "mt-4"}`}
+    <div
+      id={`comment-${comment.id}`}
+      className={`flex gap-3 group animate-in fade-in slide-in-from-bottom-2 duration-300 ${
+        isReply ? "ml-11 mt-3" : "mt-4"
+      }`}
     >
       <img
         src={comment.user?.avatar_url || FailedImageIcon}
         alt="User"
-        className={`${isReply ? "w-6 h-6" : "w-8 h-8"} rounded-full object-cover border border-gray-100 flex-shrink-0`}
+        className={`${
+          isReply ? "w-6 h-6" : "w-8 h-8"
+        } rounded-full object-cover border border-gray-100 flex-shrink-0`}
       />
       <div className="flex-1 space-y-1">
         <div className="flex flex-col">
@@ -948,96 +959,103 @@ function CommentItem({ event, comment, user, onDelete, onReply, onEdit, isReply 
             <span className="font-bold text-sm text-gray-900">
               {comment.user?.username || "Unknown"}
             </span>
-            
+
             {isEditing ? (
               <div className="flex-1">
-                  <Input 
-                      value={editContent}
-                      onChange={(e) => setEditContent(e.target.value)}
-                      className="h-8 text-sm"
-                      autoFocus
-                  />
-                  <div className="flex gap-2 mt-1">
-                      <span 
-                          onClick={handleSaveEdit}
-                          className="text-[10px] font-bold text-blue-600 cursor-pointer hover:underline"
-                      >
-                          Save
-                      </span>
-                      <span 
-                          onClick={() => {
-                              setIsEditing(false);
-                              setEditContent(comment.content);
-                          }}
-                          className="text-[10px] text-gray-500 cursor-pointer hover:underline"
-                      >
-                          Cancel
-                      </span>
-                  </div>
+                <Input
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  className="h-8 text-sm"
+                  autoFocus
+                />
+                <div className="flex gap-2 mt-1">
+                  <span
+                    onClick={handleSaveEdit}
+                    className="text-[10px] font-bold text-blue-600 cursor-pointer hover:underline"
+                  >
+                    Save
+                  </span>
+                  <span
+                    onClick={() => {
+                      setIsEditing(false);
+                      setEditContent(comment.content);
+                    }}
+                    className="text-[10px] text-gray-500 cursor-pointer hover:underline"
+                  >
+                    Cancel
+                  </span>
+                </div>
               </div>
             ) : (
-                <span className="text-sm text-gray-700 break-words whitespace-pre-wrap">
-                  {comment.content}
-                </span>
+              <span className="text-sm text-gray-700 break-words whitespace-pre-wrap">
+                {comment.content}
+              </span>
             )}
           </div>
         </div>
 
         {!isEditing && (
-            <div className="flex items-center gap-4 px-1 mt-1">
-              <span className="text-[10px] text-gray-400 font-medium">
-                {formatRelativeTime(comment.created_at)}
+          <div className="flex items-center gap-4 px-1 mt-1">
+            <span className="text-[10px] text-gray-400 font-medium">
+              {formatRelativeTime(comment.created_at)}
+            </span>
+
+            <button
+              onClick={toggleCommentLike}
+              disabled={isLiking}
+              className="flex items-center gap-1 group/like disabled:opacity-50"
+            >
+              <Heart
+                size={12}
+                className={`transition-colors ${
+                  isLiked
+                    ? "fill-red-500 text-red-500"
+                    : "text-gray-400 group-hover/like:text-red-500"
+                }`}
+              />
+              <span className="text-[10px] text-gray-500 font-semibold">
+                {likesCount}
               </span>
+            </button>
 
-              <button 
-                onClick={toggleCommentLike}
-                disabled={isLiking}
-                className="flex items-center gap-1 group/like disabled:opacity-50"
-              >
-                <Heart 
-                  size={12} 
-                  className={`transition-colors ${isLiked ? 'fill-red-500 text-red-500' : 'text-gray-400 group-hover/like:text-red-500'}`} 
-                />
-                <span className="text-[10px] text-gray-500 font-semibold">
-                  {likesCount}
-                </span>
-              </button>
+            <button
+              onClick={() => onReply(comment)}
+              className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-blue-600 font-semibold transition-colors"
+            >
+              <Reply size={10} /> Reply
+            </button>
 
-              <button
-                onClick={() => onReply(comment)}
-                className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-blue-600 font-semibold transition-colors"
-              >
-                <Reply size={10} /> Reply
-              </button>
+            {(user?.id === comment.user_id || user?.role === "admin") && (
+              <DropdownMenu>
+                <DropdownMenuTrigger className="focus:outline-none opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity">
+                  <MoreHorizontal
+                    size={14}
+                    className="text-gray-400 hover:text-gray-700 transition-colors"
+                  />
+                </DropdownMenuTrigger>
 
-              {(user?.id === comment.user_id || user?.role === "admin") && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger className="focus:outline-none opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity">
-                    <MoreHorizontal 
-                        size={14} 
-                        className="text-gray-400 hover:text-gray-700 transition-colors"
-                    />
-                  </DropdownMenuTrigger>
-                  
-                  <DropdownMenuContent align="start" className="w-32 z-[100] bg-white">
-                    {user?.id === comment.user_id && (
-                      <DropdownMenuItem onClick={() => setIsEditing(true)}>
-                        <Edit size={12} className="mr-2" /> 
-                        <span className="text-xs">Edit</span>
-                      </DropdownMenuItem>
-                    )}
-                    
-                    <DropdownMenuItem 
-                        onClick={() => onDelete(comment.id)}
-                        className="text-red-600 focus:text-red-600"
-                    >
-                      <Trash2 size={12} className="mr-2" /> 
-                      <span className="text-xs">Delete</span>
+                <DropdownMenuContent
+                  align="start"
+                  className="w-32 z-[100] bg-white"
+                >
+                  {user?.id === comment.user_id && (
+                    <DropdownMenuItem onClick={() => setIsEditing(true)}>
+                      <Edit size={12} className="mr-2" />
+                      <span className="text-xs">Edit</span>
                     </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
+                  )}
+
+                  <DropdownMenuItem
+                    onClick={() => onDelete(comment.id)}
+                    className="text-red-600 focus:text-red-600"
+                  >
+                    <Trash2 size={12} className="mr-2" />
+                    <span className="text-xs">Delete</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         )}
       </div>
     </div>
