@@ -10,10 +10,9 @@ export interface UserProfile {
   last_name: string | null;
   bio: string | null;
   pronouns: string | null;
-  contact_number?: string | null; // ✅ Added
+  contact_number?: string | null;
 }
 
-// ✅ NEW: Comment Interface
 export interface Comment {
   id: string;
   user_id: string;
@@ -23,6 +22,7 @@ export interface Comment {
   user?: UserProfile;
 }
 
+// ✅ UPDATED: Added Luma-style fields
 export interface OutreachEvent {
   id: string;
   admin_id: string;
@@ -33,6 +33,13 @@ export interface OutreachEvent {
   created_at: string;
   updated_at: string;
   admin?: UserProfile;
+  // New fields
+  event_date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  max_attendees?: number | null;
+  requires_registration?: boolean;
+  event_type?: string; // 'official' | 'general'
 }
 
 export type UpdateProfilePayload = {
@@ -43,7 +50,7 @@ export type UpdateProfilePayload = {
   pronouns?: string;
   first_name?: string;
   last_name?: string;
-  contact_number?: string; // ✅ Added
+  contact_number?: string;
 };
 
 export interface Message {
