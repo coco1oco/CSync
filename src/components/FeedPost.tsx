@@ -21,8 +21,6 @@ import {
   Reply,
   Heart,
   MessageCircle,
-  CalendarCheck,
-  CheckCircle2,
   Trash2,
   MoreHorizontal,
   Edit,
@@ -82,8 +80,8 @@ export function FeedPost({
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [, setIsLoading] = useState(true);
+  const [, setError] = useState<string | null>(null);
 
   // State for visual effect on Like
   const [triggerLikeAnim, setTriggerLikeAnim] = useState(false);
