@@ -1,18 +1,15 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "@/context/authContext";
+import { Heart, MessageCircle, AtSign, X, UserPlus, Bell } from "lucide-react";
 
-// All supported notification types (matches DB CHECK constraint)
+// --- Types ---
 type NotificationType =
-  | "message"
-  | "reaction"
-  | "comment"
-  | "pet_task"
-  | "schedule"
-  | "vaccination";
+  | "message" | "reaction" | "comment" | "reply" | "mention" | "comment_like"
+  | "follow" | "pet_task" | "schedule" | "vaccination";
 
-// Shape of a notification row coming from Supabase
 interface Notification {
   id: string;
   from_user_id: string | null;
@@ -24,266 +21,292 @@ interface Notification {
   is_unread: boolean;
   created_at: string;
   read_at: string | null;
+  sender?: { username: string; avatar_url: string | null; };
 }
 
-type FilterTab = "all" | "unread";
+interface NotificationCenterProps {
+  variant?: "page" | "panel";
+  isOpen?: boolean;
+  onClose?: () => void;
+}
 
-export function NotificationCenter() {
+export function NotificationCenter({ 
+  variant = "page", 
+  isOpen = false, 
+  onClose = () => {} 
+}: NotificationCenterProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
-
-  // All notifications loaded from the DB
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  // Which tab is active: "all" or "unread"
-  const [filter, setFilter] = useState<FilterTab>("all");
-  // Loading state for initial fetch
   const [loading, setLoading] = useState(true);
-  // Number of unread notifications (for the Unread tab badge)
-  const [unreadCount, setUnreadCount] = useState(0);
 
-  // On mount / when user changes: fetch notifications + subscribe to realtime
+  // --- Fetch Logic ---
   useEffect(() => {
     if (!user?.id) return;
     fetchNotifications();
-    const cleanup = subscribeToNotifications();
-    return cleanup;
+    
+    const channel = supabase
+      .channel(`notifications:user_id=eq.${user.id}`)
+      .on("postgres_changes", 
+        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        async (payload) => {
+          const { data } = await supabase.from("notifications")
+            .select("*, sender:from_user_id(username, avatar_url)")
+            .eq("id", payload.new.id).single();
+          if (data) setNotifications(prev => [data as any, ...prev]);
+        }
+      ).subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [user?.id]);
 
-  // Load latest notifications for this user
   async function fetchNotifications() {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("notifications")
-        .select("*")
-        .eq("user_id", user?.id)
-        .order("created_at", { ascending: false })
-        .limit(50); // UI only needs the latest 50
-
-      if (error) throw error;
-
-      const list = (data || []) as Notification[];
-      setNotifications(list);
-      setUnreadCount(list.filter((n) => n.is_unread).length);
-    } catch (err) {
-      console.error("Error fetching notifications:", err);
-    } finally {
-      setLoading(false);
-    }
+    setLoading(true);
+    const { data } = await supabase
+      .from("notifications")
+      .select(`*, sender:from_user_id(username, avatar_url)`)
+      .eq("user_id", user?.id)
+      .order("created_at", { ascending: false })
+      .limit(80); // Limit set to 80
+    setNotifications((data || []) as any);
+    setLoading(false);
   }
 
-  // Subscribe to realtime changes for this user's notifications
-  function subscribeToNotifications() {
-    if (!user?.id) return () => {};
+  // --- 🔥 UPDATED: Click Handler (Fixes Read Status) ---
+  async function handleClick(n: Notification) {
+    // 1. Optimistically update UI (So it turns white instantly)
+    setNotifications(prev => 
+      prev.map(item => item.id === n.id ? { ...item, is_unread: false } : item)
+    );
 
-    const subscription = supabase
-      .channel(`notifications:user_id=eq.${user.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*", // INSERT and UPDATE
-          schema: "public",
-          table: "notifications",
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          if (payload.eventType === "INSERT") {
-            // New notification: add to top of list
-            const n = payload.new as Notification;
-            setNotifications((prev) => [n, ...prev]);
-            if (n.is_unread) setUnreadCount((c) => c + 1);
-          } else if (payload.eventType === "UPDATE") {
-            // Updated notification: replace in list
-            const n = payload.new as Notification;
-            const old = payload.old as Notification;
-            setNotifications((prev) =>
-              prev.map((x) => (x.id === n.id ? n : x))
-            );
-            // Adjust unread count if it switched from unread → read
-            if (old.is_unread && !n.is_unread) {
-              setUnreadCount((c) => Math.max(0, c - 1));
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    // Cleanup on unmount
-    return () => {
-      supabase.removeChannel(subscription);
-    };
-  }
-
-  // Apply "All" vs "Unread" filter
-  const filtered =
-    filter === "unread"
-      ? notifications.filter((n) => n.is_unread)
-      : notifications;
-
-  // Group notifications by date label (Today, Yesterday, etc.)
-  const grouped = groupByDate(filtered);
-
-  // Mark a single notification as read in the DB
-  async function markAsRead(id: string) {
-    try {
-      await supabase
+    // 2. Update Database (So it stays read forever)
+    if (n.is_unread) {
+      const { error } = await supabase
         .from("notifications")
         .update({ is_unread: false, read_at: new Date().toISOString() })
-        .eq("id", id);
-    } catch (err) {
-      console.error("Error marking as read:", err);
+        .eq("id", n.id);
+
+      if (error) console.error("Error marking as read:", error);
+    }
+
+    // 3. Navigate
+    if (n.data?.link) {
+      navigate(n.data.link);
+      if (variant === "panel") onClose(); 
     }
   }
 
-  // When the user clicks a notification:
-  // - mark it as read if needed
-  // - navigate to the link stored in data.link (e.g. /event/:id)
-  function handleClick(n: Notification) {
-    if (n.is_unread) markAsRead(n.id);
-    const link = n.data?.link;
-    if (link) navigate(link);
+  // --- Date Grouping Helper ---
+  function getGroupLabel(dateStr: string) {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const notifDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+    if (notifDate.getTime() === today.getTime()) return "Today";
+    if (notifDate.getTime() === yesterday.getTime()) return "Yesterday";
+    
+    const diffTime = Math.abs(today.getTime() - notifDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays <= 7) return "This week";
+    if (diffDays <= 30) return "This month";
+    return "Earlier";
   }
 
-  return (
-    <div className="w-[360px] bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900">Notifications</h2>
-        <button
-          className="text-gray-500 hover:text-gray-700 text-xl"
-          aria-label="Options"
-        >
-          ⋯
-        </button>
-      </div>
+  // --- Icon Helper ---
+  const getIcon = (type: NotificationType) => {
+    const base = "absolute -bottom-0.5 -right-0.5 rounded-full p-0.5 border-2 border-white flex items-center justify-center";
+    switch(type) {
+      case 'reaction': return <div className={`${base} bg-red-500`}><Heart size={10} className="text-white fill-white"/></div>;
+      case 'comment': return <div className={`${base} bg-blue-500`}><MessageCircle size={10} className="text-white fill-white"/></div>;
+      case 'mention': return <div className={`${base} bg-orange-500`}><AtSign size={10} className="text-white"/></div>;
+      case 'follow': return <div className={`${base} bg-purple-500`}><UserPlus size={10} className="text-white"/></div>;
+      default: return <div className={`${base} bg-gray-500`}><Bell size={10} className="text-white"/></div>;
+    }
+  };
 
-      {/* Tabs */}
-      <div className="flex gap-4 px-4 py-2 border-b border-gray-200">
-        <button
-          onClick={() => setFilter("all")}
-          className={`pb-2 text-sm font-medium transition-colors border-b-2 ${
-            filter === "all"
-              ? "text-teal-600 border-teal-600"
-              : "text-gray-600 border-transparent hover:text-gray-900"
-          }`}
-        >
-          All
-        </button>
-        <button
-          onClick={() => setFilter("unread")}
-          className={`pb-2 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
-            filter === "unread"
-              ? "text-teal-600 border-teal-600"
-              : "text-gray-600 border-transparent hover:text-gray-900"
-          }`}
-        >
-          Unread
-          {unreadCount > 0 && (
-            <span className="inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold text-white bg-teal-600 rounded-full">
-              {unreadCount}
-            </span>
-          )}
-        </button>
-      </div>
+  function getRelativeTime(dateStr: string) {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    if (seconds < 60) return "Just now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d`;
+    return `${Math.floor(days / 7)}w`;
+  }
 
-      {/* Content */}
-      <div className="max-h-96 overflow-y-auto">
-        {loading ? (
-          <div className="px-4 py-8 text-center text-gray-500 text-sm">
-            Loading notifications…
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="px-4 py-8 text-center text-gray-500 text-sm">
-            {filter === "unread"
-              ? "No unread notifications"
-              : "No notifications yet"}
-          </div>
-        ) : (
-          Object.entries(grouped).map(([dateLabel, items]) => (
-            <div key={dateLabel}>
-              <div className="px-4 py-2 bg-gray-50 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                {dateLabel}
-              </div>
-              {items.map((n) => (
-                <button
-                  key={n.id}
-                  onClick={() => handleClick(n)}
-                  className={`w-full flex items-start gap-3 px-4 py-3 text-left border-l-4 transition-colors ${
-                    n.is_unread
-                      ? "bg-teal-50 border-teal-600 hover:bg-teal-100"
-                      : "bg-white border-transparent hover:bg-gray-50"
-                  }`}
-                >
-                  {/* Avatar / Icon */}
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-teal-500 flex items-center justify-center text-white font-semibold">
-                    🐾
-                  </div>
+  // --- Smart Content Renderer (Handles Bolding) ---
+  const renderNotificationContent = (n: Notification) => {
+    const actors = n.data?.actors; // This list comes from our SQL function
 
-                  {/* Text */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">
-                      {n.title}
-                    </p>
-                    <p className="text-sm text-gray-700 line-clamp-2">
-                      {n.action_text && (
-                        <span className="font-medium text-gray-900">
-                          {n.action_text}{" "}
-                        </span>
+    // CASE 1: It is a Grouped Notification (Has 'actors' array)
+    if (Array.isArray(actors) && actors.length > 0) {
+      const count = actors.length;
+      
+      let suffix = "acted";
+      if (n.type === 'reaction') suffix = "liked your post";
+      else if (n.type === 'comment') suffix = "commented on your post";
+      else if (n.type === 'comment_like') suffix = "liked your comment";
+
+      if (count === 1) {
+        return (
+          <>
+            <span className="font-bold text-gray-900">{actors[0]}</span>
+            <span className="text-gray-600"> {suffix}</span>
+          </>
+        );
+      }
+      if (count === 2) {
+        return (
+          <>
+            <span className="font-bold text-gray-900">{actors[0]}</span>
+            <span className="text-gray-600"> and </span>
+            <span className="font-bold text-gray-900">{actors[1]}</span>
+            <span className="text-gray-600"> {suffix}</span>
+          </>
+        );
+      }
+      const othersCount = count - 2;
+      return (
+        <>
+          <span className="font-bold text-gray-900">{actors[0]}</span>
+          <span className="text-gray-600">, </span>
+          <span className="font-bold text-gray-900">{actors[1]}</span>
+          <span className="text-gray-600"> and </span>
+          <span className="font-bold text-gray-900">{othersCount} {othersCount === 1 ? "other" : "others"}</span>
+          <span className="text-gray-600"> {suffix}</span>
+        </>
+      );
+    }
+
+    // CASE 2: Single Notification
+    const username = n.sender?.username || "Someone";
+    const cleanBody = n.body.startsWith(username) 
+      ? n.body.replace(username, "").trim() 
+      : n.body;
+
+    return (
+      <>
+        <span className="font-bold text-gray-900 mr-1">{username}</span>
+        <span className="text-gray-600">{cleanBody}</span>
+      </>
+    );
+  };
+
+  const groupedNotifications = notifications.reduce((acc, n) => {
+    const label = getGroupLabel(n.created_at);
+    if (!acc[label]) acc[label] = [];
+    acc[label].push(n);
+    return acc;
+  }, {} as Record<string, Notification[]>);
+
+  const groupOrder = ["Today", "Yesterday", "This week", "This month", "Earlier"];
+
+  const NotificationContent = (
+    <div className="flex flex-col pb-24">
+      {loading ? (
+        <div className="p-8 text-center text-gray-500 flex flex-col items-center gap-2">
+           <Loader2 className="animate-spin text-gray-300" size={24} />
+        </div>
+      ) : notifications.length === 0 ? (
+        <div className="p-12 text-center text-gray-500 flex flex-col items-center gap-3">
+           <Bell className="text-gray-300" size={32} />
+           <p className="text-sm font-medium">No notifications yet</p>
+        </div>
+      ) : (
+        <div className="flex flex-col">
+          {groupOrder.map((label) => {
+             const items = groupedNotifications[label];
+             if (!items || items.length === 0) return null;
+
+             return (
+               <div key={label}>
+                 <h3 className="px-5 py-2 text-[15px] font-bold text-gray-900 mt-2">
+                   {label}
+                 </h3>
+                 
+                 {items.map((n) => (
+                    <div 
+                      key={n.id} 
+                      onClick={() => handleClick(n)} 
+                      className={`flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition-colors cursor-pointer active:bg-gray-100 ${n.is_unread ? 'bg-blue-50/30' : ''}`}
+                    >
+                      <div className="relative flex-shrink-0 mt-1">
+                        <img 
+                          src={n.sender?.avatar_url || "/default-avatar.png"} 
+                          className="w-11 h-11 rounded-full object-cover border border-gray-100" 
+                          alt="User"
+                        />
+                        {getIcon(n.type)}
+                      </div>
+
+                      <div className="flex-1 min-w-0 text-sm leading-snug">
+                        {renderNotificationContent(n)}
+                        
+                        <span className="text-gray-400 text-xs ml-1.5 whitespace-nowrap">{getRelativeTime(n.created_at)}</span>
+                        
+                        {n.type === 'follow' && (
+                          <div className="mt-2">
+                            <button className="px-4 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
+                              Follow Back
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {n.data?.post_image && (
+                        <img src={n.data.post_image} className="w-11 h-11 rounded-md object-cover border border-gray-200 flex-shrink-0 ml-1" alt="Post" />
                       )}
-                      {n.body}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {formatRelativeTime(n.created_at)}
-                    </p>
-                  </div>
-
-                  {/* Unread dot */}
-                  {n.is_unread && (
-                    <span className="mt-2 flex-shrink-0 w-2 h-2 rounded-full bg-teal-600" />
-                  )}
-                </button>
-              ))}
-            </div>
-          ))
-        )}
-      </div>
+                    </div>
+                 ))}
+               </div>
+             );
+          })}
+        </div>
+      )}
     </div>
+  );
+
+  if (variant === "page") return <div className="w-full bg-white min-h-[50vh]">{NotificationContent}</div>;
+
+  return createPortal(
+    <div 
+      className={`
+        fixed top-0 bottom-0 z-[50] 
+        w-full sm:w-[397px] 
+        bg-white border-r border-gray-200 shadow-[4px_0_24px_rgba(0,0,0,0.02)]
+        flex flex-col
+        transform transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]
+        left-0 lg:left-[72px]
+        ${isOpen ? "translate-x-0" : "-translate-x-[120%] invisible"}
+      `}
+    >
+      <div className="px-6 py-5 flex justify-between items-center bg-white z-10 sticky top-0">
+        <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Notifications</h2>
+        <button 
+          onClick={onClose} 
+          className="p-2 -mr-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors active:scale-95 cursor-pointer"
+          aria-label="Close notifications"
+        >
+          <X size={24} />
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto overscroll-contain">
+        {NotificationContent}
+      </div>
+    </div>,
+    document.body
   );
 }
 
-// Group notifications by date label (Today, Yesterday, or date)
-function groupByDate(notifs: Notification[]): Record<string, Notification[]> {
-  const grouped: Record<string, Notification[]> = {};
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-
-  for (const n of notifs) {
-    const d = new Date(n.created_at);
-    let label: string;
-    if (d.toDateString() === today.toDateString()) label = "Today";
-    else if (d.toDateString() === yesterday.toDateString()) label = "Yesterday";
-    else
-      label = d.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      });
-
-    if (!grouped[label]) grouped[label] = [];
-    grouped[label].push(n);
-  }
-  return grouped;
-}
-
-// Format created_at into short relative time ("5m", "2h", "1d", etc.)
-function formatRelativeTime(dateStr: string): string {
-  const d = new Date(dateStr);
-  const now = new Date();
-  const diffSec = Math.floor((now.getTime() - d.getTime()) / 1000);
-
-  if (diffSec < 60) return "now";
-  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m`;
-  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h`;
-  if (diffSec < 604800) return `${Math.floor(diffSec / 86400)}d`;
-  return d.toLocaleDateString();
+function Loader2({ className, size }: { className?: string; size?: number }) {
+    return <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>;
 }

@@ -1,10 +1,18 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
+// 1. UPDATE: Import useSearchParams
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/authContext";
 import { EventCard } from "@/components/EventCard";
 import { EventRegistrationModal } from "@/components/EventRegistrationModal";
-import { notifyLike, notifyComment } from "@/lib/NotificationService";
+import { 
+  notifyLike, 
+  notifyComment, 
+  notifyReply, 
+  notifyMentions, 
+  notifyCommentLike 
+} from "@/lib/NotificationService";
 import { 
   Loader2, 
   X, 
@@ -29,7 +37,7 @@ import {
 import FailedImageIcon from "@/assets/FailedImage.svg";
 import type { OutreachEvent, Comment } from "@/types";
 
-// --- 1. Interfaces ---
+// --- Interfaces ---
 
 interface FeedPostProps {
   event: OutreachEvent;
@@ -37,6 +45,8 @@ interface FeedPostProps {
   onDelete: () => void;
   onEdit: () => void;
   onTagClick?: (tag: string) => void;
+  customUsername?: string;
+  customAvatar?: string;
 }
 
 interface CommentWithExtras extends Comment {
@@ -46,7 +56,7 @@ interface CommentWithExtras extends Comment {
   parent_comment_id: string | null;
 }
 
-// --- 2. Main Component (FeedPost) ---
+// --- Main Component (FeedPost) ---
 
 export function FeedPost({
   event,
@@ -54,8 +64,15 @@ export function FeedPost({
   onDelete,
   onEdit,
   onTagClick,
+  customUsername, // 👈 Destructure here
+  customAvatar,
 }: FeedPostProps) {
   const { user } = useAuth();
+  // 2. UPDATE: Read URL params for Deep Linking
+  const [searchParams] = useSearchParams();
+  const highlightCommentId = searchParams.get("comment_id");
+  const actionType = searchParams.get("action");
+
   const [likesCount, setLikesCount] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
@@ -65,6 +82,9 @@ export function FeedPost({
   const [isRegistered, setIsRegistered] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // State for visual effect on Like
+  const [triggerLikeAnim, setTriggerLikeAnim] = useState(false);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -84,6 +104,19 @@ export function FeedPost({
     };
     loadInitialData();
   }, [event.id]);
+
+  // 3. UPDATE: Effect to handle Deep Links (Open Modal or Animate)
+  useEffect(() => {
+    // If URL has ?comment_id=..., automatically open comments
+    if (highlightCommentId) {
+       setIsCommentsOpen(true);
+    }
+    // If URL has ?action=like, trigger animation
+    if (actionType === "like") {
+      setTriggerLikeAnim(true);
+      setTimeout(() => setTriggerLikeAnim(false), 2000);
+    }
+  }, [highlightCommentId, actionType]);
 
   const fetchLikes = async () => {
     try {
@@ -186,6 +219,9 @@ export function FeedPost({
           onEdit={onEdit}
           onDelete={onDelete}
           onTagClick={onTagClick}
+          // 🔥 Pass them down to the EventCard
+          customUsername={customUsername}
+          customAvatar={customAvatar}
         >
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-4">
@@ -196,12 +232,13 @@ export function FeedPost({
                 className="flex items-center gap-1.5 group transition-all focus:outline-none disabled:opacity-50"
               >
                 <Heart
+                  // 4. UPDATE: Add bounce animation if triggered via notification
                   className={`w-6 h-6 transition-transform group-active:scale-90 ${
-                    isLiked
+                    isLiked || triggerLikeAnim
                       ? "fill-red-500 text-red-500"
                       : "text-gray-900 hover:text-gray-600"
-                  }`}
-                  strokeWidth={isLiked ? 0 : 2}
+                  } ${triggerLikeAnim ? "animate-bounce" : ""}`}
+                  strokeWidth={isLiked || triggerLikeAnim ? 0 : 2}
                 />
                 {likesCount > 0 && (
                   <span className="text-sm font-bold text-gray-900">
@@ -255,6 +292,8 @@ export function FeedPost({
           onClose={() => setIsCommentsOpen(false)}
           onCommentAdded={() => setCommentsCount((prev) => prev + 1)}
           onCommentDeleted={() => setCommentsCount((prev) => Math.max(0, prev - 1))}
+          // 5. UPDATE: Pass highlight ID
+          highlightId={highlightCommentId} 
         />
       )}
 
@@ -270,7 +309,7 @@ export function FeedPost({
   );
 }
 
-// --- 3. Comments Modal Component ---
+// --- Comments Modal Component ---
 
 interface CommentsModalProps {
   event: OutreachEvent;
@@ -278,6 +317,7 @@ interface CommentsModalProps {
   onClose: () => void;
   onCommentAdded: () => void;
   onCommentDeleted: () => void;
+  highlightId?: string | null; // 6. UPDATE: Prop for highlighting
 }
 
 function CommentsModal({
@@ -286,10 +326,15 @@ function CommentsModal({
   onClose,
   onCommentAdded,
   onCommentDeleted,
+  highlightId,
 }: CommentsModalProps) {
   const [comments, setComments] = useState<CommentWithExtras[]>([]);
   const [newComment, setNewComment] = useState("");
   const [activeReplyId, setActiveReplyId] = useState<string | null>(null);
+  
+  // 1. SMART TARGETING STATE: Remembers exactly who you clicked
+  const [replyTarget, setReplyTarget] = useState<CommentWithExtras | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
 
@@ -325,6 +370,32 @@ function CommentsModal({
       supabase.removeChannel(channel);
     };
   }, [event.id]);
+
+  // 7. UPDATE: Effect to Scroll & Highlight specific comment
+  useEffect(() => {
+    if (highlightId && !loading && comments.length > 0) {
+      // Small timeout to ensure rendering
+      setTimeout(() => {
+        const element = document.getElementById(`comment-${highlightId}`);
+        if (element) {
+          // If it's a reply, ensure parent is expanded
+          const comment = comments.find(c => c.id === highlightId);
+          if (comment?.parent_comment_id) {
+            setExpandedComments(prev => new Set(prev).add(comment.parent_comment_id!));
+          }
+
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+          
+          // Add highlight animation
+          element.classList.add("bg-yellow-50", "ring-2", "ring-yellow-100", "rounded-lg");
+          setTimeout(() => {
+            element.classList.remove("bg-yellow-50", "ring-2", "ring-yellow-100", "rounded-lg");
+            element.classList.add("transition-all", "duration-1000");
+          }, 3000);
+        }
+      }, 300);
+    }
+  }, [loading, comments, highlightId]);
 
   const fetchComments = async () => {
     setLoading(true);
@@ -366,13 +437,22 @@ function CommentsModal({
     });
   };
 
+  // --- 2. UPDATED: THE INSTAGRAM LOGIC (Auto-fill + Save Target) ---
   const handleReplyClick = (comment: CommentWithExtras) => {
     const targetUsername = comment.user?.username || "user";
+    // A. INSTAGRAM STYLE: Auto-fill the text input
     setNewComment(`@${targetUsername} `);
+    
+    // B. SMART TARGETING: Remember this specific user object in the background
+    setReplyTarget(comment);
+
+    // C. DATABASE STRUCTURE: Keep the thread flat
     setActiveReplyId(comment.parent_comment_id || comment.id); 
+    
     inputRef.current?.focus();
   };
 
+  // --- 3. UPDATED: SUBMIT LOGIC (Smart Notification Routing) ---
   const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim() || !user) return;
@@ -415,11 +495,45 @@ function CommentsModal({
       setComments((prev) => prev.filter((c) => c.id !== tempId));
     } else if (insertedData) {
       setActiveReplyId(null);
-      await notifyComment(
+      setReplyTarget(null); // Reset target
+      
+      // We will track who got a "Reply" alert so we don't send them a "Mention" alert too.
+      const notifiedUserIds: string[] = [];
+      
+      // --- LOGIC A: HANDLE REPLIES (The Smart Target) ---
+      if (replyTarget) {
+        // Notify the specific person we clicked (User B), not the Main Commenter (User A)
+        if (replyTarget.user_id !== user.id) {
+           await notifyReply(
+             { id: event.id, admin_id: event.admin_id, title: event.title },
+             { id: user.id, username: user.username },
+             content,
+             replyTarget.user_id, // <--- Target the specific user
+             insertedData.id
+           );
+           notifiedUserIds.push(replyTarget.user_id); // Add to exclusion list
+        }
+      } else {
+        // --- LOGIC B: HANDLE MAIN COMMENT ---
+        // If no reply target, it's a root comment. Notify Admin.
+        if (event.admin_id && event.admin_id !== user.id) {
+            await notifyComment(
+                { id: event.id, admin_id: event.admin_id, title: event.title },
+                { id: user.id, username: user.username },
+                content,
+                insertedData.id
+            );
+        }
+      }
+
+      // --- LOGIC C: HANDLE MENTIONS ---
+      // Pass the exclusion list to prevent duplicates
+      await notifyMentions(
         { id: event.id, admin_id: event.admin_id, title: event.title },
         { id: user.id, username: user.username },
         content,
-        insertedData.id
+        insertedData.id,
+        notifiedUserIds // <--- The Deduplication Magic
       );
     }
   };
@@ -463,6 +577,7 @@ function CommentsModal({
   const renderCommentRow = (comment: CommentWithExtras, isReply = false) => (
     <CommentItem
       key={comment.id}
+      event={event} 
       comment={comment}
       user={user}
       onDelete={handleDeleteComment}
@@ -570,7 +685,6 @@ function CommentsModal({
   );
 }
 
-// Helper function to format relative time
 const formatRelativeTime = (dateString: string) => {
   const now = new Date();
   const date = new Date(dateString);
@@ -589,9 +703,10 @@ const formatRelativeTime = (dateString: string) => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
-// --- 4. Individual Comment Item Component ---
+// --- Individual Comment Item Component ---
 
 interface CommentItemProps {
+  event: OutreachEvent; 
   comment: CommentWithExtras;
   user: any;
   onDelete: (id: string) => void;
@@ -600,7 +715,7 @@ interface CommentItemProps {
   isReply?: boolean; 
 }
 
-function CommentItem({ comment, user, onDelete, onReply, onEdit, isReply = false }: CommentItemProps) {
+function CommentItem({ event, comment, user, onDelete, onReply, onEdit, isReply = false }: CommentItemProps) {
   const [likesCount, setLikesCount] = useState(comment.likes_count || 0);
   const [isLiked, setIsLiked] = useState(comment.is_liked_by_user || false);
   const [isLiking, setIsLiking] = useState(false);
@@ -656,6 +771,17 @@ function CommentItem({ comment, user, onDelete, onReply, onEdit, isReply = false
         await supabase
           .from("comment_likes")
           .insert([{ comment_id: comment.id, user_id: user.id }]);
+
+        // 9. UPDATE: Pass comment ID to notification
+        if (comment.user_id !== user.id) {
+           await notifyCommentLike(
+             { id: event.id, admin_id: event.admin_id, title: event.title },
+             { id: user.id, username: user.username },
+             comment.user_id,
+             comment.content,
+             comment.id // Pass ID
+           );
+        }
       }
     } catch (err) {
       console.error("Like error:", err);
@@ -674,7 +800,11 @@ function CommentItem({ comment, user, onDelete, onReply, onEdit, isReply = false
   };
 
   return (
-    <div className={`flex gap-3 group animate-in fade-in slide-in-from-bottom-2 duration-300 ${isReply ? "ml-11 mt-3" : "mt-4"}`}>
+    // 10. UPDATE: Add ID to div for scrolling
+    <div 
+      id={`comment-${comment.id}`} 
+      className={`flex gap-3 group animate-in fade-in slide-in-from-bottom-2 duration-300 ${isReply ? "ml-11 mt-3" : "mt-4"}`}
+    >
       <img
         src={comment.user?.avatar_url || FailedImageIcon}
         alt="User"
@@ -757,7 +887,6 @@ function CommentItem({ comment, user, onDelete, onReply, onEdit, isReply = false
                     />
                   </DropdownMenuTrigger>
                   
-                  {/* --- FIX IS HERE: Added z-[100] --- */}
                   <DropdownMenuContent align="start" className="w-32 z-[100] bg-white">
                     {user?.id === comment.user_id && (
                       <DropdownMenuItem onClick={() => setIsEditing(true)}>

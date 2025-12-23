@@ -42,6 +42,8 @@ interface EventCardProps {
   onDelete?: () => void;
   onTagClick?: (tag: string) => void;
   children?: React.ReactNode;
+  customUsername?: string;
+  customAvatar?: string;
 }
 
 const slideVariants = {
@@ -64,10 +66,20 @@ export function EventCard({
   onDelete,
   onTagClick,
   children,
+  customUsername, 
+  customAvatar,
 }: Readonly<EventCardProps>) {
   const [[page, direction], setPage] = useState([0, 0]);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  // Using "as any" is a quick way to bypass the type error if you haven't 
+// updated your OutreachEvent interface yet.
+  // Inside EventCard.tsx
+// displayName and displayAvatar will no longer have red underlines!
+// Using (event as any) will remove the red underlines and fix the display mismatch
+// Priority: 1. Manual Prop, 2. Database Join, 3. Default Fallback
+  const displayName = customUsername || (event as any).profiles?.username || "Youth For Animals";
+  const displayAvatar = customAvatar || (event as any).profiles?.avatar_url || "/public/PawPal.png";
 
   const {
     title,
@@ -127,15 +139,15 @@ export function EventCard({
       <div className="flex items-start justify-between px-4 pt-4 pb-2">
         <div className="flex gap-3">
           <div className="h-10 w-10 rounded-full bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-100">
-            {admin?.avatar_url ? (
+          {customAvatar ? (
               <img
-                src={admin.avatar_url}
-                alt={admin.username}
+                src={customAvatar}
+                alt={customUsername || "Avatar"}
                 className="h-full w-full object-cover"
               />
             ) : (
               <span className="flex h-full w-full items-center justify-center text-xs font-bold text-gray-500">
-                {admin?.username?.slice(0, 2).toUpperCase() || "YFA"}
+                {(customUsername?.slice(0, 2).toUpperCase()) || "YFA"}
               </span>
             )}
           </div>
@@ -143,7 +155,7 @@ export function EventCard({
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
               <span className="text-sm font-bold text-gray-900 leading-none">
-                {admin?.username || "Youth For Animals"}
+                {customUsername || "Youth For Animals"}
               </span>
               <span className="text-xs text-gray-400">· {dateStr}</span>
             </div>
