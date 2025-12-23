@@ -18,13 +18,20 @@ export function BottomNavigation({
 
   // ✅ NEW LOGIC: Hide badge if we are already on the messages page
   const isOnMessagesPage = location.pathname === "/messages";
+  // Placeholder: Replace with real notification count logic for admins
+  const adminNotificationCount = userRole === "admin" ? 3 : 0; // TODO: Replace with real data
 
   const navItems = [
     { path: "/", icon: Home, label: "Home" },
     { path: "/messages", icon: MessageCircle, label: "Messages" },
     ...(userRole === "admin"
-      ? [{ path: "/admin/team", icon: Users, label: "Team" }]
-      : [{ path: "/notifications", icon: Bell, label: "Alerts" }]),
+      ? [
+          { path: "/admin/team", icon: Users, label: "Team" },
+          { path: "/notifications", icon: Bell, label: "Notifications", adminNotificationCount },
+        ]
+      : [
+          { path: "/notifications", icon: Bell, label: "Alerts" },
+        ]),
     {
       path: "/PetDashboard",
       icon: PawPrint,
@@ -54,6 +61,10 @@ export function BottomNavigation({
                 <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold px-1 py-0.5 rounded-full min-w-[16px] flex items-center justify-center border border-white">
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
+              )}
+              {/* Admin notification badge */}
+              {label === "Notifications" && userRole === "admin" && adminNotificationCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 bg-red-500 w-2 h-2 rounded-full border border-white"></span>
               )}
             </div>
             <span className="text-[10px] font-medium">{label}</span>

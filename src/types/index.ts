@@ -13,12 +13,18 @@ export interface UserProfile {
   contact_number?: string | null;
 }
 
+<<<<<<< HEAD
+=======
+// ✅ NEW: Comment Interface
+// ✅ NEW: Comment Interface (Updated)
+>>>>>>> PawPal-v0.2
 export interface Comment {
   id: string;
   user_id: string;
   event_id: string;
   content: string;
   created_at: string;
+  parent_comment_id: string | null; // <--- This was missing!
   user?: UserProfile;
 }
 
@@ -33,6 +39,7 @@ export interface OutreachEvent {
   created_at: string;
   updated_at: string;
   admin?: UserProfile;
+<<<<<<< HEAD
   // New fields
   event_date?: string | null;
   start_time?: string | null;
@@ -40,6 +47,12 @@ export interface OutreachEvent {
   max_attendees?: number | null;
   requires_registration?: boolean;
   event_type?: string; // 'official' | 'general'
+=======
+  profiles?: {
+    username: string | null;
+    avatar_url: string | null;
+  } | null; 
+>>>>>>> PawPal-v0.2
 }
 
 export type UpdateProfilePayload = {
