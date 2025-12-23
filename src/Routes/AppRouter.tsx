@@ -66,6 +66,9 @@ const NotificationsPage = lazy(
   }))
 );
 
+// 1. UPDATE: Lazy Load the new Event Details Page
+const EventDetails = lazy(() => import("@/pages/SharedPages/EventDetails")); // Make sure this path matches where you saved the file
+
 // Loading Spinner
 const PageLoader = () => (
   <div className="flex h-screen w-full items-center justify-center bg-gray-50">
@@ -199,6 +202,16 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoader />}>
             <NotificationsPage />
+          </Suspense>
+        ),
+      },
+
+      // 2. UPDATE: Add the Route for Single Event Details
+      {
+        path: "/event/:id",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <EventDetails />
           </Suspense>
         ),
       },

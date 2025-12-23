@@ -35,6 +35,10 @@ export interface OutreachEvent {
   created_at: string;
   updated_at: string;
   admin?: UserProfile;
+  profiles?: {
+    username: string | null;
+    avatar_url: string | null;
+  } | null; 
 }
 
 export type UpdateProfilePayload = {
