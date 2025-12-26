@@ -5,6 +5,7 @@ export interface UserProfile {
   username: string;
   email: string;
   role: UserRole;
+  committee?: string | null; // Mark as optional or nullable
   avatar_url: string | null;
   first_name: string | null;
   last_name: string | null;

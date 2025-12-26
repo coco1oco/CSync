@@ -13,6 +13,7 @@ import {
   X,
   ArrowLeft,
   Paperclip,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,31 +70,70 @@ export default function MessagesPage() {
   }, [user]);
 
   const fetchRooms = async () => {
-    const { data, error } = await supabase
-      .from("conversation_members")
-      .select("conversation:conversations(id, name, is_group)")
-      .eq("user_id", user?.id);
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from("conversation_members")
+        .select("conversation:conversations(id, name, is_group)")
+        .eq("user_id", user.id);
 
-    if (!error && data) {
-      const rooms = data.map((item: any) => item.conversation);
-      rooms.sort((a: Conversation, b: Conversation) => {
+      if (error) throw error;
+
+      let rooms = data.map((item: any) => item.conversation);
+
+      // ✅ ENFORCE VISIBILITY RULES (Fully Type-Safe)
+      const filteredRooms = rooms.filter((room) => {
+        if (!room || !room.name) return false;
+
+        // 1. General is visible to everyone
+        if (room.name === "General") return true;
+
+        // 2. Executive Board visibility (using your fix)
+        if (room.name === "Executive Board") {
+          return ["admin", "president", "vice_president"].includes(
+            user.role ?? ""
+          );
+        }
+
+        // 3. Committee Chat visibility
+        if (
+          room.is_group &&
+          !["General", "Executive Board"].includes(room.name)
+        ) {
+          // Presidents and Admins see all committee chats they are in
+          if (["admin", "president"].includes(user.role ?? "")) return true;
+
+          // Apply the same fix here for committee
+          const userCommittee = user.committee ?? "";
+          return userCommittee !== "" && room.name === userCommittee;
+        }
+
+        // 4. Direct Messages are always visible
+        return !room.is_group;
+      });
+
+      // ✅ SORTING
+      filteredRooms.sort((a: Conversation, b: Conversation) => {
+        if (!a.name || !b.name) return 0;
         if (a.name === "Executive Board") return -1;
         if (b.name === "Executive Board") return 1;
         if (a.name === "General") return -1;
         if (b.name === "General") return 1;
         return a.name.localeCompare(b.name);
       });
-      setConversations(rooms);
-    }
-    setLoading(false);
-  };
 
+      setConversations(filteredRooms);
+    } catch (err) {
+      console.error("Room fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
   // --- ROOM LOGIC (Messages + Realtime) ---
   useEffect(() => {
     if (!activeRoom || !user) return;
 
     const markReadAndFetch = async () => {
-      // ✅ FIX: Await this so the badge updates accurately
       await supabase.rpc("mark_room_as_read", {
         room_id: activeRoom.id,
         user_id: user.id,
@@ -131,7 +171,6 @@ export default function MessagesPage() {
         async (payload) => {
           if (payload.new.sender_id === user.id) return;
 
-          // Mark read immediately if we are in the room receiving a message
           markReadAndFetch();
 
           let senderData = profileCache.current[payload.new.sender_id];
@@ -162,14 +201,12 @@ export default function MessagesPage() {
       )
       .on("broadcast", { event: "typing" }, (payload) => {
         if (payload.payload.userId === user.id) return;
-
         const username = payload.payload.username;
         setTypingUsers((prev) => {
           const next = new Set(prev);
           next.add(username);
           return next;
         });
-
         setTimeout(() => {
           setTypingUsers((prev) => {
             const next = new Set(prev);
@@ -322,57 +359,21 @@ export default function MessagesPage() {
     return format(date, "MMM d, yyyy");
   };
 
-  const getIcon = (name: string) => {
-    if (name === "General") return Hash;
-    if (name.includes("Executive")) return Lock;
-    return Users;
+  const getRoomIcon = (room: Conversation) => {
+    if (room.name === "General") return <Hash size={18} />;
+    if (room.name === "Executive Board")
+      return <ShieldCheck size={18} className="text-amber-500" />;
+    if (room.is_group) return <Users size={18} />;
+    return <Users size={18} />;
   };
 
   const toggleMessageTime = (id: number | string) => {
     setRevealedMessageId(revealedMessageId === id ? null : id);
   };
 
-  // --- RESTORED SKELETON LOADER ---
-  if (loading) {
-    return (
-      <div className="flex flex-col lg:flex-row h-full w-full bg-white lg:bg-gray-50 lg:rounded-2xl lg:border lg:border-gray-200 overflow-hidden shadow-sm">
-        {/* Sidebar Skeleton */}
-        <div className="w-full lg:w-80 bg-white border-r border-gray-200 flex flex-col h-full">
-          <div className="h-16 px-4 border-b border-gray-100 flex justify-between items-center">
-            <Skeleton className="h-6 w-24 rounded-md" />
-            <Skeleton className="h-8 w-8 rounded-full" />
-          </div>
-          <div className="p-2 space-y-2">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="flex items-center gap-3 p-3">
-                <Skeleton className="h-10 w-10 rounded-full" />
-                <div className="space-y-2 flex-1">
-                  <Skeleton className="h-4 w-24 rounded-md" />
-                  <Skeleton className="h-3 w-16 rounded-md" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+  if (loading) return <MessagesSkeleton />;
 
-        {/* Chat Area Skeleton (Desktop only) */}
-        <div className="hidden lg:flex flex-1 flex-col bg-white h-full relative">
-          <div className="h-16 px-4 border-b border-gray-100 flex items-center gap-3">
-            <Skeleton className="h-8 w-8 rounded-full" />
-            <Skeleton className="h-5 w-32 rounded-md" />
-          </div>
-          <div className="flex-1 p-6 space-y-6">
-            <Skeleton className="h-20 w-1/2 rounded-xl" />
-            <Skeleton className="h-10 w-1/3 rounded-xl self-end" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // --- MAIN RENDER ---
   return (
-    // ✅ SCROLL FIX: Subtract 64px (approx BottomNav height) on mobile, Full height on desktop
     <div className="flex flex-col lg:flex-row h-[calc(100dvh-64px)] lg:h-full w-full bg-white lg:bg-gray-50 lg:rounded-2xl lg:border lg:border-gray-200 overflow-hidden shadow-sm">
       {/* SIDEBAR */}
       <div
@@ -380,8 +381,8 @@ export default function MessagesPage() {
           activeRoom ? "hidden lg:flex" : "flex"
         } h-full`}
       >
-        <div className="h-16 px-4 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10 shrink-0">
-          <h1 className="text-xl font-bold text-gray-900">Chats</h1>
+        <div className="h-16 px-4 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10 shrink-0">
+          <h1 className="text-xl font-bold text-gray-900">Messages</h1>
           <Button
             size="icon"
             variant="ghost"
@@ -402,7 +403,6 @@ export default function MessagesPage() {
             </div>
           ) : (
             conversations.map((room) => {
-              const Icon = getIcon(room.name);
               const isActive = activeRoom?.id === room.id;
               return (
                 <button
@@ -419,10 +419,19 @@ export default function MessagesPage() {
                       isActive ? "bg-blue-100" : "bg-gray-100"
                     }`}
                   >
-                    {room.is_group ? <Icon size={18} /> : <Users size={18} />}
+                    {getRoomIcon(room)}
                   </div>
-                  <div className="min-w-0">
-                    <span className="truncate block">{room.name}</span>
+                  <div className="min-w-0 flex-1">
+                    <span className="truncate block font-semibold">
+                      {room.name}
+                    </span>
+                    {room.is_group &&
+                      room.name !== "General" &&
+                      room.name !== "Executive Board" && (
+                        <span className="text-[10px] text-blue-500 font-bold uppercase tracking-wider">
+                          Committee
+                        </span>
+                      )}
                   </div>
                 </button>
               );
@@ -439,7 +448,6 @@ export default function MessagesPage() {
       >
         {activeRoom ? (
           <>
-            {/* Header */}
             <div className="h-16 px-4 border-b border-gray-100 flex items-center justify-between bg-white shadow-sm z-20 shrink-0">
               <div className="flex items-center gap-3">
                 <button
@@ -462,7 +470,6 @@ export default function MessagesPage() {
               </div>
             </div>
 
-            {/* Message List */}
             <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-1">
               {messages.map((msg, index) => {
                 const isMe = msg.sender_id === user?.id;
@@ -482,7 +489,6 @@ export default function MessagesPage() {
                         </span>
                       </div>
                     )}
-
                     <div
                       className={`flex flex-col mb-2 ${
                         isMe ? "items-end" : "items-start"
@@ -500,7 +506,6 @@ export default function MessagesPage() {
                             className="w-8 h-8 rounded-full border bg-gray-200 self-end mb-1 shrink-0"
                           />
                         )}
-
                         <div
                           onClick={() => toggleMessageTime(msg.id)}
                           className={`cursor-pointer active:scale-[0.98] transition-transform shadow-sm overflow-hidden ${
@@ -523,7 +528,6 @@ export default function MessagesPage() {
                           )}
                         </div>
                       </div>
-
                       <div
                         className={`overflow-hidden transition-all duration-300 ease-in-out ${
                           isRevealed
@@ -543,7 +547,6 @@ export default function MessagesPage() {
                   </div>
                 );
               })}
-
               {typingUsers.size > 0 && (
                 <div className="flex items-center gap-2 ml-10 mb-2 animate-in fade-in slide-in-from-bottom-2">
                   <div className="bg-gray-200 rounded-full px-3 py-2 flex gap-1">
@@ -556,11 +559,9 @@ export default function MessagesPage() {
                   </span>
                 </div>
               )}
-
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Area */}
             <div className="p-3 bg-white border-t border-gray-100 shrink-0 lg:pb-3 pb-7">
               <input
                 type="file"
@@ -577,7 +578,7 @@ export default function MessagesPage() {
                   type="button"
                   size="icon"
                   variant="ghost"
-                  className="rounded-full text-gray-400 hover:text-blue-600 hover:bg-blue-50 shrink-0"
+                  className="rounded-full text-gray-400 hover:text-blue-600 shrink-0"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploading}
                 >
@@ -587,7 +588,6 @@ export default function MessagesPage() {
                     <Paperclip size={20} />
                   )}
                 </Button>
-
                 <Input
                   value={newMessage}
                   onChange={(e) => {
@@ -595,9 +595,8 @@ export default function MessagesPage() {
                     handleTyping();
                   }}
                   placeholder="Type a message..."
-                  className="flex-1 rounded-full bg-gray-100 border-none focus-visible:ring-blue-500 h-10 px-4"
+                  className="flex-1 rounded-full bg-gray-100 border-none h-10 px-4"
                 />
-
                 <Button
                   type="submit"
                   size="icon"
@@ -647,7 +646,6 @@ export default function MessagesPage() {
                 searchResults.map((u) => (
                   <button
                     key={u.id}
-                    // @ts-ignore
                     onClick={() => startDM(u)}
                     className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 rounded-xl text-left"
                   >
@@ -668,6 +666,40 @@ export default function MessagesPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function MessagesSkeleton() {
+  return (
+    <div className="flex flex-col lg:flex-row h-full w-full bg-white lg:bg-gray-50 lg:rounded-2xl lg:border lg:border-gray-200 overflow-hidden shadow-sm">
+      <div className="w-full lg:w-80 bg-white border-r border-gray-200 flex flex-col h-full">
+        <div className="h-16 px-4 border-b border-gray-100 flex justify-between items-center">
+          <Skeleton className="h-6 w-24 rounded-md" />
+          <Skeleton className="h-8 w-8 rounded-full" />
+        </div>
+        <div className="p-2 space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="flex items-center gap-3 p-3">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <div className="space-y-2 flex-1">
+                <Skeleton className="h-4 w-24 rounded-md" />
+                <Skeleton className="h-3 w-16 rounded-md" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="hidden lg:flex flex-1 flex-col bg-white h-full relative">
+        <div className="h-16 px-4 border-b border-gray-100 flex items-center gap-3">
+          <Skeleton className="h-8 w-8 rounded-full" />
+          <Skeleton className="h-5 w-32 rounded-md" />
+        </div>
+        <div className="flex-1 p-6 space-y-6">
+          <Skeleton className="h-20 w-1/2 rounded-xl" />
+          <Skeleton className="h-10 w-1/3 rounded-xl self-end" />
+        </div>
+      </div>
     </div>
   );
 }
