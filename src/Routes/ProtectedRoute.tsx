@@ -1,48 +1,48 @@
-// routes/ProtectedRoute.tsx
-
+import React from "react";
 import { Navigate } from "react-router-dom";
-import { useAuth } from "@/context/authContext";
-import { Loader2 } from "lucide-react";
+import { useAuth } from "../context/authContext";
+import LoadingSpinner from "../components/LoadingSpinner";
 
-// Reusable wrapper for any route that should only be accessible
-// when the user is authenticated (and optionally has a specific role).
-export const ProtectedRoute = ({
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  requiredRole?: "admin" | "user";
+}
+
+// ✅ FIX: Changed to named export 'export const ProtectedRoute'
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   requiredRole,
-}: {
-  children: React.ReactNode;
-  // If provided, only users with this role can access the route.
-  // If omitted, any logged‑in user is allowed.
-  requiredRole?: "user" | "admin";
 }) => {
-  // Get current auth state from your AuthContext
   const { user, loading } = useAuth();
 
+  // 1. Wait for Auth to load
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 gap-3">
-        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-        <p className="text-sm font-medium text-gray-500">Loading PawPal...</p>
+      <div className="h-screen w-full flex items-center justify-center">
+        <LoadingSpinner />
       </div>
     );
   }
 
-  // If there is no authenticated user after loading finishes,
-  // redirect to the Welcome page instead of SignIn.
+  // 2. Check if User is Logged In
   if (!user) {
-    return <Navigate to="/welcome" replace />;
+    return <Navigate to="/SignIn" replace />;
   }
 
-  // If this route requires a specific role and the logged‑in user
-  // does not have that role, redirect to an Unauthorized page.
+  // 3. Security Check: Banned
+  if (user.banned_at || user.role === ("banned" as any)) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+  // 4. Security Check: Soft Deleted
+  if (user.deleted_at) {
+    return <Navigate to="/SignIn" replace />;
+  }
+
+  // 5. Role Based Access Control
   if (requiredRole && user.role !== requiredRole) {
-    return <Navigate to="/Unauthorized" replace />;
+    return <Navigate to="/unauthorized" replace />;
   }
 
-  // If we reach this point:
-  // - loading is false
-  // - user exists
-  // - and either no requiredRole was specified, or the user has that role
-  // → render the protected children.
+  // 6. Render the content
   return <>{children}</>;
 };

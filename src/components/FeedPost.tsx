@@ -54,6 +54,56 @@ interface CommentWithExtras extends Comment {
   parent_comment_id: string | null;
 }
 
+// --- New Delete Modal Component ---
+
+interface DeleteConfirmationProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title?: string;
+  description?: string;
+}
+
+function DeleteConfirmationModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  title = "Are you sure?",
+  description = "This action cannot be undone.",
+}: DeleteConfirmationProps) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="relative bg-white rounded-lg shadow-xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-200">
+        <div className="flex flex-col gap-2 mb-6">
+          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+          <p className="text-sm text-gray-500">{description}</p>
+        </div>
+        <div className="flex justify-end gap-3">
+          <Button variant="outline" onClick={onClose} className="h-9 px-4">
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => {
+              onConfirm();
+              onClose();
+            }}
+            className="h-9 px-4 bg-red-600 hover:bg-red-700 text-white"
+          >
+            Delete
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // --- Main Component (FeedPost) ---
 
 export function FeedPost({
@@ -342,6 +392,9 @@ function CommentsModal({
     new Set()
   );
 
+  // ✅ New state for the Delete Confirmation Modal
+  const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -499,9 +552,8 @@ function CommentsModal({
     const content = newComment.trim();
     setNewComment("");
 
-    const tempId = `temp-${Date.now()}-${Math.random()
-      .toString(36)
-      .substr(2, 9)}`;
+    // 1. Create Optimistic Comment with TEMP ID
+    const tempId = `temp-${Date.now()}`;
     const optimisticComment: any = {
       id: tempId,
       event_id: event.id,
@@ -525,11 +577,13 @@ function CommentsModal({
       setExpandedComments((prev) => new Set(prev).add(activeReplyId));
     }
 
+    // Scroll to bottom
     setTimeout(
       () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
       100
     );
 
+    // 2. Insert into Database
     const { data: insertedData, error } = await supabase
       .from("comments")
       .insert([
@@ -545,11 +599,19 @@ function CommentsModal({
 
     if (error) {
       console.error(error);
+      // Revert if failed
       setComments((prev) => prev.filter((c) => c.id !== tempId));
     } else if (insertedData) {
+      // ✅ FIX: Swap the "temp-" ID with the real Database UUID
+      setComments((prev) =>
+        prev.map((c) => (c.id === tempId ? { ...c, id: insertedData.id } : c))
+      );
+
+      // Reset input state
       setActiveReplyId(null);
       setReplyTarget(null);
 
+      // ... (Notification logic remains the same) ...
       const notifiedUserIds: string[] = [];
 
       if (replyTarget) {
@@ -599,11 +661,34 @@ function CommentsModal({
     }
   };
 
-  const handleDeleteComment = async (commentId: string) => {
-    if (!confirm("Delete this comment?")) return;
+  // ✅ NEW: Open the confirmation modal instead of using window.confirm
+  const requestDelete = (commentId: string) => {
+    setCommentToDelete(commentId);
+  };
+
+  // ✅ NEW: The actual delete logic (ran after confirmation)
+  const confirmDelete = async () => {
+    if (!commentToDelete) return;
+    const commentId = commentToDelete;
+
+    // Update UI immediately
     setComments((prev) => prev.filter((c) => c.id !== commentId));
     onCommentDeleted();
-    await supabase.from("comments").delete().eq("id", commentId);
+
+    // Close Modal
+    setCommentToDelete(null);
+
+    // Skip DB delete if it's a temporary ID (optimistic update)
+    if (commentId.startsWith("temp-")) return;
+
+    const { error } = await supabase
+      .from("comments")
+      .delete()
+      .eq("id", commentId);
+
+    if (error) {
+      console.error("Error deleting comment:", error);
+    }
   };
 
   const repliesByParent = useMemo(() => {
@@ -626,7 +711,7 @@ function CommentsModal({
       event={event}
       comment={comment}
       user={user}
-      onDelete={handleDeleteComment}
+      onDelete={requestDelete} // 👈 Use requestDelete here
       onEdit={handleEditComment}
       onReply={handleReplyClick}
       isReply={isReply}
@@ -741,6 +826,15 @@ function CommentsModal({
           </form>
         </div>
       </div>
+
+      {/* ✅ Add the Delete Confirmation Modal Here */}
+      <DeleteConfirmationModal
+        isOpen={!!commentToDelete}
+        onClose={() => setCommentToDelete(null)}
+        onConfirm={confirmDelete}
+        title="Delete Comment?"
+        description="Are you sure you want to delete this comment? This cannot be undone."
+      />
     </div>,
     document.body
   );
@@ -797,6 +891,10 @@ function CommentItem({
   }, [comment.id]);
 
   const fetchCommentLikes = async () => {
+    // ✅ FIX: Don't fetch likes for optimistic (temporary) comments
+    // This prevents the "invalid input syntax for type uuid" (Status 400) error
+    if (!comment.id || comment.id.startsWith("temp-")) return;
+
     try {
       const { count } = await supabase
         .from("comment_likes")
@@ -820,7 +918,8 @@ function CommentItem({
   };
 
   const toggleCommentLike = async () => {
-    if (!user || isLiking) return;
+    // ✅ FIX: Prevent liking a comment that hasn't saved to DB yet
+    if (!user || isLiking || comment.id.startsWith("temp-")) return;
 
     setIsLiking(true);
     const previousLiked = isLiked;

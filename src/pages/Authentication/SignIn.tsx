@@ -8,14 +8,13 @@ import { Link } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabaseClient";
-// ✅ IMPORT TOAST
+// ✅ IMPORT THE HELPER FUNCTION
+import { supabase, setPersistencePreference } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 
-import logo from "@/assets/images/Pawpal.svg";
+import logo from "@/assets/images/PawPal.svg";
 import heroBg from "@/assets/images/hero_3.jpg";
 
-// 1. Define the Zod Schema
 const signInSchema = z.object({
   email: z
     .string()
@@ -32,7 +31,6 @@ type SignInFormValues = z.infer<typeof signInSchema>;
 
 export default function SignIn() {
   const [showPassword, setShowPassword] = useState(false);
-  // ❌ REMOVED: serverError state (replaced by toast)
 
   const {
     register,
@@ -43,12 +41,17 @@ export default function SignIn() {
     defaultValues: {
       email: "",
       password: "",
-      rememberMe: false,
+      rememberMe: false, // Default unchecked
     },
   });
 
   const onSubmit = async (data: SignInFormValues) => {
     try {
+      // ✅ 1. SET PREFERENCE
+      // This tells our custom storage adapter where to save the NEW token
+      setPersistencePreference(!!data.rememberMe);
+
+      // 2. Attempt Login
       const { data: authData, error: signInError } =
         await supabase.auth.signInWithPassword({
           email: data.email,
@@ -58,20 +61,26 @@ export default function SignIn() {
       if (signInError) throw signInError;
 
       if (authData.user) {
-        // Optional: Update last sign in
+        // 3. Silent Status Check
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("banned_at, deleted_at")
+          .eq("id", authData.user.id)
+          .maybeSingle();
+
+        // 4. Update Audit Log
         await supabase
           .from("profiles")
           .update({ last_sign_in_at: new Date().toISOString() })
           .eq("id", authData.user.id);
 
-        // ✅ SUCCESS TOAST
-        toast.success("Welcome back! 🐾");
+        // 5. Conditional Toast
+        if (!profile?.banned_at && !profile?.deleted_at) {
+          toast.success("Welcome back! 🐾");
+        }
       }
-
-      // AuthContext will handle the redirect via PublicRoute
     } catch (err: any) {
       console.error("Login error:", err);
-      // ✅ ERROR TOAST
       toast.error(err.message || "Invalid login credentials.");
     }
   };
@@ -116,8 +125,6 @@ export default function SignIn() {
               </Link>
             </p>
           </div>
-
-          {/* ❌ REMOVED: Server Error Message Div */}
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {/* Email Field */}

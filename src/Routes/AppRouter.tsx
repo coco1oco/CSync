@@ -4,25 +4,19 @@ import {
   RouterProvider,
   Navigate,
 } from "react-router-dom";
-import { AuthProvider } from "@/context/authContext";
+// ❌ REMOVED: AuthProvider, ChatProvider, Toaster (Already in App.tsx)
 import { ProtectedRoute } from "./ProtectedRoute";
 import { PublicRoute } from "./PublicRoute";
 import AppLayout from "@/components/AppLayout";
 import AuthLayout from "@/components/AuthLayout";
 import { Loader2 } from "lucide-react";
-import { Toaster } from "sonner";
-import { ChatProvider } from "@/context/ChatContext";
 
 // --- LAZY IMPORTS ---
-
-// ✅ UNIFIED DASHBOARD
 const UnifiedDashboard = lazy(() =>
-  import("@/pages/SharedPages/UnifiedDashboard").then((module) => ({
-    default: module.UnifiedDashboard,
+  import("@/pages/SharedPages/UnifiedDashboard").then((m) => ({
+    default: m.UnifiedDashboard,
   }))
 );
-
-// Admin Pages
 const CreateEvent = lazy(() => import("@/pages/AdminD/CreateEvent"));
 const EditEvent = lazy(() => import("@/pages/AdminD/EditEvent"));
 const ManageTeam = lazy(() => import("@/pages/AdminD/ManageTeam"));
@@ -33,8 +27,6 @@ const ManageEventsPage = lazy(() => import("@/pages/AdminD/ManageEventsPage"));
 const EditOfficialEvent = lazy(
   () => import("@/pages/AdminD/EditOfficialEvent")
 );
-
-// Pet Pages
 const MainPetProfilePage = lazy(
   () => import("@/pages/PetProfile/MainPetProfilePage")
 );
@@ -42,13 +34,9 @@ const AddPetPage = lazy(() => import("@/pages/PetProfile/AddPetPage"));
 const PetProfilePage = lazy(() => import("@/pages/PetProfile/PetProfilePage"));
 const PetEditProfile = lazy(() => import("@/pages/PetProfile/PetEditProfile"));
 const CampusPetsPage = lazy(() => import("@/pages/PetProfile/CampusPetsPage"));
-
-// ✅ PUBLIC PET PROFILE (For QR Codes)
 const PublicPetProfile = lazy(
   () => import("@/pages/SharedPages/PublicPetProfile")
 );
-
-// Auth Pages
 const Welcome = lazy(() => import("@/pages/Authentication/Welcome"));
 const SignIn = lazy(() => import("@/pages/Authentication/SignIn"));
 const SignUp = lazy(() => import("@/pages/Authentication/SignUp"));
@@ -59,24 +47,19 @@ const Unauthorized = lazy(() => import("@/pages/Authentication/Unauthorized"));
 const UpdatePassword = lazy(
   () => import("@/pages/Authentication/UpdatePassword")
 );
-
-// Shared Pages
 const ProfilePage = lazy(() => import("@/pages/SharedPages/ProfilePage"));
 const MenuPage = lazy(() => import("@/pages/SharedPages/MenuPage"));
 const EditProfilePage = lazy(
   () => import("@/pages/SharedPages/EditProfilePage")
 );
 const MessagesPage = lazy(() => import("@/pages/SharedPages/MessagesPage"));
-const NotificationsPage = lazy(
-  () => import("@/pages/SharedPages/NotificationsPage").then((module) => ({
-    default: module.NotificationsPage,
+const NotificationsPage = lazy(() =>
+  import("@/pages/SharedPages/NotificationsPage").then((m) => ({
+    default: m.NotificationsPage,
   }))
 );
+const EventDetails = lazy(() => import("@/pages/SharedPages/EventDetails"));
 
-// 1. UPDATE: Lazy Load the new Event Details Page
-const EventDetails = lazy(() => import("@/pages/SharedPages/EventDetails")); // Make sure this path matches where you saved the file
-
-// Loading Spinner
 const PageLoader = () => (
   <div className="flex h-screen w-full items-center justify-center bg-gray-50">
     <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -84,9 +67,7 @@ const PageLoader = () => (
 );
 
 const router = createBrowserRouter([
-  // -------------------------------------------------------------------------
-  // 1. TRULY PUBLIC ROUTES (Accessible by ANYONE - Guest or Logged In)
-  // -------------------------------------------------------------------------
+  // 1. PUBLIC (QR CODES)
   {
     path: "/lost-and-found/:petId",
     element: (
@@ -95,10 +76,16 @@ const router = createBrowserRouter([
       </Suspense>
     ),
   },
-
-  // -------------------------------------------------------------------------
-  // 2. GUEST ONLY ROUTES (Redirects to Dashboard if already logged in)
-  // -------------------------------------------------------------------------
+  // ✅ FIX: Move Unauthorized OUT of PublicRoute
+  {
+    path: "/unauthorized",
+    element: (
+      <Suspense fallback={<PageLoader />}>
+        <Unauthorized />
+      </Suspense>
+    ),
+  },
+  // 2. GUEST ONLY
   {
     element: (
       <PublicRoute>
@@ -138,20 +125,9 @@ const router = createBrowserRouter([
           </Suspense>
         ),
       },
-      {
-        path: "/unauthorized",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <Unauthorized />
-          </Suspense>
-        ),
-      },
     ],
   },
-
-  // -------------------------------------------------------------------------
-  // 3. PROTECTED ROUTES (Requires Login)
-  // -------------------------------------------------------------------------
+  // 3. PROTECTED
   {
     element: (
       <ProtectedRoute>
@@ -159,7 +135,6 @@ const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      // Unified Dashboard
       {
         path: "/",
         element: (
@@ -186,6 +161,8 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
+
+      // Admin Events
       {
         path: "/admin/events/new-official",
         element: (
@@ -216,44 +193,6 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-
-      // Account & Settings
-      {
-        path: "/reset-password",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <UpdatePassword />
-          </Suspense>
-        ),
-      },
-      {
-        path: "/messages",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <MessagesPage />
-          </Suspense>
-        ),
-      },
-      {
-        path: "/notifications",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <NotificationsPage />
-          </Suspense>
-        ),
-      },
-
-      // 2. UPDATE: Add the Route for Single Event Details
-      {
-        path: "/event/:id",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <EventDetails />
-          </Suspense>
-        ),
-      },
-
-      // Admin Specific
       {
         path: "/admin/events/create",
         element: (
@@ -285,7 +224,41 @@ const router = createBrowserRouter([
         ),
       },
 
-      // Shared / Profile
+      // Account & Features
+      {
+        path: "/reset-password",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <UpdatePassword />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/messages",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <MessagesPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/notifications",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <NotificationsPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/event/:id",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <EventDetails />
+          </Suspense>
+        ),
+      },
+
+      // Shared
       {
         path: "/ProfilePage",
         element: (
@@ -311,7 +284,7 @@ const router = createBrowserRouter([
         ),
       },
 
-      // Pet Routes
+      // Pets
       {
         path: "/PetDashboard",
         element: (
@@ -354,30 +327,11 @@ const router = createBrowserRouter([
       },
     ],
   },
-
-  // -------------------------------------------------------------------------
   // 4. CATCH ALL
-  // -------------------------------------------------------------------------
   { path: "*", element: <Navigate to="/welcome" replace /> },
 ]);
 
 export default function AppRouter() {
-  const toastOffset = useMemo(() => {
-    if (typeof window === "undefined") return 12;
-    // Helper to avoid overlap with safe areas on mobile
-    const raw = getComputedStyle(document.documentElement)
-      .getPropertyValue("--safe-area-inset-top")
-      .trim();
-    const insetTop = Number.parseFloat(raw) || 0;
-    return Math.ceil(insetTop + 12);
-  }, []);
-
-  return (
-    <AuthProvider>
-      <ChatProvider>
-        <Toaster position="top-center" richColors offset={toastOffset} />
-        <RouterProvider router={router} />
-      </ChatProvider>
-    </AuthProvider>
-  );
+  // ✅ CLEAN: No providers here. They are in App.tsx
+  return <RouterProvider router={router} />;
 }

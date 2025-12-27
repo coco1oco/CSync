@@ -49,3 +49,25 @@ export async function updateProfile(update: ProfileUpdate) {
 
   return data;
 }
+
+// ✅ NEW: Add this function
+export async function deleteUserAccount() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new Error("No user logged in");
+
+  // 1. Mark profile as deleted (Soft Delete)
+  const { error } = await supabase
+    .from("profiles")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", user.id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  // 2. Sign out immediately
+  await supabase.auth.signOut();
+}
