@@ -7,10 +7,9 @@ import React, {
 } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
-// Define strict types to match your other files
 type UserRole = "user" | "admin";
 
-type UserProfile = {
+export type UserProfile = {
   id: string;
   email: string;
   username?: string;
@@ -21,6 +20,8 @@ type UserProfile = {
   bio?: string;
   contact_number?: string;
   pronouns?: string;
+  banned_at?: string | null;
+  deleted_at?: string | null;
   [key: string]: any;
 };
 
@@ -46,7 +47,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Helper: Extract basic metadata from the session
   const getUserFromSession = (sessionUser: any): UserProfile => {
     const meta = sessionUser.user_metadata || {};
     return {
@@ -60,8 +60,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       pronouns: meta.pronouns,
       contact_number: meta.contact_number,
       bio: meta.bio,
-      // Default to "user" if role is missing in metadata
       role: (meta.role as UserRole) || "user",
+      banned_at: meta.banned_at || null,
+      deleted_at: meta.deleted_at || null,
     };
   };
 
@@ -70,66 +71,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     sessionUser: any,
     retries = 1
   ): Promise<any> => {
-   // inside fetchProfileSafe function...
-
     try {
-  const fetchPromise = supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", userId)
-    .maybeSingle();
+      const fetchPromise = supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .maybeSingle();
 
-  const timeoutPromise = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error("Profile fetch timeout")), 5000)
-  );
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Profile fetch timeout")), 5000)
+      );
 
-  const result: any = await Promise.race([fetchPromise, timeoutPromise]);
+      const result: any = await Promise.race([fetchPromise, timeoutPromise]);
 
-  // ✅ FIX IS HERE: Do not throw 'result.error' directly.
-  if (result.error) {
-    throw new Error(result.error.message || "Failed to fetch profile");
-  }
+      if (result.error) {
+        throw new Error(result.error.message || "Failed to fetch profile");
+      }
 
-  const db = result.data;
-  const meta = sessionUser.user_metadata || {};
+      const db = result.data;
+      const meta = sessionUser.user_metadata || {};
 
-  if (db) {
-    // Sync critical fields from DB to Session Metadata if they differ
-    const needsSync =
-      db.role !== meta.role ||
-      db.avatar_url !== meta.avatar_url ||
-      db.username !== meta.username ||
-      db.first_name !== meta.first_name ||
-      db.contact_number !== meta.contact_number;
+      if (db) {
+        // ✅ CHANGED: Removed the "Bouncer" check here.
+        // We WANT to return the profile even if banned, so the UI can handle it.
 
-    if (needsSync) {
-      console.log("♻️ Syncing full profile to session cache...");
-      await supabase.auth.updateUser({
-        data: {
-          role: db.role,
-          avatar_url: db.avatar_url,
-          username: db.username,
-          first_name: db.first_name,
-          last_name: db.last_name,
-          pronouns: db.pronouns,
-          bio: db.bio,
-          contact_number: db.contact_number,
-        },
-      });
+        const needsSync =
+          db.role !== meta.role ||
+          db.avatar_url !== meta.avatar_url ||
+          db.username !== meta.username ||
+          db.first_name !== meta.first_name ||
+          db.contact_number !== meta.contact_number ||
+          db.banned_at !== meta.banned_at ||
+          db.deleted_at !== meta.deleted_at;
+
+        if (needsSync) {
+          console.log("♻️ Syncing full profile to session cache...");
+          await supabase.auth.updateUser({
+            data: {
+              role: db.role,
+              avatar_url: db.avatar_url,
+              username: db.username,
+              first_name: db.first_name,
+              last_name: db.last_name,
+              pronouns: db.pronouns,
+              bio: db.bio,
+              contact_number: db.contact_number,
+              banned_at: db.banned_at,
+              deleted_at: db.deleted_at,
+            },
+          });
+        }
+      }
+
+      return result.data || null;
+    } catch (err: any) {
+      if (retries > 0) {
+        return fetchProfileSafe(userId, sessionUser, retries - 1);
+      }
+      return null;
     }
-  }
-
-  return result.data || null;
-
-} catch (err: any) {
-  // ✅ FIX IS HERE: Retry logic must be safe
-  if (retries > 0) {
-    console.warn(`Profile fetch failed, retrying... (${retries} left)`);
-    return fetchProfileSafe(userId, sessionUser, retries - 1);
-  }
-  // REMOVED: The hardcoded fallback block
-  return null;
-}
   };
 
   useEffect(() => {
@@ -143,22 +143,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
         if (session?.user) {
           const instantUser = getUserFromSession(session.user);
+
           if (mounted) {
             setUser(instantUser);
-            setLoading(false); // Unblock UI immediately
+            setLoading(false);
           }
 
-          // Fetch detailed profile in background
           const dbProfile = await fetchProfileSafe(
             session.user.id,
             session.user
           );
 
           if (mounted && dbProfile) {
-            setUser((prev) => ({ 
-                ...instantUser, 
-                ...(prev || {}), 
-                ...dbProfile 
+            setUser((prev) => ({
+              ...instantUser,
+              ...(prev || {}),
+              ...dbProfile,
             }));
           }
         } else {
@@ -183,11 +183,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setLoading(false);
 
         const dbProfile = await fetchProfileSafe(session.user.id, session.user);
+
         if (mounted && dbProfile) {
-          setUser((prev) => ({ 
-              ...instantUser, 
-              ...(prev || {}), 
-              ...dbProfile 
+          setUser((prev) => ({
+            ...instantUser,
+            ...(prev || {}),
+            ...dbProfile,
           }));
         }
       } else if (event === "SIGNED_OUT") {

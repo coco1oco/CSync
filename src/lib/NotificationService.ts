@@ -7,17 +7,21 @@ import { supabase } from "../lib/supabaseClient";
 /** Allowed notification types (keep in sync with DB CHECK constraint). */
 export type NotificationType =
   | "message"
-  | "reaction"      // Used for Post Likes (Grouped)
-  | "comment"       // Used for Post Comments (Grouped)
-  | "reply"         // New: For replies to comments
-  | "mention"       // New: For @mentions
-  | "comment_like"  // New: For liking a comment
+  | "reaction" // Used for Post Likes (Grouped)
+  | "comment" // Used for Post Comments (Grouped)
+  | "reply" // New: For replies to comments
+  | "mention" // New: For @mentions
+  | "comment_like" // New: For liking a comment
   | "pet_task"
   | "schedule"
   | "vaccination";
 
 /** Simple shapes so we don't depend heavily on your types file */
-type SimpleEvent = { id: string; admin_id: string | null; title: string | null };
+type SimpleEvent = {
+  id: string;
+  admin_id: string | null;
+  title: string | null;
+};
 type SimpleActor = { id: string; username?: string | null };
 
 // --- Permission & Token Management ---
@@ -98,13 +102,7 @@ export async function createNotification(params: {
 
   if (error) throw error;
 
-  const { error: rpcError } = await supabase.rpc("prune_old_notifications", {
-    p_user_id: params.userId,
-  });
-
-  if (rpcError) {
-    console.error("Failed to prune notifications:", rpcError);
-  }
+  // ❌ REMOVED: Pruning logic deleted to fix P0001 Unauthorized error
 }
 
 // --- Business Logic: Grouped Notifications (Using SQL RPC) ---
@@ -114,7 +112,6 @@ export async function notifyLike(event: SimpleEvent, actor: SimpleActor) {
 
   const actorName = actor.username ?? "Someone";
 
-  // ✅ Calls the new SQL function for secure grouping
   const { error } = await supabase.rpc("send_grouped_notification", {
     p_user_id: event.admin_id,
     p_from_user_id: actor.id,
@@ -138,9 +135,9 @@ export async function notifyComment(
   if (!event.admin_id || event.admin_id === actor.id) return;
 
   const actorName = actor.username ?? "Someone";
-  const shortPreview = preview.length > 30 ? preview.substring(0, 30) + "..." : preview;
+  const shortPreview =
+    preview.length > 30 ? preview.substring(0, 30) + "..." : preview;
 
-  // ✅ Calls the new SQL function for secure grouping
   const { error } = await supabase.rpc("send_grouped_notification", {
     p_user_id: event.admin_id,
     p_from_user_id: actor.id,
@@ -165,14 +162,16 @@ export async function notifyCommentLike(
   if (actor.id === commentOwnerId) return;
 
   const actorName = actor.username ?? "Someone";
-  const shortPreview = commentContent.length > 30 ? commentContent.substring(0, 30) + "..." : commentContent;
+  const shortPreview =
+    commentContent.length > 30
+      ? commentContent.substring(0, 30) + "..."
+      : commentContent;
 
-  // ✅ Calls the new SQL function for secure grouping
   const { error } = await supabase.rpc("send_grouped_notification", {
     p_user_id: commentOwnerId,
     p_from_user_id: actor.id,
     p_type: "comment_like",
-    p_event_id: event.id, 
+    p_event_id: event.id,
     p_actor_name: actorName,
     p_preview_text: shortPreview,
     p_link: `/event/${event.id}?comment_id=${commentId}`,
@@ -193,9 +192,10 @@ export async function notifyReply(
 ) {
   if (actor.id === replyToUserId) return;
 
-  const preview = commentContent.length > 50 
-    ? commentContent.substring(0, 50) + "..." 
-    : commentContent;
+  const preview =
+    commentContent.length > 50
+      ? commentContent.substring(0, 50) + "..."
+      : commentContent;
 
   const actorName = actor.username ?? "Someone";
 
@@ -212,16 +212,15 @@ export async function notifyReply(
   });
 }
 
-// 1. UPDATED: Accepts excludeUserIds to prevent duplicate notifications
 export async function notifyMentions(
   event: SimpleEvent,
   actor: SimpleActor,
   commentContent: string,
-  commentId: string, 
-  excludeUserIds: string[] = [] // Default to empty array
+  commentId: string,
+  excludeUserIds: string[] = []
 ) {
   const mentionRegex = /@(\w+)/g;
-  const matches = [...commentContent.matchAll(mentionRegex)].map(m => m[1]);
+  const matches = [...commentContent.matchAll(mentionRegex)].map((m) => m[1]);
 
   if (matches.length === 0) return;
 
@@ -236,9 +235,8 @@ export async function notifyMentions(
 
   for (const user of mentionedUsers) {
     if (user.id === actor.id) continue;
-    
-    // 2. UPDATED: Skip if user was already notified (e.g. via Reply)
-    if (excludeUserIds.includes(user.id)) continue; 
+
+    if (excludeUserIds.includes(user.id)) continue;
 
     await createNotification({
       userId: user.id,
