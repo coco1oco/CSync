@@ -2,7 +2,8 @@ import { useState, useRef } from "react";
 import { AlertCircle, Paperclip, Loader2, Check, X, Image as ImageIcon } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient"; 
 import { useAuth } from "@/context/authContext"; 
-import { uploadImageToCloudinary } from "@/lib/cloudinary"; // Adjust path
+import { uploadImageToCloudinary } from "@/lib/cloudinary"; 
+import emailjs from '@emailjs/browser';
 
 export function ReportProblem() {
   const { user } = useAuth();
@@ -37,26 +38,62 @@ export function ReportProblem() {
     setIsSubmitting(true);
 
     try {
-      // 1. Upload Images to Cloudinary
+      // --- STEP 1: CHECK MONTHLY LIMIT (199/month) ---
+      const date = new Date();
+      // Get the first day of the current month (e.g., "2024-05-01")
+      const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).toISOString();
+
+      // Count reports sent since the 1st of this month
+      const { count, error: countError } = await supabase
+        .from('reports')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', firstDay);
+
+      if (countError) throw countError;
+
+      if (count !== null && count >= 199) {
+        alert("System limit reached: The report limit for this month has been met. Please try again next month.");
+        setIsSubmitting(false);
+        return; // STOP HERE
+      }
+
+      // --- STEP 2: UPLOAD IMAGES TO CLOUDINARY ---
       const uploadPromises = selectedFiles.map((file) => 
         uploadImageToCloudinary(file, "report")
       );
       const imageUrls = await Promise.all(uploadPromises);
 
-      // 2. Save to Supabase
-      const { error } = await supabase
+      // --- STEP 3: SAVE TO SUPABASE (Backup & Counter) ---
+      const { error: dbError } = await supabase
         .from('reports')
         .insert({
           user_id: user?.id,
           category: category,
           description: description,
-          status: 'pending',
+          // status: 'pending', // You can remove this if you deleted the 'status' column
           image_urls: imageUrls
         });
 
-      if (error) throw error;
+      if (dbError) {
+         console.error("Backup save failed, but attempting email:", dbError);
+         // We continue to email even if DB fails
+      }
 
-      // 3. Success State
+      // --- STEP 4: SEND EMAIL VIA EMAILJS ---
+      const SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+      const TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+      const PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+
+      const templateParams = {
+        user_email: user?.email || "Anonymous",
+        category: category,
+        description: description,
+        image_urls: imageUrls.length > 0 ? imageUrls.join("\n") : "No screenshots attached"
+      };
+
+      await emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams, PUBLIC_KEY);
+
+      // --- STEP 5: SUCCESS STATE ---
       setIsSent(true);
       setDescription("");
       setCategory("Bug");
@@ -73,7 +110,7 @@ export function ReportProblem() {
   // --- Success View ---
   if (isSent) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 text-center animate-in zoom-in-95">
+      <div className="flex flex-col items-center justify-center h-64 text-center animate-in zoom-in-95 px-4">
         <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4">
           <Check size={32} />
         </div>

@@ -1,15 +1,14 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { 
-  User, ShieldAlert, HelpCircle, FileText, ChevronRight,
+  User, HelpCircle, FileText, ChevronRight,
   ArrowLeft, Moon, MessageSquareWarning, LogOut, Info,
   Loader2, Settings
-} from "lucide-react";
+} from "lucide-react"; // Removed ShieldAlert
 import { useAuth } from "@/context/authContext";
 
 // Import your components...
 import { AccountSettings } from "@/components/settings/AccountSettings";
-import { AdminReports } from "@/components/settings/AdminReports";
 import { PrivacyPolicy } from "@/components/settings/PrivacyPolicy";
 import { HelpSupport } from "@/components/settings/HelpSupport";
 import { DisplaySettings } from "@/components/settings/DisplaySettings";
@@ -23,6 +22,7 @@ export default function SettingsPage() {
   const [showMobileDetail, setShowMobileDetail] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
+  // --- ADMIN LIST REMOVED FROM HERE ---
   const menuItems = [
     { id: "account", label: "Account Center", icon: User },
     { id: "privacy", label: "Privacy & Policy", icon: FileText },
@@ -31,10 +31,6 @@ export default function SettingsPage() {
     { id: "report", label: "Report a problem", icon: MessageSquareWarning },
     { id: "about", label: "About", icon: Info },
   ];
-
-  if (user?.role === "admin") {
-    menuItems.push({ id: "admin_reports", label: "Report List (Admin)", icon: ShieldAlert });
-  }
 
   const handleTabClick = (id: string) => {
     setActiveTab(id);
@@ -49,7 +45,6 @@ export default function SettingsPage() {
   const renderContent = () => {
     switch (activeTab) {
       case "account": return <AccountSettings />;
-      case "admin_reports": return <AdminReports />;
       case "privacy": return <PrivacyPolicy />;
       case "help": return <HelpSupport />;
       case "display": return <DisplaySettings />;
@@ -60,11 +55,6 @@ export default function SettingsPage() {
   };
 
   return (
-    // FIXES APPLIED:
-    // 1. Removed "lg:ml-64" (AppLayout handles this)
-    // 2. Removed "max-w-..." (AppLayout now allows full width)
-    // 3. Removed "mx-auto" or "mr-auto" (Default block layout aligns left)
-    // 4. Added "w-full" to ensure it fills the space provided by AppLayout
     <div className="w-full min-h-full transition-all duration-300"> 
       
       <div className="w-full">
