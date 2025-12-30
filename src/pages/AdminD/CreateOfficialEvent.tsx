@@ -8,7 +8,6 @@ import { useAuth } from "@/context/authContext";
 import {
   Calendar,
   Clock,
-  MapPin,
   Image as ImageIcon,
   Loader2,
   Users,

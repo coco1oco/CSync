@@ -196,7 +196,9 @@ export default function MainPetProfilePage() {
                 <div className="absolute top-2 right-2 w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
               )}
             </div>
-            <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-3">
+
+            {/* 3. TASKS CARD (Fix: Added 'relative') */}
+            <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-3 relative">
               <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600 shrink-0">
                 <ClipboardList size={20} />
               </div>
@@ -207,9 +209,15 @@ export default function MainPetProfilePage() {
                 <p className="text-xl font-black text-gray-900">
                   {stats.tasksPending}
                 </p>
+                {/* This logic was already here, but now it will show up because of the 'relative' parent */}
+                {stats.tasksPending > 0 && (
+                  <div className="absolute top-2 right-2 w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+                )}
               </div>
             </div>
-            <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-3">
+
+            {/* 4. VISITS CARD (Fix: Added 'relative') */}
+            <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-3 relative">
               <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-green-600 shrink-0">
                 <CalendarClock size={20} />
               </div>
@@ -220,6 +228,10 @@ export default function MainPetProfilePage() {
                 <p className="text-xl font-black text-gray-900">
                   {stats.upcomingVisits}
                 </p>
+                {/* This logic was already here, but now it will show up */}
+                {stats.upcomingVisits > 0 && (
+                  <div className="absolute top-2 right-2 w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+                )}
               </div>
             </div>
           </div>

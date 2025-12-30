@@ -73,6 +73,10 @@ const NotificationsPage = lazy(
   }))
 );
 
+const SettingsPage = lazy(() => import("@/pages/MenuPage/SettingsPage"));
+
+// ... existing imports
+
 // 1. UPDATE: Lazy Load the new Event Details Page
 const EventDetails = lazy(() => import("@/pages/SharedPages/EventDetails")); // Make sure this path matches where you saved the file
 
@@ -349,6 +353,15 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoader />}>
             <PetEditProfile />
+          </Suspense>
+        ),
+      },
+      // 2. ADD THIS ROUTE BLOCK
+      {
+        path: "/settings",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <SettingsPage />
           </Suspense>
         ),
       },
