@@ -171,7 +171,11 @@ export default function EventDetails() {
            setIsPostLiked(!!myLike);
         }
 
-        await fetchComments(id, user?.id);
+     // ...existing code...
+        if (id) {
+            await fetchComments(id, user?.id ?? "");
+        }
+// ...existing code...
 
       } catch (err) {
         console.error("Error fetching data:", err);
@@ -463,6 +467,9 @@ export default function EventDetails() {
   const isOwner = currentUser?.id === event.admin_id;
 
   // --- RETURN JSX ---
+ // ... existing code ...
+
+  // --- RETURN JSX ---
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       
@@ -480,15 +487,19 @@ export default function EventDetails() {
            <FeedPost event={event} isAdmin={false} onDelete={() => navigate(-1)} onEdit={() => {}} onTagClick={handleTagClick} />
         </div>
       ) : (
-        /* 1. DESKTOP WRAPPER */
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 lg:p-6 lg:pl-64 overflow-hidden">
+        /* 1. DESKTOP WRAPPER (UPDATED: Removed bg-black/40) */
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 lg:p-6 lg:pl-64 overflow-hidden">
             
+            {/* OPTIONAL: If you want to click outside to close, add an absolute div here with onClick={() => navigate(-1)} */}
+            <div className="absolute inset-0 bg-white/50 backdrop-blur-sm" onClick={() => navigate(-1)} />
+
             {/* 2. MODAL */}
-            <div className="bg-white w-full max-w-[1000px] h-[85vh] rounded-xl shadow-2xl border border-gray-200 flex overflow-hidden">
+            <div className="relative bg-white w-full max-w-[1000px] h-[85vh] rounded-xl shadow-2xl border border-gray-200 flex overflow-hidden z-10">
             
+            {/* ... rest of your modal content (Left Column, Right Column) remains exactly the same ... */}
             {/* LEFT COLUMN: Media + Caption (60% Width) */}
             <div className="w-[60%] h-full flex flex-col border-r border-gray-200 bg-white relative">
-               
+               {/* ... same content ... */}
                <Button 
                     variant="ghost" 
                     size="icon" 
@@ -499,65 +510,64 @@ export default function EventDetails() {
                 </Button>
 
                {hasImages ? (
-                   // CASE A: HAS IMAGES
+                   // ... same image logic ...
                    <>
-                       <div className="flex-1 relative group/carousel bg-black flex items-center justify-center min-h-0">
-                           <img 
-                               src={images[currentImageIndex]} 
-                               alt="Post" 
-                               className="max-w-full max-h-full object-contain" 
-                           />
-                           
-                           {/* Carousel Controls */}
-                           {images.length > 1 && (
-                               <>
-                                   {currentImageIndex > 0 && (
-                                       <button 
-                                            onClick={(e) => { e.stopPropagation(); prevImage(); }}
-                                            className="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/20 hover:bg-white/40 text-white backdrop-blur-sm transition-all"
-                                       >
-                                            <ChevronLeft size={24} />
-                                       </button>
-                                   )}
-                                   {currentImageIndex < images.length - 1 && (
-                                       <button 
-                                            onClick={(e) => { e.stopPropagation(); nextImage(); }}
-                                            className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/20 hover:bg-white/40 text-white backdrop-blur-sm transition-all"
-                                       >
-                                            <ChevronRight size={24} />
-                                       </button>
-                                   )}
-                                   <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5">
-                                        {images.map((_, idx) => (
-                                            <div 
-                                                key={idx}
-                                                className={`w-1.5 h-1.5 rounded-full ${idx === currentImageIndex ? 'bg-white' : 'bg-white/40'}`}
-                                            />
-                                        ))}
-                                   </div>
-                               </>
-                           )}
-                       </div>
+                        <div className="flex-1 relative group/carousel bg-black flex items-center justify-center min-h-0">
+                            <img 
+                                src={images[currentImageIndex]} 
+                                alt="Post" 
+                                className="max-w-full max-h-full object-contain" 
+                            />
+                            {/* ... carousel controls ... */}
+                            {images.length > 1 && (
+                                <>
+                                    {currentImageIndex > 0 && (
+                                        <button 
+                                                onClick={(e) => { e.stopPropagation(); prevImage(); }}
+                                                className="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/20 hover:bg-white/40 text-white backdrop-blur-sm transition-all"
+                                        >
+                                                <ChevronLeft size={24} />
+                                        </button>
+                                    )}
+                                    {currentImageIndex < images.length - 1 && (
+                                        <button 
+                                                onClick={(e) => { e.stopPropagation(); nextImage(); }}
+                                                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/20 hover:bg-white/40 text-white backdrop-blur-sm transition-all"
+                                        >
+                                                <ChevronRight size={24} />
+                                        </button>
+                                    )}
+                                    <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5">
+                                            {images.map((_, idx) => (
+                                                <div 
+                                                    key={idx}
+                                                    className={`w-1.5 h-1.5 rounded-full ${idx === currentImageIndex ? 'bg-white' : 'bg-white/40'}`}
+                                                />
+                                            ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
 
-                       {(event.title || event.description) && (
-                           <div className="shrink-0 bg-white border-t border-gray-100 p-4 max-h-[30%] overflow-y-auto">
+                        {(event.title || event.description) && (
+                            <div className="shrink-0 bg-white border-t border-gray-100 p-4 max-h-[30%] overflow-y-auto">
                                 <h1 className="text-sm font-bold text-gray-900 mb-1">{event.title}</h1>
                                 <div className={`text-xs text-gray-700 whitespace-pre-wrap leading-relaxed ${isCaptionExpanded ? '' : 'line-clamp-2'}`}>
                                     {renderContentWithTags(event.description || "")}
                                 </div>
                                 {(event.description || "").length > 100 && (
                                     <button 
-                                        onClick={() => setIsCaptionExpanded(!isCaptionExpanded)}
-                                        className="text-[10px] text-gray-400 font-medium mt-1 self-start hover:text-gray-600 focus:outline-none"
+                                            onClick={() => setIsCaptionExpanded(!isCaptionExpanded)}
+                                            className="text-[10px] text-gray-400 font-medium mt-1 self-start hover:text-gray-600 focus:outline-none"
                                     >
-                                        {isCaptionExpanded ? 'See less' : 'See more'}
+                                            {isCaptionExpanded ? 'See less' : 'See more'}
                                     </button>
                                 )}
-                           </div>
-                       )}
+                            </div>
+                        )}
                    </>
                ) : (
-                   // CASE B: NO IMAGES
+                   // ... same no-image logic ...
                    <div className="flex-1 w-full h-full flex flex-col justify-start items-start p-8 pt-20 overflow-y-auto bg-white text-left">
                         <div className="w-full">
                             {event.title && <h1 className="text-2xl font-bold text-gray-900 mb-4">{event.title}</h1>}
@@ -694,7 +704,6 @@ export default function EventDetails() {
     </div>
   );
 }
-
 // --- SUB-COMPONENT: Individual Comment Item ---
 interface CommentItemProps {
   event: OutreachEvent;

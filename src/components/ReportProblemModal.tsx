@@ -1,8 +1,9 @@
-import { X, Paperclip, AlertCircle, Loader2, Image as ImageIcon } from "lucide-react";
+import { X, Paperclip, AlertCircle, Loader2 } from "lucide-react";
 import { useState, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient"; 
 import { useAuth } from "@/context/authContext"; 
-import { uploadImageToCloudinary } from "@/lib/cloudinary"; // Adjust path if needed
+import { uploadImageToCloudinary } from "@/lib/cloudinary"; 
+import emailjs from '@emailjs/browser';
 
 interface ReportProblemModalProps {
   isOpen: boolean;
@@ -13,26 +14,20 @@ export function ReportProblemModal({ isOpen, onClose }: Readonly<ReportProblemMo
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Form State
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Bug");
-  
-  // CHANGED: Now storing an ARRAY of files
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]); 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  // CHANGED: Handle multiple file selection
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      // Convert FileList to Array and add to state
       const newFiles = Array.from(e.target.files);
       setSelectedFiles((prev) => [...prev, ...newFiles]);
     }
   };
 
-  // NEW: Helper to remove a specific file from the list
   const removeFile = (indexToRemove: number) => {
     setSelectedFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
   };
@@ -44,37 +39,72 @@ export function ReportProblemModal({ isOpen, onClose }: Readonly<ReportProblemMo
     setIsSubmitting(true);
 
     try {
-      // CHANGED: Upload ALL files in parallel
+      // --- STEP 1: CHECK MONTHLY LIMIT (199/month) ---
+      const date = new Date();
+      // Get the first day of the current month (e.g., "2024-05-01")
+      const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).toISOString();
+
+      // Count reports sent since the 1st of this month
+      const { count, error: countError } = await supabase
+        .from('reports')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', firstDay);
+
+      if (countError) throw countError;
+
+      if (count !== null && count >= 199) {
+        alert("System limit reached: The report limit for this month has been met. Please try again next month or contact support directly.");
+        setIsSubmitting(false);
+        return; // STOP: Do not upload images or send email
+      }
+
+      // --- STEP 2: UPLOAD IMAGES TO CLOUDINARY ---
       const uploadPromises = selectedFiles.map((file) => 
         uploadImageToCloudinary(file, "report")
       );
-      
       const imageUrls = await Promise.all(uploadPromises);
 
-      // CHANGED: Insert into Supabase with 'image_urls' array
-      const { error } = await supabase
-        .from('reports')
-        .insert({
-          user_id: user?.id,
-          category: category,
-          description: description,
-          status: 'pending',
-          image_urls: imageUrls // Saving the array of links
-        });
+      // --- STEP 3: SAVE TO SUPABASE (Backup & Counter) ---
+      // This increases the 'count' for next time and saves a backup
+      const { error: dbError } = await supabase.from('reports').insert({
+         user_id: user?.id,
+         category: category,
+         description: description, 
+         image_urls: imageUrls     
+      });
+      
+      if (dbError) {
+          console.error("Database backup failed:", dbError);
+          // We continue to email even if DB fails, or you can throw error here
+      }
 
-      if (error) throw error;
+      // --- STEP 4: SEND EMAIL VIA EMAILJS ---
+      // Using keys from your .env file
+      const SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+      const TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+      const PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
 
-      // Success & Cleanup
+      const templateParams = {
+        user_email: user?.email || "Anonymous",
+        category: category,
+        description: description,
+        // Join links with newlines for the email body
+        image_urls: imageUrls.length > 0 ? imageUrls.join("\n") : "No screenshots attached"
+      };
+
+      await emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams, PUBLIC_KEY);
+
+      // --- STEP 5: CLEANUP ---
       setDescription("");
       setCategory("Bug");
-      setSelectedFiles([]); // Clear array
+      setSelectedFiles([]); 
       onClose();
       
       alert("Report sent successfully!");
 
     } catch (error: any) {
       console.error("Error submitting report:", error);
-      alert(error.message || "Failed to send report. Please try again.");
+      alert("Failed to send report. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -137,7 +167,7 @@ export function ReportProblemModal({ isOpen, onClose }: Readonly<ReportProblemMo
             />
           </div>
 
-          {/* CHANGED: File Preview Section */}
+          {/* File Preview Section */}
           {selectedFiles.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {selectedFiles.map((file, index) => (
@@ -158,14 +188,13 @@ export function ReportProblemModal({ isOpen, onClose }: Readonly<ReportProblemMo
           {/* Attachment & Actions */}
           <div className="flex items-center justify-between pt-2">
             
-            {/* CHANGED: Input accepts multiple files */}
             <input 
                 type="file" 
                 ref={fileInputRef} 
                 onChange={handleFileSelect} 
                 className="hidden" 
                 accept="image/*"
-                multiple // <--- Important!
+                multiple
             />
             
             <button 
