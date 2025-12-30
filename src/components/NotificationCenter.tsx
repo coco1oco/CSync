@@ -123,7 +123,6 @@ export function NotificationCenter({
       case 'reaction': return <div className={`${base} bg-red-500`}><Heart size={10} className="text-white fill-white"/></div>;
       case 'comment': return <div className={`${base} bg-blue-500`}><MessageCircle size={10} className="text-white fill-white"/></div>;
       case 'mention': return <div className={`${base} bg-orange-500`}><AtSign size={10} className="text-white"/></div>;
-      case 'follow': return <div className={`${base} bg-purple-500`}><UserPlus size={10} className="text-white"/></div>;
       default: return <div className={`${base} bg-gray-500`}><Bell size={10} className="text-white"/></div>;
     }
   };

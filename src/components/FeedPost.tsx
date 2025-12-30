@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
-// 1. UPDATE: Import useSearchParams
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/authContext";
 import { EventCard } from "@/components/EventCard";
-import { OfficialEventCard } from "@/components/OfficialEventCard"; // ✅ IMPORT NEW CARD
+import { OfficialEventCard } from "@/components/OfficialEventCard";
 import { EventRegistrationModal } from "@/components/EventRegistrationModal";
 import {
   notifyLike,
@@ -24,6 +23,8 @@ import {
   Trash2,
   MoreHorizontal,
   Edit,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -35,10 +36,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import FailedImageIcon from "@/assets/FailedImage.svg";
 import type { OutreachEvent, Comment } from "@/types";
-
+import { format } from "date-fns";
 
 // --- Interfaces ---
-
 
 interface FeedPostProps {
   event: OutreachEvent;
@@ -50,17 +50,15 @@ interface FeedPostProps {
   customAvatar?: string;
 }
 
-
 interface CommentWithExtras extends Comment {
   reply_count?: number;
   likes_count?: number;
   is_liked_by_user?: boolean;
   parent_comment_id: string | null;
+  updated_at?: string;
 }
 
-
 // --- Main Component (FeedPost) ---
-
 
 export function FeedPost({
   event,
@@ -68,17 +66,15 @@ export function FeedPost({
   onDelete,
   onEdit,
   onTagClick,
-  customUsername, // 👈 Destructure here
+  customUsername,
   customAvatar,
 }: FeedPostProps) {
   const { user } = useAuth();
-  // 2. UPDATE: Read URL params for Deep Linking
   const [searchParams] = useSearchParams();
   const highlightCommentId = searchParams.get("comment_id");
   const actionType = searchParams.get("action");
 
-
-  // Shared Logic (Likes, Comments, Reg)
+  // Shared Logic
   const [likesCount, setLikesCount] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
@@ -89,15 +85,12 @@ export function FeedPost({
   const [, setIsLoading] = useState(true);
   const [, setError] = useState<string | null>(null);
 
-
-  // State for visual effect on Like
+  // Visual effect on Like
   const [triggerLikeAnim, setTriggerLikeAnim] = useState(false);
 
-
-  // ✅ SMART CHECK: Is this an "Official Event" or a "Standard Post"?
+  // Check Official Event
   const officialTypes = ["official", "pet", "member", "campus"];
   const isOfficialEvent = officialTypes.includes(event.event_type || "");
-
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -118,22 +111,16 @@ export function FeedPost({
     loadInitialData();
   }, [event.id]);
 
-
-  // 3. UPDATE: Effect to handle Deep Links (Open Modal or Animate)
   useEffect(() => {
-    // If URL has ?comment_id=..., automatically open comments
     if (highlightCommentId) {
       setIsCommentsOpen(true);
     }
-    // If URL has ?action=like, trigger animation
     if (actionType === "like") {
       setTriggerLikeAnim(true);
       setTimeout(() => setTriggerLikeAnim(false), 2000);
     }
   }, [highlightCommentId, actionType]);
 
-
-  // ... (Keep existing fetchLikes, toggleLike, fetchCommentsCount, checkRegistration logic exactly the same) ...
   const fetchLikes = async () => {
     try {
       const { count } = await supabase
@@ -141,7 +128,6 @@ export function FeedPost({
         .select("*", { count: "exact", head: true })
         .eq("event_id", event.id);
       setLikesCount(count || 0);
-
 
       if (user) {
         const { data } = await supabase
@@ -159,16 +145,13 @@ export function FeedPost({
     }
   };
 
-
   const toggleLike = async () => {
     if (!user || isLiking) return;
-
 
     setIsLiking(true);
     const previousLiked = isLiked;
     setIsLiked(!isLiked);
     setLikesCount(isLiked ? likesCount - 1 : likesCount + 1);
-
 
     try {
       if (previousLiked) {
@@ -182,7 +165,6 @@ export function FeedPost({
           .from("likes")
           .insert([{ event_id: event.id, user_id: user.id }]);
         if (error) throw error;
-
 
         if (event.admin_id !== user.id) {
           await notifyLike(
@@ -202,7 +184,6 @@ export function FeedPost({
     }
   };
 
-
   const fetchCommentsCount = async () => {
     try {
       const { count } = await supabase
@@ -215,7 +196,6 @@ export function FeedPost({
       setCommentsCount(0);
     }
   };
-
 
   const checkRegistration = async () => {
     if (!user) return;
@@ -233,11 +213,6 @@ export function FeedPost({
     }
   };
 
-
-  // --- RENDER ---
-
-
-  // 🎨 OPTION A: OFFICIAL EVENT CARD (Luma Style)
   if (isOfficialEvent) {
     return (
       <>
@@ -258,18 +233,15 @@ export function FeedPost({
                 ? new Date(event.event_date).toLocaleDateString()
                 : undefined
             }
-            // ✅ NEW: Pass the type so the modal knows whether to ask for pets
             eventType={event.event_type}
             onClose={() => setIsRegistrationOpen(false)}
             onSuccess={() => setIsRegistered(true)}
           />
-        )}{" "}
+        )}
       </>
     );
   }
 
-
-  // 📝 OPTION B: STANDARD SOCIAL POST (Facebook Style)
   return (
     <>
       <div className="mb-4">
@@ -279,21 +251,17 @@ export function FeedPost({
           onEdit={onEdit}
           onDelete={onDelete}
           onTagClick={onTagClick}
-          // 🔥 Pass them down to the EventCard
           customUsername={customUsername}
           customAvatar={customAvatar}
         >
-          {/* Action Bar for Standard Posts */}
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-4">
-              {/* Event Like Button */}
               <button
                 onClick={toggleLike}
                 disabled={isLiking}
                 className="flex items-center gap-1.5 group transition-all focus:outline-none disabled:opacity-50"
               >
                 <Heart
-                  // 4. UPDATE: Add bounce animation if triggered via notification
                   className={`w-6 h-6 transition-transform group-active:scale-90 ${
                     isLiked || triggerLikeAnim
                       ? "fill-red-500 text-red-500"
@@ -308,8 +276,6 @@ export function FeedPost({
                 )}
               </button>
 
-
-              {/* Comment Button */}
               <button
                 onClick={() => setIsCommentsOpen(true)}
                 className="flex items-center gap-1.5 group transition-all focus:outline-none"
@@ -329,38 +295,44 @@ export function FeedPost({
         </EventCard>
       </div>
 
-
       {isCommentsOpen && (
         <CommentsModal
           event={event}
           user={user}
+          customUsername={customUsername}
+          customAvatar={customAvatar}
           onClose={() => setIsCommentsOpen(false)}
           onCommentAdded={() => setCommentsCount((prev) => prev + 1)}
           onCommentDeleted={() =>
             setCommentsCount((prev) => Math.max(0, prev - 1))
           }
-          // 5. UPDATE: Pass highlight ID
           highlightId={highlightCommentId}
+          isLiked={isLiked}
+          likesCount={likesCount}
+          onToggleLike={toggleLike}
+          commentsCount={commentsCount}
         />
       )}
     </>
   );
 }
 
+// --- Comments Modal Component ---
 
-// ... (Keep CommentsModal Component at bottom as is) ...
-
-
-// ... (CommentsModal Logic remains unchanged below)
 interface CommentsModalProps {
   event: OutreachEvent;
   user: any;
   onClose: () => void;
   onCommentAdded: () => void;
   onCommentDeleted: () => void;
-  highlightId?: string | null; // 6. UPDATE: Prop for highlighting
+  highlightId?: string | null;
+  customUsername?: string;
+  customAvatar?: string;
+  isLiked?: boolean;
+  likesCount?: number;
+  onToggleLike?: () => void;
+  commentsCount?: number;
 }
-
 
 function CommentsModal({
   event,
@@ -369,83 +341,79 @@ function CommentsModal({
   onCommentAdded,
   onCommentDeleted,
   highlightId,
+  customUsername,
+  customAvatar,
+  isLiked,
+  likesCount,
+  onToggleLike,
+  commentsCount,
 }: CommentsModalProps) {
   const [comments, setComments] = useState<CommentWithExtras[]>([]);
   const [newComment, setNewComment] = useState("");
   const [activeReplyId, setActiveReplyId] = useState<string | null>(null);
-
-
-  // 1. SMART TARGETING STATE: Remembers exactly who you clicked
   const [replyTarget, setReplyTarget] = useState<CommentWithExtras | null>(
     null
   );
-
-
   const [loading, setLoading] = useState(true);
   const [expandedComments, setExpandedComments] = useState<Set<string>>(
     new Set()
   );
+  // Carousel State
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
+  // State to hold fetched author if missing from event data
+  const [fetchedAuthor, setFetchedAuthor] = useState<any>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const commentsTopRef = useRef<HTMLDivElement>(null);
 
+  // Identity Resolution
+  const getEmbeddedProfile = () => {
+    const p = (event as any).profiles;
+    if (Array.isArray(p) && p.length > 0) return p[0];
+    if (p && typeof p === "object") return p;
+    return null;
+  };
 
-  useEffect(() => {
-    const originalHtmlOverflow = document.documentElement.style.overflow;
-    const originalBodyOverflow = document.body.style.overflow;
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
+  const embeddedProfile = getEmbeddedProfile();
 
+  const displayName =
+    customUsername ||
+    embeddedProfile?.username ||
+    fetchedAuthor?.username ||
+    null;
 
-     fetchComments();
-  }, [event.id]);
+  const displayAvatar =
+    customAvatar ||
+    embeddedProfile?.avatar_url ||
+    fetchedAuthor?.avatar_url ||
+    null;
 
+  // Normalize Images Logic
+  const images = event.images && event.images.length > 0 
+    ? event.images 
+    : (event as any).image_url ? [(event as any).image_url] : [];
 
-  // 7. UPDATE: Effect to Scroll & Highlight specific comment
-  useEffect(() => {
-    if (highlightId && !loading && comments.length > 0) {
-      // Small timeout to ensure rendering
-      setTimeout(() => {
-        const element = document.getElementById(`comment-${highlightId}`);
-        if (element) {
-          // If it's a reply, ensure parent is expanded
-          const comment = comments.find((c) => c.id === highlightId);
-          if (comment?.parent_comment_id) {
-            setExpandedComments((prev) =>
-              new Set(prev).add(comment.parent_comment_id!)
-            );
-          }
-
-
-          element.scrollIntoView({ behavior: "smooth", block: "center" });
-
-
-          // Add highlight animation
-          element.classList.add(
-            "bg-yellow-50",
-            "ring-2",
-            "ring-yellow-100",
-            "rounded-lg"
-          );
-          setTimeout(() => {
-            element.classList.remove(
-              "bg-yellow-50",
-              "ring-2",
-              "ring-yellow-100",
-              "rounded-lg"
-            );
-            element.classList.add("transition-all", "duration-1000");
-          }, 3000);
-        }
-      }, 300);
+  const nextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (currentImageIndex < images.length - 1) {
+      setCurrentImageIndex((prev) => prev + 1);
     }
-  }, [loading, comments, highlightId]);
+  };
 
+  const prevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (currentImageIndex > 0) {
+      setCurrentImageIndex((prev) => prev - 1);
+    }
+  };
 
   const fetchComments = async () => {
     setLoading(true);
     try {
+      let dataToProcess: any[] | null = null;
+
       const { data, error } = await supabase
         .from("comments")
         .select(
@@ -454,12 +422,21 @@ function CommentsModal({
         .eq("event_id", event.id)
         .order("created_at", { ascending: true });
 
-
       if (error) {
-        console.error("Error fetching comments:", error);
-        setComments([]);
-      } else if (data) {
-        const formatted = data.map((c) => ({
+        const { data: retryData, error: retryError } = await supabase
+          .from("comments")
+          .select("*, user:profiles(id, username, avatar_url)")
+          .eq("event_id", event.id)
+          .order("created_at", { ascending: true });
+
+        if (retryError) throw retryError;
+        dataToProcess = retryData;
+      } else {
+        dataToProcess = data;
+      }
+
+      if (dataToProcess) {
+        const formatted = dataToProcess.map((c) => ({
           ...c,
           likes_count: 0,
           is_liked_by_user: false,
@@ -474,6 +451,113 @@ function CommentsModal({
     }
   };
 
+  useEffect(() => {
+    const originalHtmlOverflow = document.documentElement.style.overflow;
+    const originalBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+
+    const targetId = event.admin_id;
+
+    if (!customUsername && !getEmbeddedProfile() && targetId) {
+      supabase
+        .from("profiles")
+        .select("username, avatar_url")
+        .eq("id", targetId)
+        .single()
+        .then(({ data }) => {
+          if (data) setFetchedAuthor(data);
+        });
+    }
+
+    fetchComments();
+
+    const channel = supabase
+      .channel(`comments-${event.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "comments",
+          filter: `event_id=eq.${event.id}`,
+        },
+        async (payload) => {
+          if (payload.new.user_id === user?.id) return;
+          const { data: userData } = await supabase
+            .from("profiles")
+            .select("id, username, avatar_url")
+            .eq("id", payload.new.user_id)
+            .single();
+          const newMsg = {
+            ...payload.new,
+            user: userData,
+            likes_count: 0,
+            is_liked_by_user: false,
+          } as CommentWithExtras;
+          setComments((prev) => [...prev, newMsg]);
+          onCommentAdded();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      document.documentElement.style.overflow = originalHtmlOverflow;
+      document.body.style.overflow = originalBodyOverflow;
+      supabase.removeChannel(channel);
+    };
+  }, [event.id]);
+
+  // SCROLL LOGIC
+  useEffect(() => {
+    if (!loading) {
+      if (highlightId && comments.length > 0) {
+        setTimeout(() => {
+          const element = document.getElementById(`comment-${highlightId}`);
+          if (element) {
+            const comment = comments.find((c) => c.id === highlightId);
+            if (comment?.parent_comment_id) {
+              setExpandedComments((prev) =>
+                new Set(prev).add(comment.parent_comment_id!)
+              );
+            }
+            element.scrollIntoView({ behavior: "smooth", block: "center" });
+            // --- FIX: CHANGED YELLOW CLASSES TO BLUE ---
+            element.classList.add(
+              "bg-blue-50",
+              "ring-2",
+              "ring-blue-100",
+              "rounded-lg"
+            );
+            setTimeout(() => {
+              element.classList.remove(
+                "bg-blue-50",
+                "ring-2",
+                "ring-blue-100",
+                "rounded-lg"
+              );
+              element.classList.add("transition-all", "duration-1000");
+            }, 3000);
+          }
+        }, 300);
+      } else {
+        setTimeout(() => {
+          if (commentsTopRef.current) {
+            commentsTopRef.current.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            });
+          }
+        }, 300);
+      }
+    }
+  }, [loading, comments, highlightId]);
+
+  useEffect(() => {
+    if (activeReplyId && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [activeReplyId]);
 
   const toggleReplies = (commentId: string) => {
     setExpandedComments((prev) => {
@@ -487,33 +571,18 @@ function CommentsModal({
     });
   };
 
-
-  // --- 2. UPDATED: THE INSTAGRAM LOGIC (Auto-fill + Save Target) ---
   const handleReplyClick = (comment: CommentWithExtras) => {
     const targetUsername = comment.user?.username || "user";
-    // A. INSTAGRAM STYLE: Auto-fill the text input
     setNewComment(`@${targetUsername} `);
-
-
-    // B. SMART TARGETING: Remember this specific user object in the background
     setReplyTarget(comment);
-
-
-    // C. DATABASE STRUCTURE: Keep the thread flat
     setActiveReplyId(comment.parent_comment_id || comment.id);
-
-
-    inputRef.current?.focus();
   };
 
-
-  // --- 3. UPDATED: SUBMIT LOGIC (Smart Notification Routing) ---
   const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim() || !user) return;
     const content = newComment.trim();
     setNewComment("");
-
 
     const tempId = `temp-${Date.now()}-${Math.random()
       .toString(36)
@@ -530,23 +599,25 @@ function CommentsModal({
         username: user.username,
         avatar_url: user.avatar_url,
       },
+      likes_count: 0,
+      is_liked_by_user: false,
     };
-
 
     setComments((prev) => [...prev, optimisticComment]);
     onCommentAdded();
 
-
     if (activeReplyId) {
-      setExpandedComments((prev) => new Set(prev).add(activeReplyId));
+      setExpandedComments((prev) => {
+        const next = new Set(prev);
+        next.add(activeReplyId);
+        return next;
+      });
     }
-
 
     setTimeout(
       () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
       100
     );
-
 
     const { data: insertedData, error } = await supabase
       .from("comments")
@@ -558,38 +629,36 @@ function CommentsModal({
           parent_comment_id: activeReplyId,
         },
       ])
-      .select("id")
+      .select("id, created_at")
       .single();
-
 
     if (error) {
       console.error(error);
       setComments((prev) => prev.filter((c) => c.id !== tempId));
     } else if (insertedData) {
+      setComments((prev) => 
+        prev.map(c => 
+          c.id === tempId ? { ...c, id: insertedData.id, created_at: insertedData.created_at } : c
+        )
+      );
+
       setActiveReplyId(null);
-      setReplyTarget(null); // Reset target
+      setReplyTarget(null);
 
-
-      // We will track who got a "Reply" alert so we don't send them a "Mention" alert too.
       const notifiedUserIds: string[] = [];
 
-
-      // --- LOGIC A: HANDLE REPLIES (The Smart Target) ---
       if (replyTarget) {
-        // Notify the specific person we clicked (User B), not the Main Commenter (User A)
         if (replyTarget.user_id !== user.id) {
           await notifyReply(
             { id: event.id, admin_id: event.admin_id, title: event.title },
             { id: user.id, username: user.username },
             content,
-            replyTarget.user_id, // <--- Target the specific user
+            replyTarget.user_id,
             insertedData.id
           );
-          notifiedUserIds.push(replyTarget.user_id); // Add to exclusion list
+          notifiedUserIds.push(replyTarget.user_id);
         }
       } else {
-        // --- LOGIC B: HANDLE MAIN COMMENT ---
-        // If no reply target, it's a root comment. Notify Admin.
         if (event.admin_id && event.admin_id !== user.id) {
           await notifyComment(
             { id: event.id, admin_id: event.admin_id, title: event.title },
@@ -600,37 +669,35 @@ function CommentsModal({
         }
       }
 
-
-      // --- LOGIC C: HANDLE MENTIONS ---
-      // Pass the exclusion list to prevent duplicates
       await notifyMentions(
         { id: event.id, admin_id: event.admin_id, title: event.title },
         { id: user.id, username: user.username },
         content,
         insertedData.id,
-        notifiedUserIds // <--- The Deduplication Magic
+        notifiedUserIds
       );
     }
   };
 
-
   const handleEditComment = async (commentId: string, newContent: string) => {
+    const newTime = new Date().toISOString();
     setComments((prev) =>
-      prev.map((c) => (c.id === commentId ? { ...c, content: newContent } : c))
+      prev.map((c) =>
+        c.id === commentId
+          ? { ...c, content: newContent, updated_at: newTime }
+          : c
+      )
     );
-
 
     const { error } = await supabase
       .from("comments")
-      .update({ content: newContent })
+      .update({ content: newContent, updated_at: newTime })
       .eq("id", commentId);
-
 
     if (error) {
       console.error("Failed to edit comment:", error);
     }
   };
-
 
   const handleDeleteComment = async (commentId: string) => {
     if (!confirm("Delete this comment?")) return;
@@ -638,7 +705,6 @@ function CommentsModal({
     onCommentDeleted();
     await supabase.from("comments").delete().eq("id", commentId);
   };
-
 
   const repliesByParent = useMemo(() => {
     const map = new Map<string, CommentWithExtras[]>();
@@ -651,10 +717,8 @@ function CommentsModal({
     return map;
   }, [comments]);
 
-
   const rootComments = comments.filter((c) => !c.parent_comment_id);
   const getReplies = (parentId: string) => repliesByParent.get(parentId) || [];
-
 
   const renderCommentRow = (comment: CommentWithExtras, isReply = false) => (
     <CommentItem
@@ -669,18 +733,23 @@ function CommentsModal({
     />
   );
 
-
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-end justify-center md:items-center">
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
         onClick={onClose}
       />
-      <div className="relative w-full md:w-[480px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl flex flex-col max-h-[85vh] md:max-h-[600px] animate-in slide-in-from-bottom-10 fade-in duration-300">
+      {/* MODAL CONTAINER */}
+      <div className="relative w-full md:w-[650px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl flex flex-col max-h-[85vh] md:max-h-[90vh] animate-in slide-in-from-bottom-10 fade-in duration-300">
+        
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-100 shrink-0">
           <div className="w-8" />
-          <h3 className="font-bold text-gray-900">Comments</h3>
+          {displayName ? (
+            <h3 className="font-bold text-gray-900">{displayName}'s Post</h3>
+          ) : (
+            <div className="h-6 w-32 bg-gray-200 animate-pulse rounded" />
+          )}
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -689,64 +758,181 @@ function CommentsModal({
           </button>
         </div>
 
+        {/* SCROLLABLE CONTENT AREA */}
+        <div className="flex-1 overflow-y-auto overscroll-contain">
+          
+          {/* POST PREVIEW SECTION (Desktop Only) */}
+          <div className="hidden md:block p-5 border-b border-gray-100 bg-white">
+            {/* Author */}
+            <div className="flex items-center gap-3 mb-4">
+              {displayAvatar ? (
+                <img
+                  src={displayAvatar}
+                  alt={displayName || "User"}
+                  className="w-10 h-10 rounded-full object-cover border border-gray-100"
+                />
+              ) : (
+                <div className="w-10 h-10 bg-gray-200 animate-pulse rounded-full" />
+              )}
+              
+              <div className="flex flex-col leading-tight">
+                {displayName ? (
+                  <span className="font-bold text-gray-900">{displayName}</span>
+                ) : (
+                  <div className="h-4 w-24 bg-gray-200 animate-pulse rounded mb-1" />
+                )}
+                <span className="text-xs text-gray-500">
+                  {formatRelativeTime(event.created_at)}
+                </span>
+              </div>
+            </div>
 
-      {/* List Section in CommentsModal */}
-<div className="flex-1 overflow-y-auto overscroll-contain p-4">
-  {loading ? (
-    <div className="flex justify-center py-10">
-      <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-    </div>
-  ) : comments.length === 0 ? (
-    <div className="text-center py-10 text-gray-400">
-      <p className="text-sm">No comments yet.</p>
-    </div>
-  ) : (
-    /* ✅ FIX: Only map rootComments here */
-    rootComments.map((comment) => {
-      const replies = getReplies(comment.id);
-      const hasReplies = replies.length > 0;
-      const isExpanded = expandedComments.has(comment.id);
+            {/* Text Content */}
+            {event.description && (
+              <div className="mb-4 text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                {event.title && (
+                  <h4 className="font-bold text-lg mb-2">{event.title}</h4>
+                )}
+                {event.description}
+              </div>
+            )}
 
+            {/* IMAGE CAROUSEL SECTION */}
+            {images.length > 0 && (
+              <div className="relative rounded-xl overflow-hidden border border-gray-100 bg-gray-50 mb-4 group/carousel">
+                <img
+                  src={images[currentImageIndex]}
+                  alt="Post content"
+                  className="w-full h-auto max-h-[400px] object-cover"
+                />
+                
+                {/* Carousel Controls */}
+                {images.length > 1 && (
+                  <>
+                    {/* Prev Button */}
+                    {currentImageIndex > 0 && (
+                      <button 
+                        onClick={prevImage}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white opacity-0 group-hover/carousel:opacity-100 transition-opacity"
+                      >
+                        <ChevronLeft size={20} />
+                      </button>
+                    )}
+                    {/* Next Button */}
+                    {currentImageIndex < images.length - 1 && (
+                      <button 
+                        onClick={nextImage}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white opacity-0 group-hover/carousel:opacity-100 transition-opacity"
+                      >
+                        <ChevronRight size={20} />
+                      </button>
+                    )}
+                    {/* Dots */}
+                    <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
+                      {images.map((_, idx) => (
+                        <div 
+                          key={idx}
+                          className={`w-1.5 h-1.5 rounded-full shadow-sm transition-all ${idx === currentImageIndex ? 'bg-white scale-125' : 'bg-white/50'}`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
-      return (
-        <div key={comment.id}>
-          {renderCommentRow(comment)}
-
-
-          {hasReplies && (
-            <div className="ml-14 mt-2 flex items-center">
-              <div className="w-8 h-[1px] bg-gray-300 mr-2"></div>
+            {/* ACTIONS INSIDE MODAL (Desktop Only) */}
+            <div className="flex items-center gap-6 pt-2 border-t border-gray-50">
               <button
-                onClick={() => toggleReplies(comment.id)}
-                className="text-[11px] font-semibold text-gray-500 hover:text-gray-800"
+                onClick={onToggleLike}
+                className="flex items-center gap-1.5 group transition-all"
               >
-                {isExpanded
-                  ? "Hide replies"
-                  : `View replies (${replies.length})`}
+                <Heart
+                  className={`w-6 h-6 transition-transform group-active:scale-90 ${
+                    isLiked
+                      ? "fill-red-500 text-red-500"
+                      : "text-gray-900 hover:text-gray-600"
+                  }`}
+                  strokeWidth={isLiked ? 0 : 2}
+                />
+                <span className="text-sm font-bold text-gray-900">
+                  {likesCount && likesCount > 0 ? likesCount : "Like"}
+                </span>
+              </button>
+
+              <button 
+                onClick={() => inputRef.current?.focus()}
+                className="flex items-center gap-1.5 group transition-all"
+              >
+                <MessageCircle
+                  className="w-6 h-6 text-gray-900 hover:text-gray-600"
+                  strokeWidth={2}
+                />
+                <span className="text-sm font-bold text-gray-900">
+                  {commentsCount && commentsCount > 0
+                    ? `${commentsCount}`
+                    : ""}
+                </span>
               </button>
             </div>
-          )}
+          </div>
 
+          {/* COMMENTS LIST */}
+          <div ref={commentsTopRef} className="p-4 bg-gray-50/50 min-h-[200px]">
+            {loading ? (
+              <div className="flex justify-center py-10">
+                <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+              </div>
+            ) : comments.length === 0 ? (
+              <div className="text-center py-10 text-gray-400">
+                <p className="text-sm">
+                  No comments yet. Be the first to say something!
+                </p>
+              </div>
+            ) : (
+              rootComments.map((comment) => {
+                const replies = getReplies(comment.id);
+                const hasReplies = replies.length > 0;
+                const isExpanded = expandedComments.has(comment.id);
 
-          {/* ✅ This renders the nested replies */}
-          {isExpanded && (
-            <div className="mb-2">
-              {replies.map((reply) => renderCommentRow(reply, true))}
-            </div>
-          )}
+                return (
+                  <div key={comment.id}>
+                    {renderCommentRow(comment)}
+
+                    {hasReplies && (
+                      <div className="ml-14 mt-2 flex items-center">
+                        <div className="w-8 h-[1px] bg-gray-300 mr-2" />
+                        <button
+                          onClick={() => toggleReplies(comment.id)}
+                          className="text-[11px] font-semibold text-gray-500 hover:text-gray-800"
+                        >
+                          {isExpanded
+                            ? "Hide replies"
+                            : `View replies (${replies.length})`}
+                        </button>
+                      </div>
+                    )}
+
+                    {isExpanded && (
+                      <div className="mb-2">
+                        {replies.map((reply) => renderCommentRow(reply, true))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+            <div ref={bottomRef} />
+          </div>
         </div>
-      );
-    })
-  )}
-  <div ref={bottomRef} />
-</div>
 
-
-        {/* Input */}
-        <div className="p-4 border-t border-gray-100 bg-white md:rounded-b-2xl">
+        {/* INPUT AREA */}
+        <div className="p-4 border-t border-gray-100 bg-white md:rounded-b-2xl shrink-0 z-10">
           {activeReplyId && (
             <div className="text-xs text-gray-400 mb-2 ml-4 flex justify-between items-center">
-              <span>Replying to comment...</span>
+              <span>
+                Replying to {replyTarget?.user?.username || "comment"}...
+              </span>
               <button
                 onClick={() => setActiveReplyId(null)}
                 className="mr-2 hover:text-gray-600"
@@ -769,15 +955,15 @@ function CommentsModal({
                 ref={inputRef}
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
-                placeholder={`Add a comment...`}
-                className="bg-gray-50 border-transparent focus:border-blue-200 focus:bg-white rounded-full h-11 pl-4 pr-12 transition-all"
+                placeholder="Write a comment..."
+                className="bg-gray-100 border-transparent focus:border-blue-200 focus:bg-white rounded-full h-10 pl-4 pr-12 transition-all"
                 autoFocus={!loading}
               />
               <Button
                 type="submit"
                 size="icon"
                 disabled={!newComment.trim()}
-                className="absolute right-1 top-1 h-9 w-9 rounded-full bg-blue-600 hover:bg-blue-700 text-white shrink-0 shadow-sm"
+                className="absolute right-1 top-0.5 h-9 w-9 rounded-full bg-blue-600 hover:bg-blue-700 text-white shrink-0 shadow-sm"
               >
                 <Send className="w-4 h-4 ml-0.5" />
               </Button>
@@ -790,12 +976,12 @@ function CommentsModal({
   );
 }
 
-
 const formatRelativeTime = (dateString: string) => {
   const now = new Date();
   const date = new Date(dateString);
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
+  if (diffInSeconds < 0) return "0s"; 
 
   if (diffInSeconds < 2629746) {
     if (diffInSeconds < 60) return `${diffInSeconds}s`;
@@ -810,9 +996,7 @@ const formatRelativeTime = (dateString: string) => {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 };
 
-
 // --- Individual Comment Item Component ---
-
 
 interface CommentItemProps {
   event: OutreachEvent;
@@ -823,7 +1007,6 @@ interface CommentItemProps {
   onEdit: (id: string, newContent: string) => void;
   isReply?: boolean;
 }
-
 
 function CommentItem({
   event,
@@ -838,15 +1021,16 @@ function CommentItem({
   const [isLiked, setIsLiked] = useState(comment.is_liked_by_user || false);
   const [isLiking, setIsLiking] = useState(false);
 
-
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
 
+  // Check if the comment has been edited
+  const isEdited =
+    comment.updated_at && comment.updated_at !== comment.created_at;
 
   useEffect(() => {
     fetchCommentLikes();
   }, [comment.id]);
-
 
   const fetchCommentLikes = async () => {
     try {
@@ -855,9 +1039,7 @@ function CommentItem({
         .select("*", { count: "exact", head: true })
         .eq("comment_id", comment.id);
 
-
       setLikesCount(count || 0);
-
 
       if (user) {
         const { data } = await supabase
@@ -873,19 +1055,15 @@ function CommentItem({
     }
   };
 
-
   const toggleCommentLike = async () => {
     if (!user || isLiking) return;
-
 
     setIsLiking(true);
     const previousLiked = isLiked;
     const previousCount = likesCount;
 
-
     setIsLiked(!isLiked);
     setLikesCount(previousLiked ? likesCount - 1 : likesCount + 1);
-
 
     try {
       if (previousLiked) {
@@ -899,15 +1077,13 @@ function CommentItem({
           .from("comment_likes")
           .insert([{ comment_id: comment.id, user_id: user.id }]);
 
-
-        // 9. UPDATE: Pass comment ID to notification
         if (comment.user_id !== user.id) {
           await notifyCommentLike(
             { id: event.id, admin_id: event.admin_id, title: event.title },
             { id: user.id, username: user.username },
             comment.user_id,
             comment.content,
-            comment.id // Pass ID
+            comment.id
           );
         }
       }
@@ -920,7 +1096,6 @@ function CommentItem({
     }
   };
 
-
   const handleSaveEdit = () => {
     if (editContent.trim() !== "") {
       onEdit(comment.id, editContent);
@@ -928,9 +1103,7 @@ function CommentItem({
     }
   };
 
-
   return (
-    // 10. UPDATE: Add ID to div for scrolling
     <div
       id={`comment-${comment.id}`}
       className={`flex gap-3 group animate-in fade-in slide-in-from-bottom-2 duration-300 ${
@@ -950,7 +1123,6 @@ function CommentItem({
             <span className="font-bold text-sm text-gray-900">
               {comment.user?.username || "Unknown"}
             </span>
-
 
             {isEditing ? (
               <div className="flex-1">
@@ -986,13 +1158,12 @@ function CommentItem({
           </div>
         </div>
 
-
         {!isEditing && (
           <div className="flex items-center gap-4 px-1 mt-1">
             <span className="text-[10px] text-gray-400 font-medium">
               {formatRelativeTime(comment.created_at)}
+              {isEdited && <span className="ml-1 italic"> (edited)</span>}
             </span>
-
 
             <button
               onClick={toggleCommentLike}
@@ -1012,14 +1183,12 @@ function CommentItem({
               </span>
             </button>
 
-
             <button
               onClick={() => onReply(comment)}
               className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-blue-600 font-semibold transition-colors"
             >
               <Reply size={10} /> Reply
             </button>
-
 
             {(user?.id === comment.user_id || user?.role === "admin") && (
               <DropdownMenu>
@@ -1029,7 +1198,6 @@ function CommentItem({
                     className="text-gray-400 hover:text-gray-700 transition-colors"
                   />
                 </DropdownMenuTrigger>
-
 
                 <DropdownMenuContent
                   align="start"
@@ -1041,7 +1209,6 @@ function CommentItem({
                       <span className="text-xs">Edit</span>
                     </DropdownMenuItem>
                   )}
-
 
                   <DropdownMenuItem
                     onClick={() => onDelete(comment.id)}
@@ -1059,4 +1226,3 @@ function CommentItem({
     </div>
   );
 }
-

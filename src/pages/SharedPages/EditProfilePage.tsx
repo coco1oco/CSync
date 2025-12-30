@@ -29,7 +29,13 @@ import FailedImageIcon from "@/assets/FailedImage.svg";
 const profileSchema = z.object({
   first_name: z.string().min(1, "First name is required"),
   last_name: z.string().min(1, "Last name is required"),
-  username: z.string().min(3, "Username must be at least 3 chars"),
+  username: z
+    .string()
+    .min(3, "Username must be at least 3 characters")
+    .regex(
+      /^[a-zA-Z0-9_]+$/,
+      "Username can only contain letters, numbers, and underscores (no spaces or special characters)"
+    ),
   bio: z.string().max(120, "Bio must be under 120 characters").optional(),
   pronouns: z.string().optional(),
   contact_number: z.string().optional(),

@@ -1,6 +1,6 @@
 export async function uploadImageToCloudinary(
   file: File,
-  presetType: "avatar" | "pet" | "chat" = "chat"
+  presetType: "avatar" | "pet" | "chat" | "report" = "chat"
 ): Promise<string> {
   // 1. Validate file type
   if (!file.type.startsWith("image/")) {
@@ -24,6 +24,9 @@ export async function uploadImageToCloudinary(
     uploadPreset = import.meta.env.VITE_CLOUDINARY_PETIMAGEURL;
   } else if (presetType === "avatar") {
     uploadPreset = import.meta.env.VITE_CLOUDINARY_AVATARURL;
+  }
+  else if (presetType === "report") {
+    uploadPreset = import.meta.env.VITE_CLOUDINARY_REPORTURL;
   }
 
   if (!uploadPreset) {
