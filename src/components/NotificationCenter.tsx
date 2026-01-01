@@ -83,7 +83,6 @@ export function NotificationCenter({
   }
 
   const getIcon = (type: NotificationType) => {
-    // ... (Keep your existing getIcon logic)
     const base =
       "absolute -bottom-0.5 -right-0.5 rounded-full p-0.5 border-2 border-white flex items-center justify-center";
     switch (type) {
@@ -103,12 +102,6 @@ export function NotificationCenter({
         return (
           <div className={`${base} bg-orange-500`}>
             <AtSign size={10} className="text-white" />
-          </div>
-        );
-      case "follow":
-        return (
-          <div className={`${base} bg-purple-500`}>
-            <UserPlus size={10} className="text-white" />
           </div>
         );
       default:

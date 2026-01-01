@@ -231,6 +231,10 @@ export default function MainPetProfilePage() {
                 <p className="text-xl font-black text-gray-900">
                   {stats.upcomingVisits}
                 </p>
+                {/* This logic was already here, but now it will show up */}
+                {stats.upcomingVisits > 0 && (
+                  <div className="absolute top-2 right-2 w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+                )}
               </div>
             </div>
           </div>

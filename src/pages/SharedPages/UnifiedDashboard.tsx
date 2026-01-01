@@ -147,157 +147,267 @@ export function UnifiedDashboard() {
       )
     : events;
 
+  // --- SKELETON HELPERS ---
+  const renderHeaderSkeleton = () => (
+    <div className="flex justify-between items-center w-full">
+      <div className="space-y-2">
+        <Skeleton className="h-7 w-40 rounded-lg" />
+        <Skeleton className="h-3 w-24 rounded" />
+      </div>
+      <Skeleton className="h-8 w-24 rounded-full" />
+    </div>
+  );
+
+  const renderStatsSkeleton = () => (
+    <div className="grid grid-cols-3 gap-3">
+      {[1, 2, 3].map((i) => (
+        <div
+          key={i}
+          className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex flex-col items-center"
+        >
+          <Skeleton className="w-8 h-8 rounded-full mb-2" />
+          <Skeleton className="w-8 h-5 mb-1" />
+          <Skeleton className="w-12 h-3" />
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderAlertsSkeleton = () => (
+    <div className="flex gap-3 overflow-x-hidden pb-2 -mx-4 px-4">
+      {[1, 2].map((i) => (
+        <div
+          key={i}
+          className="shrink-0 w-64 p-3 rounded-2xl border bg-white border-gray-200 shadow-sm flex flex-col gap-3"
+        >
+          <div className="flex items-center gap-3">
+            <Skeleton className="w-10 h-10 rounded-full" />
+            <div className="space-y-1.5 flex-1">
+              <Skeleton className="w-20 h-4" />
+              <Skeleton className="w-16 h-3" />
+            </div>
+          </div>
+          <Skeleton className="w-24 h-6 rounded-lg" />
+        </div>
+      ))}
+    </div>
+  );
+
+  // ✅ NEW: Upcoming Events Skeleton (Reduced to 2 items)
+  const renderUpcomingEventsSkeleton = () => (
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden h-full">
+      {/* Header Skeleton */}
+      <div className="p-4 border-b border-gray-50 flex items-center justify-between">
+        <div className="h-5 w-28 bg-gray-100 rounded animate-pulse" />
+      </div>
+      {/* List Items Skeleton */}
+      <div className="divide-y divide-gray-50">
+        {[1, 2].map((i) => ( // <--- CHANGED FROM [1,2,3] TO [1,2]
+          <div key={i} className="p-3 flex gap-3 items-center">
+            {/* Date Box */}
+            <div className="shrink-0 w-12 h-12 bg-gray-100 rounded-lg animate-pulse" />
+            {/* Text Content */}
+            <div className="flex-1 flex flex-col justify-center gap-2">
+              <div className="h-3.5 w-3/4 bg-gray-100 rounded animate-pulse" />
+              <div className="flex gap-2">
+                <div className="h-2.5 w-1/3 bg-gray-100 rounded animate-pulse" />
+                <div className="h-2.5 w-10 bg-gray-100 rounded animate-pulse" />
+              </div>
+            </div>
+            {/* Chevron */}
+            <div className="w-4 h-4 bg-gray-100 rounded animate-pulse shrink-0" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderFeedSkeleton = () => (
+    <div className="space-y-6">
+      {[1, 2].map((i) => (
+        <div key={i} className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm space-y-4">
+          <div className="flex items-center gap-3">
+            <Skeleton className="w-10 h-10 rounded-full" />
+            <div className="space-y-1.5">
+              <Skeleton className="w-32 h-4" />
+              <Skeleton className="w-20 h-3" />
+            </div>
+          </div>
+          <Skeleton className="w-full h-48 rounded-2xl" />
+          <div className="flex justify-between">
+            <Skeleton className="w-16 h-4" />
+            <Skeleton className="w-16 h-4" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <div className="w-full max-w-xl mx-auto pb-24 px-0 md:px-4">
       {/* --- HEADER --- */}
       <div className="sticky top-0 z-30 bg-gray-50/95 backdrop-blur-sm py-4 px-4 flex items-center justify-between border-b border-gray-100 md:border-none">
-        <div>
-          <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2">
-            {isAdmin ? "Admin Dashboard" : "Dashboard"}
-          </h1>
-          <p className="text-xs text-gray-500 font-medium">
-            Welcome back, {user?.first_name || "Guest"}!
-          </p>
-        </div>
+        {loading ? (
+          renderHeaderSkeleton()
+        ) : (
+          <>
+            <div>
+              <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2">
+                {isAdmin ? "Admin Dashboard" : "Dashboard"}
+              </h1>
+              <p className="text-xs text-gray-500 font-medium">
+                Welcome back, {user?.first_name || "Guest"}!
+              </p>
+            </div>
 
-        {!isAdmin && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="rounded-full h-8 text-xs gap-1"
-            onClick={() => navigate("/PetDashboard/new")}
-          >
-            <Plus className="w-3 h-3" /> Add Pet
-          </Button>
-        )}
+            {!isAdmin && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-full h-8 text-xs gap-1"
+                onClick={() => navigate("/PetDashboard/new")}
+              >
+                <Plus className="w-3 h-3" /> Add Pet
+              </Button>
+            )}
 
-        {/* ✅ FIXED ADMIN BUTTONS */}
-        {isAdmin && (
-          <div className="flex gap-2">
-            {/* 1. Official Event */}
-            <Button
-              size="sm"
-              className="rounded-full h-8 text-xs gap-1 bg-purple-600 hover:bg-purple-700 text-white shadow-sm border border-purple-500/20"
-              onClick={() => navigate("/admin/events/new-official")}
-            >
-              <Calendar className="w-3 h-3" /> Event
-            </Button>
-
-            {/* 2. Standard Post (Restored) */}
-            <Button
-              size="sm"
-              className="rounded-full h-8 text-xs gap-1 bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-              onClick={() => navigate("/admin/events/create")}
-            >
-              <PenSquare className="w-3 h-3" /> Post
-            </Button>
-
-            {/* 3. Manage */}
-            <Button
-              size="sm"
-              variant="outline"
-              className="rounded-full h-8 text-xs gap-1 border-gray-300 text-gray-700 hover:bg-gray-100"
-              onClick={() => navigate("/admin/events/manage")}
-            >
-              <Users className="w-3 h-3" /> Manage
-            </Button>
-          </div>
+            {isAdmin && (
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  className="rounded-full h-8 text-xs gap-1 bg-purple-600 hover:bg-purple-700 text-white shadow-sm border border-purple-500/20"
+                  onClick={() => navigate("/admin/events/new-official")}
+                >
+                  <Calendar className="w-3 h-3" /> Event
+                </Button>
+                <Button
+                  size="sm"
+                  className="rounded-full h-8 text-xs gap-1 bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                  onClick={() => navigate("/admin/events/create")}
+                >
+                  <PenSquare className="w-3 h-3" /> Post
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-full h-8 text-xs gap-1 border-gray-300 text-gray-700 hover:bg-gray-100"
+                  onClick={() => navigate("/admin/events/manage")}
+                >
+                  <Users className="w-3 h-3" /> Manage
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {/* --- WIDGET AREA (Stats & Alerts) --- */}
       <div className="px-4 mt-4 space-y-4">
         {loading ? (
-          <Skeleton className="w-full h-32 rounded-2xl" />
-        ) : isAdmin ? (
-          /* 👑 ADMIN STATS GRID */
-          <div className="grid grid-cols-3 gap-3">
-            <div className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex flex-col items-center text-center">
-              <div className="p-2 bg-blue-50 text-blue-600 rounded-full mb-1">
-                <FileText size={18} />
-              </div>
-              <span className="text-xl font-bold text-gray-900">
-                {stats.totalPosts}
-              </span>
-              <span className="text-[10px] text-gray-400 uppercase font-bold">
-                Total Posts
-              </span>
-            </div>
-            <div className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex flex-col items-center text-center">
-              <div className="p-2 bg-purple-50 text-purple-600 rounded-full mb-1">
-                <BarChart3 size={18} />
-              </div>
-              <span className="text-xl font-bold text-gray-900">
-                {stats.myPosts}
-              </span>
-              <span className="text-[10px] text-gray-400 uppercase font-bold">
-                My Posts
-              </span>
-            </div>
-            <div className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex flex-col items-center text-center">
-              <div className="p-2 bg-green-50 text-green-600 rounded-full mb-1">
-                <Users size={18} />
-              </div>
-              <span className="text-xl font-bold text-gray-900">
-                {stats.totalMembers}
-              </span>
-              <span className="text-[10px] text-gray-400 uppercase font-bold">
-                Members
-              </span>
-            </div>
-          </div>
-        ) : /* 🐾 USER ALERTS */
-        alerts.length > 0 ? (
-          <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide snap-x">
-            {alerts.map((alert) => (
-              <div
-                key={alert.id}
-                onClick={() => navigate(`/PetDashboard/${alert.pet_id}`)}
-                className="snap-center shrink-0 w-64 p-3 rounded-2xl border bg-white border-gray-200 shadow-sm"
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <img
-                    src={alert.pets.petimage_url || "/default-pet.png"}
-                    className="w-10 h-10 rounded-full bg-gray-200 object-cover"
-                  />
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold truncate">
-                      {alert.pets.name}
-                    </p>
-                    <p className="text-xs text-gray-500 truncate">
-                      {alert.vaccine_name}
-                    </p>
-                  </div>
-                </div>
-                <div className="text-xs font-semibold px-2 py-1 bg-orange-50 text-orange-700 rounded-lg inline-flex items-center gap-1">
-                  <Calendar className="w-3 h-3" /> Due{" "}
-                  {formatDistanceToNow(new Date(alert.next_due_date), {
-                    addSuffix: true,
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
+          <>
+            {isAdmin ? renderStatsSkeleton() : renderAlertsSkeleton()}
+            {renderUpcomingEventsSkeleton()}
+          </>
         ) : (
-          <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-full text-blue-600">
-              <Stethoscope className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-blue-900">All caught up!</p>
-              <p className="text-xs text-blue-700">No pending vaccines.</p>
-            </div>
-          </div>
-        )}
+          <>
+            {isAdmin ? (
+              /* 👑 ADMIN STATS GRID */
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex flex-col items-center text-center">
+                  <div className="p-2 bg-blue-50 text-blue-600 rounded-full mb-1">
+                    <FileText size={18} />
+                  </div>
+                  <span className="text-xl font-bold text-gray-900">
+                    {stats.totalPosts}
+                  </span>
+                  <span className="text-[10px] text-gray-400 uppercase font-bold">
+                    Total Posts
+                  </span>
+                </div>
+                <div className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex flex-col items-center text-center">
+                  <div className="p-2 bg-purple-50 text-purple-600 rounded-full mb-1">
+                    <BarChart3 size={18} />
+                  </div>
+                  <span className="text-xl font-bold text-gray-900">
+                    {stats.myPosts}
+                  </span>
+                  <span className="text-[10px] text-gray-400 uppercase font-bold">
+                    My Posts
+                  </span>
+                </div>
+                <div className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex flex-col items-center text-center">
+                  <div className="p-2 bg-green-50 text-green-600 rounded-full mb-1">
+                    <Users size={18} />
+                  </div>
+                  <span className="text-xl font-bold text-gray-900">
+                    {stats.totalMembers}
+                  </span>
+                  <span className="text-[10px] text-gray-400 uppercase font-bold">
+                    Members
+                  </span>
+                </div>
+              </div>
+            ) : /* 🐾 USER ALERTS */
+            alerts.length > 0 ? (
+              <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide snap-x">
+                {alerts.map((alert) => (
+                  <div
+                    key={alert.id}
+                    onClick={() => navigate(`/PetDashboard/${alert.pet_id}`)}
+                    className="snap-center shrink-0 w-64 p-3 rounded-2xl border bg-white border-gray-200 shadow-sm"
+                  >
+                    <div className="flex items-center gap-3 mb-2">
+                      <img
+                        src={alert.pets.petimage_url || "/default-pet.png"}
+                        className="w-10 h-10 rounded-full bg-gray-200 object-cover"
+                      />
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold truncate">
+                          {alert.pets.name}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {alert.vaccine_name}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-xs font-semibold px-2 py-1 bg-orange-50 text-orange-700 rounded-lg inline-flex items-center gap-1">
+                      <Calendar className="w-3 h-3" /> Due{" "}
+                      {formatDistanceToNow(new Date(alert.next_due_date), {
+                        addSuffix: true,
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-full text-blue-600">
+                  <Stethoscope className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-blue-900">
+                    All caught up!
+                  </p>
+                  <p className="text-xs text-blue-700">No pending vaccines.</p>
+                </div>
+              </div>
+            )}
 
-        {/* WIDGET */}
-        <UpcomingEventsWidget />
+            {/* WIDGET */}
+            <UpcomingEventsWidget />
+          </>
+        )}
       </div>
 
       {/* --- FEED CONTROLS --- */}
       <div className="mx-4 mt-8 mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-bold text-gray-900">Community Feed</h2>
-        {isAdmin && (
+        {loading ? (
+          <Skeleton className="w-32 h-6" />
+        ) : (
+          <h2 className="text-lg font-bold text-gray-900">Community Feed</h2>
+        )}
+
+        {isAdmin && !loading && (
           <div className="bg-white border border-gray-200 p-0.5 rounded-lg flex text-xs font-medium">
             <button
               onClick={() => setFilterMode("all")}
@@ -339,9 +449,7 @@ export function UnifiedDashboard() {
       {/* --- FEED LIST --- */}
       <div className="space-y-6">
         {loading ? (
-          [1, 2].map((i) => (
-            <Skeleton key={i} className="mx-4 w-full h-64 rounded-2xl" />
-          ))
+          renderFeedSkeleton()
         ) : filteredEvents.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center mx-4">
             <LayoutGrid className="w-12 h-12 text-gray-300 mb-3" />

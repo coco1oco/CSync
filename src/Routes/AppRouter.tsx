@@ -60,6 +60,11 @@ const NotificationsPage = lazy(() =>
 );
 const EventDetails = lazy(() => import("@/pages/SharedPages/EventDetails"));
 
+const SettingsPage = lazy(() => import("@/pages/MenuPage/SettingsPage"));
+
+// 1. UPDATE: Lazy Load the new Event Details Page
+
+// Loading Spinner
 const PageLoader = () => (
   <div className="flex h-screen w-full items-center justify-center bg-gray-50">
     <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -322,6 +327,15 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoader />}>
             <PetEditProfile />
+          </Suspense>
+        ),
+      },
+      // 2. ADD THIS ROUTE BLOCK
+      {
+        path: "/settings",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <SettingsPage />
           </Suspense>
         ),
       },

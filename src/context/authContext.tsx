@@ -30,6 +30,10 @@ type AuthContextProps = {
   loading: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  updatePassword: (
+    currentPassword: string,
+    newPassword: string
+  ) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextProps>({
@@ -37,6 +41,7 @@ const AuthContext = createContext<AuthContextProps>({
   loading: true,
   signOut: async () => {},
   refreshProfile: async () => {},
+  updatePassword: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -126,6 +131,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       return result.data || null;
     } catch (err: any) {
       if (retries > 0) {
+        console.warn(`Profile fetch failed, retrying... (${retries} left)`);
         return fetchProfileSafe(userId, sessionUser, retries - 1);
       }
       return null;
@@ -226,8 +232,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  // ✅ ADD THIS FUNCTION
+  const updatePassword = async (
+    currentPassword: string,
+    newPassword: string
+  ) => {
+    // First, verify the current password by attempting reauthentication
+    if (!user?.email) {
+      throw new Error("User email not found");
+    }
+
+    try {
+      // Verify current password by signing in with current credentials
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      });
+
+      if (signInError) {
+        throw new Error("Current password is incorrect");
+      }
+
+      // If verification succeeds, update to new password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) {
+        throw new Error(updateError.message || "Failed to update password");
+      }
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to change password");
+    }
+  };
+
   const value = useMemo(
-    () => ({ user, loading, signOut, refreshProfile }),
+    () => ({ user, loading, signOut, refreshProfile, updatePassword }),
     [user, loading]
   );
 

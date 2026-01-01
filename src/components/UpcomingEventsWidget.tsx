@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/authContext";
 import { format } from "date-fns";
-import { MapPin, Loader2, Ticket, ChevronRight, PawPrint } from "lucide-react";
+import { MapPin, Ticket, ChevronRight, PawPrint } from "lucide-react";
 
 type MyEvent = {
   registration_id: string;
@@ -26,7 +26,6 @@ type MyEvent = {
 export function UpcomingEventsWidget() {
   const { user } = useAuth();
   const [events, setEvents] = useState<MyEvent[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
@@ -34,7 +33,7 @@ export function UpcomingEventsWidget() {
   }, [user]);
 
   const fetchMyEvents = async () => {
-    if (!user) return; // ✅ FIX: Stops TypeScript from complaining about "user possibly null"
+    if (!user) return;
 
     try {
       const today = new Date().toISOString().split("T")[0];
@@ -50,14 +49,13 @@ export function UpcomingEventsWidget() {
           )
         `
         )
-        .eq("user_id", user.id) // Now safe to use user.id
+        .eq("user_id", user.id)
         .gte("event.event_date", today)
         .order("event(event_date)", { ascending: true })
         .limit(3);
 
       if (error) throw error;
 
-      // Filter out null events (in case date filter failed in join) and sort manually
       const validEvents = (data || [])
         .filter((r: any) => r.event)
         .sort(
@@ -77,21 +75,14 @@ export function UpcomingEventsWidget() {
       );
     } catch (err) {
       console.error("Error fetching tickets:", err);
-    } finally {
-      setLoading(false);
     }
   };
 
-  if (loading)
-    return (
-      <div className="bg-white rounded-2xl border border-gray-100 p-6 flex justify-center">
-        <Loader2 className="animate-spin text-gray-300 w-6 h-6" />
-      </div>
-    );
-
+  // ✅ Empty State
+  // (This will show initially while data is fetching, or if there are truly no events)
   if (events.length === 0)
     return (
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 text-center space-y-3">
+      <div className="bg-white rounded-2xl border border-gray-200 p-6 text-center space-y-3 shadow-sm h-full flex flex-col items-center justify-center">
         <div className="w-12 h-12 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mx-auto">
           <Ticket size={24} />
         </div>
@@ -104,15 +95,14 @@ export function UpcomingEventsWidget() {
       </div>
     );
 
+  // ✅ Main Content
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden h-full">
       <div className="p-4 border-b border-gray-50 flex items-center justify-between">
         <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2">
           <Ticket className="w-4 h-4 text-blue-600" />
           My Tickets
         </h3>
-        {/* Optional: Link to a full "My Events" page in the future */}
-        {/* <button className="text-[10px] font-bold text-blue-600 hover:underline">View All</button> */}
       </div>
 
       <div className="divide-y divide-gray-50">
@@ -124,8 +114,7 @@ export function UpcomingEventsWidget() {
           return (
             <div
               key={registration_id}
-              className="p-3 hover:bg-gray-50 transition-colors group cursor-pointer flex gap-3"
-              // onClick={() => navigate(`/events/${event.id}`)} // If you have a details page
+              className="p-3 hover:bg-gray-50 transition-colors group cursor-pointer flex gap-3 items-center"
             >
               {/* Date Column */}
               <div className="shrink-0 flex flex-col items-center justify-center w-12 h-12 bg-gray-100 rounded-lg border border-gray-200 group-hover:border-blue-200 group-hover:bg-blue-50 transition-colors">
@@ -161,7 +150,7 @@ export function UpcomingEventsWidget() {
               </div>
 
               {/* Arrow */}
-              <div className="flex items-center text-gray-300 group-hover:text-blue-400">
+              <div className="flex items-center text-gray-300 group-hover:text-blue-400 shrink-0">
                 <ChevronRight size={16} />
               </div>
             </div>
