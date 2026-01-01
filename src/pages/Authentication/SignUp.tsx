@@ -21,6 +21,7 @@ const USERNAME_REGEX = /^[a-zA-Z][a-zA-Z0-9_]{2,15}$/;
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/;
 
 // 2. Define Zod Schema
+//check commit
 const signUpSchema = z
   .object({
     email: z
