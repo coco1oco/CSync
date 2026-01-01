@@ -202,22 +202,26 @@ export function UnifiedDashboard() {
       </div>
       {/* List Items Skeleton */}
       <div className="divide-y divide-gray-50">
-        {[1, 2].map((i) => ( // <--- CHANGED FROM [1,2,3] TO [1,2]
-          <div key={i} className="p-3 flex gap-3 items-center">
-            {/* Date Box */}
-            <div className="shrink-0 w-12 h-12 bg-gray-100 rounded-lg animate-pulse" />
-            {/* Text Content */}
-            <div className="flex-1 flex flex-col justify-center gap-2">
-              <div className="h-3.5 w-3/4 bg-gray-100 rounded animate-pulse" />
-              <div className="flex gap-2">
-                <div className="h-2.5 w-1/3 bg-gray-100 rounded animate-pulse" />
-                <div className="h-2.5 w-10 bg-gray-100 rounded animate-pulse" />
+        {[1, 2].map(
+          (
+            i // <--- CHANGED FROM [1,2,3] TO [1,2]
+          ) => (
+            <div key={i} className="p-3 flex gap-3 items-center">
+              {/* Date Box */}
+              <div className="shrink-0 w-12 h-12 bg-gray-100 rounded-lg animate-pulse" />
+              {/* Text Content */}
+              <div className="flex-1 flex flex-col justify-center gap-2">
+                <div className="h-3.5 w-3/4 bg-gray-100 rounded animate-pulse" />
+                <div className="flex gap-2">
+                  <div className="h-2.5 w-1/3 bg-gray-100 rounded animate-pulse" />
+                  <div className="h-2.5 w-10 bg-gray-100 rounded animate-pulse" />
+                </div>
               </div>
+              {/* Chevron */}
+              <div className="w-4 h-4 bg-gray-100 rounded animate-pulse shrink-0" />
             </div>
-            {/* Chevron */}
-            <div className="w-4 h-4 bg-gray-100 rounded animate-pulse shrink-0" />
-          </div>
-        ))}
+          )
+        )}
       </div>
     </div>
   );
@@ -225,7 +229,10 @@ export function UnifiedDashboard() {
   const renderFeedSkeleton = () => (
     <div className="space-y-6">
       {[1, 2].map((i) => (
-        <div key={i} className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm space-y-4">
+        <div
+          key={i}
+          className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm space-y-4"
+        >
           <div className="flex items-center gap-3">
             <Skeleton className="w-10 h-10 rounded-full" />
             <div className="space-y-1.5">
