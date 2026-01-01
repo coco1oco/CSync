@@ -135,7 +135,7 @@ export default function SignIn() {
               <Input
                 id="email"
                 type="email"
-                placeholder="name@example.com"
+                placeholder="name@cvsu.edu.ph"
                 {...register("email")}
                 className={`h-12 rounded-xl bg-white border ${
                   errors.email

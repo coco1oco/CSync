@@ -1,20 +1,12 @@
 import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import {
-  Home,
-  MessageCircle,
-  Bell,
-  PawPrint,
-  LogOut,
-  User,
-  Loader2,
-  Users,
-} from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { Home, MessageCircle, Bell, PawPrint, User, Users } from "lucide-react";
 import { useAuth } from "@/context/authContext";
 import { useChat } from "@/context/ChatContext";
 import logo from "@/assets/images/Pawpal.svg";
 import type { UserRole } from "@/types";
 import { NotificationCenter } from "./NotificationCenter";
+import { MoreMenu } from "./MoreMenu"; // <--- Import the new component
 
 interface SidebarProps {
   userRole: UserRole | null;
@@ -22,41 +14,30 @@ interface SidebarProps {
 
 export function Sidebar({ userRole }: Readonly<SidebarProps>) {
   const location = useLocation();
-  const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { user } = useAuth();
   const { unreadCount } = useChat();
-  const [isSigningOut, setIsSigningOut] = useState(false);
-
-  // State for the panel
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
 
   // Notification counts
   const adminNotificationCount = userRole === "admin" ? 3 : 0;
-
-  const handleSignOut = async () => {
-    setIsSigningOut(true);
-    try {
-      await signOut();
-      navigate("/SignIn");
-    } catch (error) {
-      setIsSigningOut(false);
-    }
-  };
+  const isMessagesPage = location.pathname.startsWith("/messages");
+  const isCollapsed = isNotificationPanelOpen || isMessagesPage;
 
   const handleNotificationClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    setIsNotificationPanelOpen(!isNotificationPanelOpen);
+    if (isMessagesPage) {
+      setIsNotificationPanelOpen(true);
+    } else {
+      setIsNotificationPanelOpen(!isNotificationPanelOpen);
+    }
   };
 
-  // Helper to determine sidebar width class
-  const sidebarWidthClass = isNotificationPanelOpen ? "w-[72px]" : "w-64";
-  const hideTextClass = isNotificationPanelOpen ? "hidden" : "block";
-  const justifyClass = isNotificationPanelOpen
-    ? "justify-center"
-    : "justify-start";
-  const pxClass = isNotificationPanelOpen ? "px-2" : "px-4";
+  const sidebarWidthClass = isCollapsed ? "w-[72px]" : "w-64";
+  const hideTextClass = isCollapsed ? "hidden" : "block";
+  const justifyClass = isCollapsed ? "justify-center" : "justify-start";
+  const pxClass = isCollapsed ? "px-2" : "px-4";
 
   // Navigation Data
   const navItems = [
@@ -82,18 +63,18 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
           },
         ]),
     { path: "/PetDashboard", icon: PawPrint, label: "Pet Dashboard" },
+    { path: "/ProfilePage", icon: User, label: "Profile" },
   ];
 
   return (
     <>
-      {/* SIDEBAR CONTAINER */}
       <aside
         className={`hidden lg:flex flex-col h-screen fixed left-0 top-0 border-r border-gray-200 bg-white z-[60] transition-all duration-300 ease-in-out ${sidebarWidthClass}`}
       >
         {/* Logo Section */}
         <div
           className={`h-16 flex items-center ${justifyClass} ${
-            isNotificationPanelOpen ? "" : "px-6 gap-3"
+            isCollapsed ? "" : "px-6 gap-3"
           }`}
         >
           <img
@@ -112,10 +93,12 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
         <nav className={`flex-1 space-y-2 py-4 ${pxClass}`}>
           {navItems.map((item) => {
             const Icon = item.icon;
-            // Highlight if active path OR if notification panel is open
             const isNotifActive =
               item.label === "Notifications" && isNotificationPanelOpen;
-            const active = isActive(item.path) || isNotifActive;
+            const active =
+              isActive(item.path) ||
+              isNotifActive ||
+              (item.label === "Messages" && isMessagesPage);
 
             const buttonClasses = `
               w-full flex items-center ${justifyClass} py-3 rounded-full transition-all font-medium relative group
@@ -124,19 +107,26 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
                   ? "bg-blue-50 text-blue-600"
                   : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
               }
-              ${isNotificationPanelOpen ? "px-0" : "px-4 gap-3"}
+              ${isCollapsed ? "px-0" : "px-4 gap-3"}
             `;
 
             const content = (
               <>
-                <div className="relative">
-                  <Icon
-                    size={24}
-                    strokeWidth={active ? 2.5 : 2}
-                    className="transition-transform group-hover:scale-105"
-                  />
+                <div className="relative flex items-center justify-center">
+                  {item.label === "Profile" && user?.avatar_url ? (
+                    <img
+                      src={user.avatar_url}
+                      alt="Profile"
+                      className="w-6 h-6 rounded-full object-cover border border-gray-200 transition-transform group-hover:scale-105"
+                    />
+                  ) : (
+                    <Icon
+                      size={24}
+                      strokeWidth={active ? 2.5 : 2}
+                      className="transition-transform group-hover:scale-105"
+                    />
+                  )}
 
-                  {/* Message Badge */}
                   {item.label === "Messages" && unreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] flex items-center justify-center border-2 border-white shadow-sm">
                       {unreadCount > 9 ? "9+" : unreadCount}
@@ -148,16 +138,12 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
                     <span className="absolute -top-1 -right-1 bg-red-500 w-2 h-2 rounded-full border-2 border-white shadow-sm"></span>
                   )}
                 </div>
-
-                {/* Text Label */}
                 <span
                   className={`whitespace-nowrap transition-opacity duration-200 ${hideTextClass}`}
                 >
                   {item.label}
                 </span>
-
-                {/* Tooltip for collapsed mode */}
-                {isNotificationPanelOpen && (
+                {isCollapsed && (
                   <div className="absolute left-14 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
                     {item.label}
                   </div>
@@ -177,7 +163,6 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
                 </button>
               );
             }
-
             return (
               <Link key={item.path} to={item.path} className={buttonClasses}>
                 {content}
@@ -186,51 +171,44 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
           })}
         </nav>
 
-        {/* Footer / Profile Section */}
-        <div className={`border-t border-gray-100 space-y-2 py-4 ${pxClass}`}>
-          <Link
-            to="/ProfilePage"
-            className={`flex items-center ${justifyClass} py-3 rounded-full transition-all font-medium group
-              ${
-                isActive("/ProfilePage")
-                  ? "bg-blue-50 text-blue-600"
-                  : "text-gray-600 hover:bg-gray-50"
-              }
-              ${isNotificationPanelOpen ? "px-0" : "px-4 gap-3"}
-            `}
-          >
-            <User size={24} />
-            <span className={hideTextClass}>Profile</span>
-          </Link>
+        {/* --- FOOTER SECTION --- */}
+        <div className={`border-t border-gray-100 p-3 space-y-2`}>
+          {/* Use the new MoreMenu Component */}
+          <MoreMenu
+            isCollapsed={isCollapsed}
+            justifyClass={justifyClass}
+            hideTextClass={hideTextClass}
+          />
 
-          <button
-            onClick={handleSignOut}
-            disabled={isSigningOut}
-            className={`w-full flex items-center ${justifyClass} py-3 rounded-full text-red-500 hover:bg-red-50 transition-all font-medium disabled:opacity-50 group
-               ${isNotificationPanelOpen ? "px-0" : "px-4 gap-3"}
-            `}
+          {/* AFFILIATION */}
+          <div
+            className={`pt-2 flex items-center opacity-60 hover:opacity-100 transition-opacity ${justifyClass} ${
+              isCollapsed ? "justify-center" : "gap-3 px-2"
+            }`}
           >
-            {isSigningOut ? (
-              <Loader2 size={24} className="animate-spin" />
-            ) : (
-              <LogOut size={24} />
-            )}
-            <span className={hideTextClass}>
-              {isSigningOut ? "..." : "Sign Out"}
-            </span>
-          </button>
+            <img
+              src="/Paws2.jpg"
+              alt="PAWS Logo"
+              className="w-8 h-8 grayscale flex-shrink-0"
+            />
+            <div className={hideTextClass}>
+              <p className="text-[10px] uppercase font-bold text-gray-400">
+                Affiliated with
+              </p>
+              <p className="text-xs font-bold text-gray-700">
+                PAWS Philippines
+              </p>
+            </div>
+          </div>
         </div>
       </aside>
 
-      {/* NOTIFICATION PANEL - Positioned next to the collapsed sidebar */}
-      {isNotificationPanelOpen && (
-        <div className="fixed left-[72px] top-0 h-screen z-50 shadow-xl border-r border-gray-200 bg-white w-80 overflow-hidden animate-in slide-in-from-left-5 duration-200">
-          <NotificationCenter
-            isOpen={isNotificationPanelOpen}
-            onClose={() => setIsNotificationPanelOpen(false)}
-          />
-        </div>
-      )}
+      {/* RENDER NOTIFICATION PANEL */}
+      <NotificationCenter
+        variant="panel"
+        isOpen={isNotificationPanelOpen}
+        onClose={() => setIsNotificationPanelOpen(false)}
+      />
     </>
   );
 }

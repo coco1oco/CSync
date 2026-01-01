@@ -14,7 +14,8 @@ export default function AppLayout() {
   const userRole = (user as any)?.role || "member";
 
   // 🔍 ROUTE DETECTION
-  const isMessagesPage = location.pathname === "/messages";
+  // ✅ UPDATED: Use startsWith to be safe, matches Sidebar logic
+  const isMessagesPage = location.pathname.startsWith("/messages");
 
   // Detect any PetDashboard route (Dashboard, Add Pet, Edit Pet, etc.)
   const isPetDashboard = location.pathname.startsWith("/PetDashboard");
@@ -30,10 +31,15 @@ export default function AppLayout() {
   const isFixedPage = isMessagesPage;
 
   // 2. Wide Page: Uses full width (max-w-full) instead of constrained width
-  const isWidePage = isFixedPage || isAdminPage || isPetDashboard;
 
   // 3. Edge-to-Edge: Removes AppLayout padding so the child page can control it
   const isEdgeToEdge = isPetDashboard;
+
+const isSettingsPage = location.pathname.startsWith("/settings") || location.pathname.startsWith("/Settings"); 
+
+// 2. UPDATE THIS VARIABLE
+// Add || isSettingsPage to the end
+const isWidePage = isFixedPage || isAdminPage || isPetDashboard || isSettingsPage;
 
   if (loading)
     return (
@@ -61,7 +67,17 @@ export default function AppLayout() {
     >
       <Sidebar userRole={userRole} />
 
-      <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
+      {/* ✅ UPDATE: Dynamic Left Margin 
+          - lg:ml-[72px] when on Messages (matches collapsed sidebar)
+          - lg:ml-64 otherwise (matches full sidebar)
+          - Added transition classes for smooth animation
+      */}
+      <div 
+        className={cn(
+          "flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out",
+          isMessagesPage ? "lg:ml-[72px]" : "lg:ml-64"
+        )}
+      >
         {/* Mobile Header (Sticky) - HIDDEN ON MESSAGES PAGE */}
         {!isFixedPage && (
           <div className="lg:hidden sticky top-0 z-40">
