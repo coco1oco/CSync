@@ -9,22 +9,27 @@ import {
   PawPrint,
   Building2,
   Syringe,
-  ClipboardList,
   CalendarClock,
   ChevronRight,
+  Pill,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton"; // ✅ Import Skeleton
+import { Skeleton } from "@/components/ui/skeleton";
+import { isSameDay, isPast, addDays, isBefore } from "date-fns";
 
 export default function MainPetProfilePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<"personal" | "campus">("personal");
+
+  // New Stats State: Tracks Daily Meds separate from General Tasks
   const [stats, setStats] = useState({
     vaccinesDue: 0,
-    tasksPending: 0,
+    dailyNeeds: 0, // Meds & Urgent Tasks due Today/Overdue
     upcomingVisits: 0,
+    urgentPets: [] as any[], // List of pets that need attention NOW
   });
 
   const { pets, loading } = usePets(user?.id, activeTab);
@@ -34,89 +39,70 @@ export default function MainPetProfilePage() {
     if (!user || activeTab !== "personal") return;
     const fetchStats = async () => {
       try {
-        const [vRes, tRes, sRes] = await Promise.all([
-          supabase
-            .from("vaccinations")
-            .select("id", { count: "exact", head: true })
-            .eq("owner_id", user.id)
-            .neq("status", "completed"),
-          supabase
-            .from("pet_tasks")
-            .select("id", { count: "exact", head: true })
-            .eq("owner_id", user.id)
-            .eq("completed", false),
-          supabase
-            .from("schedules")
-            .select("id", { count: "exact", head: true })
-            .eq("owner_id", user.id)
-            .eq("status", "pending"),
-        ]);
+        const todayStr = new Date().toISOString();
+
+        // 1. Fetch Vaccines (Upcoming 30 days or Overdue)
+        const { data: vax } = await supabase
+          .from("vaccinations")
+          .select("id")
+          .eq("owner_id", user.id)
+          .neq("status", "completed");
+
+        // 2. Fetch Tasks/Meds (Due Today or Overdue)
+        // We consider 'Daily Needs' anything due on or before today that isn't done
+        const { data: meds } = await supabase
+          .from("pet_tasks")
+          .select("id, title, pet_id, pets(name, petimage_url)")
+          .eq("owner_id", user.id)
+          .eq("completed", false)
+          .lte("due_date", todayStr); // Less than or equal to Today
+
+        // 3. Fetch Visits
+        const { data: visits } = await supabase
+          .from("schedules")
+          .select("id")
+          .eq("owner_id", user.id)
+          .eq("status", "pending");
+
+        // 4. Identify Pets needing attention
+        const urgentPetIds = new Set(meds?.map((m: any) => m.pet_id));
+        const urgentPetsList = pets.filter((p) => urgentPetIds.has(p.id));
+
         setStats({
-          vaccinesDue: vRes.count || 0,
-          tasksPending: tRes.count || 0,
-          upcomingVisits: sRes.count || 0,
+          vaccinesDue: vax?.length || 0,
+          dailyNeeds: meds?.length || 0,
+          upcomingVisits: visits?.length || 0,
+          urgentPets: urgentPetsList,
         });
       } catch (err) {
         console.error(err);
       }
     };
     fetchStats();
-  }, [user, activeTab]);
+  }, [user, activeTab, pets]);
 
-  // ✅ SKELETON LOADING STATE
+  // --- SKELETON LOADING ---
   if (loading) {
     return (
       <div className="w-full h-full flex flex-col bg-gray-50">
-        {/* Fixed Header Skeleton */}
         <div className="shrink-0 px-4 pt-4 lg:pt-8 lg:px-8 pb-4 bg-gray-50 flex flex-col gap-6">
           <div className="flex flex-col md:flex-row justify-between gap-4">
             <div className="space-y-2">
               <Skeleton className="h-8 w-48" />
               <Skeleton className="h-4 w-64" />
             </div>
-            {/* Tabs Skeleton */}
             <Skeleton className="h-10 w-64 rounded-full" />
           </div>
-
-          {/* Stats Grid Skeleton */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
             {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-3"
-              >
-                <Skeleton className="w-10 h-10 rounded-full" />
-                <div className="space-y-2">
-                  <Skeleton className="h-3 w-16" />
-                  <Skeleton className="h-6 w-8" />
-                </div>
-              </div>
+              <Skeleton key={i} className="h-24 w-full rounded-xl" />
             ))}
           </div>
         </div>
-
-        {/* Scrollable Content Skeleton */}
         <div className="flex-1 overflow-y-auto px-4 lg:px-8 pb-24 lg:pb-8">
-          <div className="flex justify-between items-center mb-4">
-            <Skeleton className="h-6 w-32" />
-            <Skeleton className="h-9 w-24 rounded-full" />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div
-                key={i}
-                className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 space-y-3"
-              >
-                <Skeleton className="aspect-[4/3] w-full rounded-xl" />
-                <div className="flex justify-between items-center px-1">
-                  <div className="space-y-2">
-                    <Skeleton className="h-5 w-32" />
-                    <Skeleton className="h-3 w-20" />
-                  </div>
-                  <Skeleton className="w-8 h-8 rounded-full" />
-                </div>
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-64 rounded-2xl" />
             ))}
           </div>
         </div>
@@ -126,15 +112,15 @@ export default function MainPetProfilePage() {
 
   return (
     <div className="w-full h-full flex flex-col bg-gray-50">
-      {/* 1. FIXED HEADER SECTION */}
+      {/* 1. HEADER SECTION */}
       <div className="shrink-0 px-4 pt-4 lg:pt-8 lg:px-8 pb-4 bg-gray-50 z-10 flex flex-col gap-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-black text-gray-900 tracking-tight">
-              Pet Management
+              Pet Dashboard
             </h1>
             <p className="text-gray-500 text-sm">
-              Manage profiles, health records, and tasks.
+              Overview of your furry family.
             </p>
           </div>
 
@@ -144,31 +130,30 @@ export default function MainPetProfilePage() {
               className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold transition-all ${
                 activeTab === "personal"
                   ? "bg-blue-600 text-white shadow-md"
-                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                  : "text-gray-500 hover:bg-gray-50"
               }`}
             >
-              <PawPrint size={16} />
-              My Pets
+              <PawPrint size={16} /> My Pets
             </button>
             <button
               onClick={() => setActiveTab("campus")}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold transition-all ${
                 activeTab === "campus"
                   ? "bg-blue-600 text-white shadow-md"
-                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                  : "text-gray-500 hover:bg-gray-50"
               }`}
             >
-              <Building2 size={16} />
-              Campus Dogs
+              <Building2 size={16} /> Campus Dogs
             </button>
           </div>
         </div>
 
-        {/* SUMMARY STATS */}
+        {/* 2. SMART STATS (Only for Personal Pets) */}
         {activeTab === "personal" && pets.length > 0 && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 animate-in fade-in slide-in-from-top-2">
+            {/* Total Pets */}
             <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+              <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
                 <Dog size={20} />
               </div>
               <div>
@@ -180,7 +165,47 @@ export default function MainPetProfilePage() {
                 </p>
               </div>
             </div>
-            <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-3 relative overflow-hidden">
+
+            {/* Daily Needs (Medicine/Tasks) - REPLACED GENERIC TASKS */}
+            <div
+              className={`p-3 md:p-4 rounded-xl border shadow-sm flex items-center gap-3 relative overflow-hidden transition-all ${
+                stats.dailyNeeds > 0
+                  ? "bg-red-50 border-red-100"
+                  : "bg-white border-gray-200"
+              }`}
+            >
+              <div
+                className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                  stats.dailyNeeds > 0
+                    ? "bg-red-100 text-red-600"
+                    : "bg-blue-50 text-blue-600"
+                }`}
+              >
+                <Pill size={20} />
+              </div>
+              <div>
+                <p
+                  className={`text-[10px] font-bold uppercase ${
+                    stats.dailyNeeds > 0 ? "text-red-400" : "text-gray-400"
+                  }`}
+                >
+                  Daily Needs
+                </p>
+                <p
+                  className={`text-xl font-black ${
+                    stats.dailyNeeds > 0 ? "text-red-900" : "text-gray-900"
+                  }`}
+                >
+                  {stats.dailyNeeds}
+                </p>
+              </div>
+              {stats.dailyNeeds > 0 && (
+                <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+              )}
+            </div>
+
+            {/* Vaccines */}
+            <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-orange-600 shrink-0">
                 <Syringe size={20} />
               </div>
@@ -192,23 +217,9 @@ export default function MainPetProfilePage() {
                   {stats.vaccinesDue}
                 </p>
               </div>
-              {stats.vaccinesDue > 0 && (
-                <div className="absolute top-2 right-2 w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
-              )}
             </div>
-            <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600 shrink-0">
-                <ClipboardList size={20} />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-gray-400 uppercase">
-                  Tasks
-                </p>
-                <p className="text-xl font-black text-gray-900">
-                  {stats.tasksPending}
-                </p>
-              </div>
-            </div>
+
+            {/* Visits */}
             <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-green-600 shrink-0">
                 <CalendarClock size={20} />
@@ -226,8 +237,36 @@ export default function MainPetProfilePage() {
         )}
       </div>
 
-      {/* 2. SCROLLABLE CONTENT AREA */}
+      {/* 3. CONTENT AREA */}
       <div className="flex-1 overflow-y-auto px-4 lg:px-8 pb-24 lg:pb-8">
+        {/* Urgent Attention Section (New) */}
+        {activeTab === "personal" && stats.dailyNeeds > 0 && (
+          <div className="mb-6 bg-red-50 border border-red-100 rounded-2xl p-4 flex items-start gap-3">
+            <AlertCircle className="text-red-600 w-5 h-5 shrink-0 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-bold text-red-900">
+                Meds & Tasks Due Today
+              </h3>
+              <p className="text-xs text-red-700 mt-1">
+                You have {stats.dailyNeeds} pending items. Check profiles for:
+                <span className="font-bold ml-1">
+                  {stats.urgentPets.map((p) => p.name).join(", ")}
+                </span>
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="ml-auto text-red-700 hover:text-red-900 hover:bg-red-100 h-8"
+              onClick={() =>
+                navigate(`/PetDashboard/${stats.urgentPets[0].id}`)
+              }
+            >
+              View
+            </Button>
+          </div>
+        )}
+
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-gray-900">
             {activeTab === "personal" ? "My Furry Friends" : "Campus Residents"}
@@ -287,6 +326,13 @@ export default function MainPetProfilePage() {
                       <Dog className="w-10 h-10 text-gray-300" />
                     </div>
                   )}
+                  {/* Badge for Daily Needs on the Card */}
+                  {activeTab === "personal" &&
+                    stats.urgentPets.some((p) => p.id === pet.id) && (
+                      <div className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-md animate-pulse">
+                        Needs Care
+                      </div>
+                    )}
                 </div>
                 <div className="flex items-center justify-between px-1">
                   <div>

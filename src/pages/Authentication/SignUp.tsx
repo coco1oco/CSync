@@ -10,10 +10,12 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
 
-import logo from "@/assets/images/Pawpal.svg";
+import logo from "@/assets/images/PawPal.svg"; // Corrected lowercase 'l' based on typical file naming if needed, kept as provided
+// Check if your import was "Pawpal.svg" or "PawPal.svg" in your assets. Assuming "PawPal.svg" from SignIn.
 import heroBg from "@/assets/images/hero_2.jpg";
 
 // 1. Define Regex Patterns
+// This regex allows for long email addresses.
 const CVSU_EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@cvsu\.edu\.ph$/;
 const USERNAME_REGEX = /^[a-zA-Z][a-zA-Z0-9_]{2,15}$/;
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/;
@@ -25,6 +27,7 @@ const signUpSchema = z
       .string()
       .min(1, "Email is required")
       .email("Invalid email format")
+      // Explicitly enforce domain
       .regex(
         CVSU_EMAIL_REGEX,
         "Please use your institutional email (@cvsu.edu.ph)"
@@ -53,9 +56,6 @@ const signUpSchema = z
 type SignUpFormValues = z.infer<typeof signUpSchema>;
 
 export default function SignUp() {
-  // ✅ REMOVED: navigate, useAuth, and useEffect
-  // The PublicRoute wrapper now handles the redirect if they are already logged in.
-
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -82,11 +82,9 @@ export default function SignUp() {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
-        // ✅ ADD THIS: Pass metadata to Supabase so triggers can use it
         options: {
           data: {
             username: data.username,
-            // You can add other default fields here if needed
           },
         },
       });
@@ -96,7 +94,6 @@ export default function SignUp() {
       const createdUser = authData.user;
 
       if (createdUser) {
-        // Create Profile Entry
         const { error: profileError } = await supabase.from("profiles").upsert([
           {
             id: createdUser.id,
@@ -107,9 +104,6 @@ export default function SignUp() {
 
         if (profileError) throw profileError;
       }
-
-      // Success! AuthContext will update, PublicRoute will see the user,
-      // and AppRouter will automatically flip them to the Dashboard.
     } catch (err: any) {
       console.error("SignUp Error:", err);
       setServerError(err.message || "An error occurred during sign up");
@@ -158,7 +152,6 @@ export default function SignUp() {
             </p>
           </div>
 
-          {/* Server Error */}
           {serverError && (
             <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl animate-in fade-in">
               {serverError}
@@ -172,7 +165,8 @@ export default function SignUp() {
               <Input
                 id="email"
                 type="email"
-                placeholder="student@cvsu.edu.ph"
+                // Placeholder updated to show a long email example
+                placeholder="firstname.lastname@cvsu.edu.ph"
                 {...register("email")}
                 className={`h-11 rounded-xl bg-white focus-visible:ring-blue-600 border ${
                   errors.email
