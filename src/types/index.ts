@@ -5,7 +5,7 @@ export interface UserProfile {
   username: string;
   email: string;
   role: UserRole;
-  committee?: string | null; // Mark as optional or nullable
+  committee?: string | null;
   avatar_url: string | null;
   first_name: string | null;
   last_name: string | null;
@@ -14,19 +14,16 @@ export interface UserProfile {
   contact_number?: string | null;
 }
 
-// ✅ NEW: Comment Interface
-// ✅ NEW: Comment Interface (Updated)
 export interface Comment {
   id: string;
   user_id: string;
   event_id: string;
   content: string;
   created_at: string;
-  parent_comment_id: string | null; // <--- This was missing!
+  parent_comment_id: string | null;
   user?: UserProfile;
 }
 
-// ✅ UPDATED: Added Luma-style fields
 export interface OutreachEvent {
   id: string;
   admin_id: string;
@@ -37,13 +34,12 @@ export interface OutreachEvent {
   created_at: string;
   updated_at: string;
   admin?: UserProfile;
-  // New fields
   event_date?: string | null;
   start_time?: string | null;
   end_time?: string | null;
   max_attendees?: number | null;
   requires_registration?: boolean;
-  event_type?: string; // 'official' | 'general'
+  event_type?: string;
   profiles?: {
     username: string | null;
     avatar_url: string | null;
@@ -74,4 +70,30 @@ export interface Conversation {
   id: string;
   name: string;
   is_group: boolean;
+}
+
+// ✅ ADDED: Missing Medication Interface
+export interface Medication {
+  id: string;
+  pet_id: string;
+  owner_id: string;
+  name: string;
+  current_stock: number;
+  dosage_per_use: number;
+  low_stock_threshold: number;
+  unit: string;
+  created_at?: string;
+  // This 'pets' property is critical for the "Joined" query in the UI
+  pets?: {
+    name: string;
+    petimage_url: string | null;
+  };
+}
+
+export interface MedicationLog {
+  id: string;
+  medication_id: string;
+  pet_id: string;
+  logged_at: string;
+  dosage_taken: number;
 }
