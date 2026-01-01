@@ -6,6 +6,7 @@ import { Plus, Trash2, Edit2 } from "lucide-react";
 
 interface ScheduleSectionProps {
   petId: string;
+  userId?: string;
 }
 
 const statusBadgeColors = {
@@ -16,7 +17,13 @@ const statusBadgeColors = {
 
 export default function ScheduleSection({ petId }: ScheduleSectionProps) {
   const { user } = useAuth();
-  const { schedules, addSchedule, updateSchedule, deleteSchedule, updateStatus } = useSchedules(petId, user?.id);
+  const {
+    schedules,
+    addSchedule,
+    updateSchedule,
+    deleteSchedule,
+    updateStatus,
+  } = useSchedules(petId, user?.id);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -98,7 +105,10 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
     }
   };
 
-  const handleStatusChange = async (id: string, newStatus: "pending" | "completed" | "cancelled") => {
+  const handleStatusChange = async (
+    id: string,
+    newStatus: "pending" | "completed" | "cancelled"
+  ) => {
     await updateStatus(id, newStatus);
   };
 
@@ -108,13 +118,18 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
       {schedules.length > 0 && (
         <div className="space-y-3">
           {schedules.map((schedule) => (
-            <div key={schedule.id} className="bg-white p-4 rounded-lg border border-gray-200 hover:shadow-md transition">
+            <div
+              key={schedule.id}
+              className="bg-white p-4 rounded-lg border border-gray-200 hover:shadow-md transition"
+            >
               <div className="flex justify-between items-start mb-2">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <p className="font-semibold text-base">{schedule.title}</p>
                     <span
-                      className={`text-xs px-2 py-1 rounded-full font-semibold cursor-pointer ${statusBadgeColors[schedule.status]}`}
+                      className={`text-xs px-2 py-1 rounded-full font-semibold cursor-pointer ${
+                        statusBadgeColors[schedule.status]
+                      }`}
                       onClick={() => {
                         const nextStatus =
                           schedule.status === "pending"
@@ -125,11 +140,14 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
                         handleStatusChange(schedule.id, nextStatus as any);
                       }}
                     >
-                      {schedule.status.charAt(0).toUpperCase() + schedule.status.slice(1)}
+                      {schedule.status.charAt(0).toUpperCase() +
+                        schedule.status.slice(1)}
                     </span>
                   </div>
                   {schedule.description && (
-                    <p className="text-sm text-gray-600 mt-1">{schedule.description}</p>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {schedule.description}
+                    </p>
                   )}
                 </div>
                 <div className="flex gap-2">
@@ -149,7 +167,9 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
               </div>
 
               <div className="space-y-1 text-sm text-gray-600">
-                <p>📅 {new Date(schedule.scheduled_date).toLocaleDateString()}</p>
+                <p>
+                  📅 {new Date(schedule.scheduled_date).toLocaleDateString()}
+                </p>
                 {schedule.scheduled_time && <p>🕐 {schedule.scheduled_time}</p>}
                 {schedule.location && <p>📍 {schedule.location}</p>}
                 {schedule.vet_name && <p>🏥 {schedule.vet_name}</p>}
@@ -179,18 +199,24 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
               type="text"
               placeholder="e.g., Annual Health Checkup"
               value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, title: e.target.value })
+              }
               className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
               required
             />
           </div>
 
           <div>
-            <label className="text-sm font-medium block mb-1">Description</label>
+            <label className="text-sm font-medium block mb-1">
+              Description
+            </label>
             <textarea
               placeholder="Add any notes..."
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
               className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500 resize-none"
               rows={2}
             />
@@ -202,7 +228,9 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
               <input
                 type="date"
                 value={formData.scheduled_date}
-                onChange={(e) => setFormData({ ...formData, scheduled_date: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, scheduled_date: e.target.value })
+                }
                 className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
                 required
               />
@@ -213,7 +241,9 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
               <input
                 type="time"
                 value={formData.scheduled_time}
-                onChange={(e) => setFormData({ ...formData, scheduled_time: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, scheduled_time: e.target.value })
+                }
                 className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
               />
             </div>
@@ -225,7 +255,9 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
               type="text"
               placeholder="e.g., Happy Paws Veterinary Clinic"
               value={formData.location}
-              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, location: e.target.value })
+              }
               className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
             />
           </div>
@@ -236,7 +268,9 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
               type="text"
               placeholder="e.g., Dr. Smith"
               value={formData.vet_name}
-              onChange={(e) => setFormData({ ...formData, vet_name: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, vet_name: e.target.value })
+              }
               className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
             />
           </div>
@@ -245,7 +279,9 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
             <label className="text-sm font-medium block mb-1">Status</label>
             <select
               value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+              onChange={(e) =>
+                setFormData({ ...formData, status: e.target.value as any })
+              }
               className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
             >
               <option value="pending">Pending</option>

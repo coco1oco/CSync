@@ -6,6 +6,7 @@ import { Plus, Trash2, Edit2, Check } from "lucide-react";
 
 interface TasksSectionProps {
   petId: string;
+  userId?: string;
 }
 
 const priorityColors = {

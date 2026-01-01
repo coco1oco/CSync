@@ -5,6 +5,7 @@ import { usePets } from "@/lib/usePets";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
 import { ArrowLeft, Building2 } from "lucide-react";
 import { toast } from "sonner";
+import { TemplateService } from "@/lib/TemplateService";
 import PetForm, { type PetFormData } from "@/components/PetForm";
 
 export default function AddPetPage() {
@@ -18,13 +19,16 @@ export default function AddPetPage() {
   const [loading, setLoading] = useState(false);
 
   const handleAddPet = async (data: PetFormData) => {
+    if (!user) return; // Guard clause
     setLoading(true);
+
     try {
       let imageUrl = null;
       if (data.imageFile) {
         imageUrl = await uploadImageToCloudinary(data.imageFile);
       }
 
+      // 1. Create Pet in Database
       const result = await addPet({
         name: data.name,
         species: data.species || null,
@@ -37,7 +41,20 @@ export default function AddPetPage() {
         petimage_url: imageUrl,
       });
 
+      // 2. If successful, apply the Smart Template
       if (result) {
+        try {
+          // ✅ FIX: Use 'result.id' (from DB), not 'data.id' (from Form)
+          await TemplateService.applyStarterTemplate(
+            result.id,
+            result.species || "dog", // Fallback if species is missing
+            user.id
+          );
+        } catch (templateError) {
+          console.error("Template error:", templateError);
+          // We don't block navigation if template fails, just log it
+        }
+
         toast.success(
           isCampusMode ? "Campus dog registered!" : "New pet added!"
         );
