@@ -1,13 +1,15 @@
+// src/lib/cloudinary.ts
+
 export async function uploadImageToCloudinary(
   file: File,
-  presetType: "avatar" | "pet" | "chat" | "report" = "chat"
+  presetType: "avatar" | "pet" | "chat" | "report" | "document" = "chat" // Added "document"
 ): Promise<string> {
   // 1. Validate file type
   if (!file.type.startsWith("image/")) {
     throw new Error("Please select a valid image file");
   }
 
-  // 2. Validate size (Uniform 5MB limit as requested)
+  // 2. Validate size (Uniform 5MB limit)
   const limit = 5 * 1024 * 1024; // 5MB
   if (file.size > limit) {
     throw new Error("Image must be smaller than 5MB");
@@ -16,16 +18,15 @@ export async function uploadImageToCloudinary(
   const formData = new FormData();
   formData.append("file", file);
 
-  // 3. Select the correct preset based on usage
-  // 'chat' reuses the Avatar preset to keep things simple, or you can add a VITE_CLOUDINARY_CHATURL later
+  // 3. Select the correct preset
+  // We'll reuse the PETIMAGEURL for documents since they belong to the pet profile.
   let uploadPreset = import.meta.env.VITE_CLOUDINARY_AVATARURL;
 
-  if (presetType === "pet") {
+  if (presetType === "pet" || presetType === "document") {
     uploadPreset = import.meta.env.VITE_CLOUDINARY_PETIMAGEURL;
   } else if (presetType === "avatar") {
     uploadPreset = import.meta.env.VITE_CLOUDINARY_AVATARURL;
-  }
-  else if (presetType === "report") {
+  } else if (presetType === "report") {
     uploadPreset = import.meta.env.VITE_CLOUDINARY_REPORTURL;
   }
 

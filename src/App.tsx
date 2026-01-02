@@ -11,6 +11,7 @@ import { AuthProvider } from "./context/authContext";
 import { ChatProvider } from "./context/ChatContext";
 import { NotificationProvider } from "./context/NotificationContext";
 import { Toaster } from "sonner";
+import { DialogProvider } from "./context/DialogContext";
 
 export default function App() {
   useEffect(() => {
@@ -39,14 +40,16 @@ export default function App() {
 
   return (
     <AuthProvider>
-      <ChatProvider>
-        <NotificationProvider>
-          <InstallPWA />
-          <AppRouter />
-          {/* ✅ FIXED: Changed to 'top-center' and added offset */}
-          <Toaster position="top-center" richColors offset={toastOffset} />
-        </NotificationProvider>
-      </ChatProvider>
+      <DialogProvider>
+        <ChatProvider>
+          <NotificationProvider>
+            <InstallPWA />
+            <AppRouter />
+            {/* ✅ FIXED: Changed to 'top-center' and added offset */}
+            <Toaster position="top-center" richColors offset={toastOffset} />
+          </NotificationProvider>
+        </ChatProvider>
+      </DialogProvider>
     </AuthProvider>
   );
 }
