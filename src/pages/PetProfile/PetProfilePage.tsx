@@ -2,43 +2,50 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/authContext";
 import { supabase } from "@/lib/supabaseClient";
+import { useDialog } from "@/context/DialogContext"; // ✅ Custom Dialog Hook
 
-// Components (Modular Structure)
+// Components
 import PetProfileCard from "./components/PetProfileCard";
-import SmartOverview from "./components/SmartOverview";
+import HealthPassport from "./components/HealthPassport";
 import QRModal from "./components/QRModal";
-import VaccinationSection from "./VaccinationSection";
-import TasksSection from "./TasksSection";
-import ScheduleSection from "./ScheduleSection";
 import DocumentsSection from "./components/DocumentsSection";
-import { FileText } from "lucide-react";
-
-// UI & Icons
+import LifeTimeline from "./components/LifeTimeline";
+import RoutineSection from "./components/RoutineSection";
+import WeightSection from "./components/WeightSection";
+import ScheduleSection from "./ScheduleSection";
+import VaccinationSection from "./VaccinationSection";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  LayoutDashboard,
-  Syringe,
-  CheckSquare,
+  ShieldCheck,
+  History,
+  Settings2,
   Calendar,
-  Sparkles,
-  Heart,
-  Dog,
-  Loader2,
+  HeartPulse,
+  Syringe,
+  Scale,
+  FileText,
+  ChevronLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 
 export default function PetProfilePage() {
   const { petId } = useParams<{ petId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { confirm, alert } = useDialog(); // ✅ Init Hooks
 
   const [pet, setPet] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("overview");
+
+  // 1. MAIN TABS
+  const [activeTab, setActiveTab] = useState("passport");
+
+  // 2. SUB TABS (Health Section)
+  const [healthSubTab, setHealthSubTab] = useState("vaccines");
+
   const [showQR, setShowQR] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // 1. Fetch Pet Data
   useEffect(() => {
     async function fetchPet() {
       if (!petId) return;
@@ -54,40 +61,49 @@ export default function PetProfilePage() {
       } catch (err) {
         console.error("Error fetching pet:", err);
       } finally {
-        setLoading(false);
+        setTimeout(() => setLoading(false), 300);
       }
     }
     fetchPet();
   }, [petId]);
 
-  // 2. Permission Logic
   const isOwner = user?.id === pet?.owner_id;
   const isCampusPet = pet?.is_campus_pet;
   const isAdmin = (user as any)?.role === "admin";
   const canManage = isOwner || (isCampusPet && isAdmin);
 
-  // 3. Loading & Error States
   if (loading) return <PetProfileSkeleton />;
+
   if (!pet) return <NotFoundState onBack={() => navigate("/PetDashboard")} />;
 
-  // 4. Delete Handler
   const handleDelete = async () => {
-    if (confirm(`Are you sure you want to remove ${pet.name}?`)) {
+    // ✅ Custom Danger Confirmation
+    const isConfirmed = await confirm(
+      `This action cannot be undone. All data for ${pet.name} will be lost permanently.`,
+      {
+        title: `Delete ${pet.name}?`,
+        variant: "danger",
+        confirmText: "Yes, Delete Profile",
+        cancelText: "Keep Profile",
+      }
+    );
+
+    if (isConfirmed) {
       setIsDeleting(true);
       try {
         await supabase.from("pets").delete().eq("id", pet.id);
         navigate("/PetDashboard");
       } catch (err) {
-        alert("Failed to delete pet. Please try again.");
+        // ✅ Custom Alert
+        await alert("Failed to delete profile. Please try again.");
         setIsDeleting(false);
       }
     }
   };
 
   return (
-    <div className="h-full w-full flex flex-col lg:flex-row bg-gray-50 lg:p-6 gap-6 overflow-hidden relative">
-      {/* --- LEFT PANEL: Profile Card --- */}
-      <div className="shrink-0 w-full lg:w-80 xl:w-96 px-4 pt-4 lg:p-0">
+    <div className="w-full min-h-screen bg-gray-50 flex flex-col lg:flex-row lg:items-start lg:p-6 gap-6 relative">
+      <div className="shrink-0 w-full lg:w-80 xl:w-96 px-4 pt-4 lg:p-0 lg:sticky lg:top-6 lg:h-fit z-20">
         <PetProfileCard
           pet={pet}
           isOwner={isOwner}
@@ -99,90 +115,109 @@ export default function PetProfilePage() {
         />
       </div>
 
-      {/* --- RIGHT PANEL: Main Hub --- */}
-      <div className="flex-1 flex flex-col bg-white lg:rounded-[2rem] lg:border lg:shadow-xl overflow-hidden mt-4 lg:mt-0 rounded-t-[2rem]">
-        {/* Header & Tabs */}
-        <div className="px-6 pt-6 pb-2 bg-white shrink-0">
-          <div className="flex justify-between items-center mb-6">
+      <div className="flex-1 flex flex-col bg-white lg:rounded-[2rem] lg:border lg:shadow-xl mt-4 lg:mt-0 rounded-t-[2rem] min-h-[calc(100vh-4rem)] pb-20 lg:pb-0">
+        <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm shrink-0 rounded-t-[2rem] border-b border-gray-100 shadow-sm lg:shadow-none lg:static transition-all">
+          <div className="lg:hidden px-6 pt-4 pb-2 flex items-center justify-between">
+            <span className="font-bold text-gray-900 truncate">
+              {pet.name}'s Binder
+            </span>
+          </div>
+
+          <div className="hidden lg:flex justify-between items-center px-8 pt-8 mb-6">
             <div>
               <h2 className="text-2xl font-black flex items-center gap-2 text-gray-900">
-                {isCampusPet ? "Campus Dog Hub" : "Health Hub"}
+                {isCampusPet ? "Campus Dog Hub" : "Pet Binder"}
               </h2>
               <p className="text-gray-500 text-sm font-medium">
                 {isCampusPet
-                  ? "Help monitor university friends."
-                  : `Managing ${pet.name}'s daily life.`}
+                  ? "Monitoring resident."
+                  : `Official records for ${pet.name}.`}
               </p>
             </div>
-            {isCampusPet && !canManage && (
-              <Button className="rounded-full bg-blue-600 shadow-md hover:bg-blue-700">
-                <Heart className="mr-2 fill-white/20" size={18} /> Support
-              </Button>
-            )}
           </div>
 
-          <div className="flex gap-6 border-b border-gray-100 overflow-x-auto">
+          <div className="flex gap-2 px-4 lg:px-8 pb-3 overflow-x-auto scrollbar-hide snap-x">
             <TabBtn
-              active={activeTab === "overview"}
-              onClick={() => setActiveTab("overview")}
-              icon={<LayoutDashboard size={18} />}
-              label="Overview"
-            />
-            <TabBtn
-              active={activeTab === "vaccines"}
-              onClick={() => setActiveTab("vaccines")}
-              icon={<Syringe size={18} />}
-              label="Medical"
-            />
-            <TabBtn
-              active={activeTab === "tasks"}
-              onClick={() => setActiveTab("tasks")}
-              icon={<CheckSquare size={18} />}
-              label="Tasks"
+              active={activeTab === "passport"}
+              onClick={() => setActiveTab("passport")}
+              icon={<ShieldCheck size={18} />}
+              label="Passport"
             />
             <TabBtn
               active={activeTab === "schedule"}
               onClick={() => setActiveTab("schedule")}
               icon={<Calendar size={18} />}
-              label="Visits"
+              label="Schedule"
             />
             <TabBtn
-              active={activeTab === "documents"}
-              onClick={() => setActiveTab("documents")}
-              icon={<FileText size={18} />}
-              label="Docs"
+              active={activeTab === "health"}
+              onClick={() => setActiveTab("health")}
+              icon={<HeartPulse size={18} />}
+              label="Health"
+            />
+            <TabBtn
+              active={activeTab === "routine"}
+              onClick={() => setActiveTab("routine")}
+              icon={<Settings2 size={18} />}
+              label="Routine"
+            />
+            <TabBtn
+              active={activeTab === "timeline"}
+              onClick={() => setActiveTab("timeline")}
+              icon={<History size={18} />}
+              label="Timeline"
             />
           </div>
         </div>
 
-        {/* Tab Content */}
-        <div className="flex-1 overflow-y-auto p-4 lg:p-8 bg-gray-50/50">
-          {activeTab === "overview" && (
-            <SmartOverview
-              pet={pet}
-              userId={pet.owner_id} // Pass owner ID so we see the correct records
-              onNavigate={setActiveTab}
-              canManage={canManage}
-              isOwner={isOwner}
-              isCampusPet={isCampusPet}
-            />
+        <div className="flex-1 p-4 lg:p-8 bg-gray-50/50 min-h-[500px]">
+          {activeTab === "passport" && (
+            <HealthPassport pet={pet} userId={pet.owner_id} />
           )}
-          {activeTab === "vaccines" && (
-            <VaccinationSection petId={pet.id} userId={pet.owner_id} />
+
+          {activeTab === "schedule" && <ScheduleSection petId={pet.id} />}
+
+          {activeTab === "health" && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+              <div className="flex p-1 bg-white rounded-xl border border-gray-200 w-full md:w-fit shadow-sm overflow-x-auto">
+                <SubTabBtn
+                  active={healthSubTab === "vaccines"}
+                  onClick={() => setHealthSubTab("vaccines")}
+                  icon={<Syringe size={14} />}
+                  label="Vaccines"
+                />
+                <SubTabBtn
+                  active={healthSubTab === "weight"}
+                  onClick={() => setHealthSubTab("weight")}
+                  icon={<Scale size={14} />}
+                  label="Weight"
+                />
+                <SubTabBtn
+                  active={healthSubTab === "docs"}
+                  onClick={() => setHealthSubTab("docs")}
+                  icon={<FileText size={14} />}
+                  label="Docs"
+                />
+              </div>
+
+              <div className="mt-4">
+                {healthSubTab === "vaccines" && (
+                  <VaccinationSection petId={pet.id} />
+                )}
+                {healthSubTab === "weight" && <WeightSection petId={pet.id} />}
+                {healthSubTab === "docs" && (
+                  <DocumentsSection petId={pet.id} canManage={canManage} />
+                )}
+              </div>
+            </div>
           )}
-          {activeTab === "tasks" && (
-            <TasksSection petId={pet.id} userId={pet.owner_id} />
-          )}
-          {activeTab === "schedule" && (
-            <ScheduleSection petId={pet.id} userId={pet.owner_id} />
-          )}
-          {activeTab === "documents" && (
-            <DocumentsSection petId={pet.id} canManage={canManage} />
-          )}
+
+          {activeTab === "routine" && <RoutineSection petId={pet.id} />}
+
+          {activeTab === "timeline" && <LifeTimeline petId={pet.id} />}
         </div>
       </div>
 
-      {/* Modals */}
       {showQR && (
         <QRModal
           name={pet.name}
@@ -194,30 +229,16 @@ export default function PetProfilePage() {
   );
 }
 
-// Helper Components
+// Helpers
 function PetProfileSkeleton() {
   return (
-    <div className="h-full w-full flex flex-col lg:flex-row bg-gray-50 lg:p-6 gap-6">
-      <div className="w-full lg:w-96 bg-white rounded-[2rem] p-6 border border-gray-100 h-[600px]">
-        <Skeleton className="w-40 h-40 rounded-full mx-auto mb-6" />
-        <Skeleton className="w-3/4 h-8 mx-auto mb-2" />
-        <Skeleton className="w-1/2 h-6 mx-auto mb-8" />
-        <div className="space-y-4">
-          <Skeleton className="w-full h-12 rounded-xl" />
-          <Skeleton className="w-full h-12 rounded-xl" />
-          <Skeleton className="w-full h-12 rounded-xl" />
-        </div>
+    <div className="w-full min-h-screen bg-gray-50 flex flex-col lg:flex-row p-4 lg:p-6 gap-6">
+      <div className="w-full lg:w-96 bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 h-fit">
+        <Skeleton className="h-40 w-40 rounded-full mb-4 mx-auto" />
       </div>
-      <div className="flex-1 bg-white rounded-[2rem] border border-gray-100 p-8 space-y-6">
-        <div className="flex justify-between">
-          <Skeleton className="w-48 h-10" />
-          <Skeleton className="w-32 h-10 rounded-full" />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <Skeleton className="h-32 rounded-3xl" />
-          <Skeleton className="h-32 rounded-3xl" />
-        </div>
-        <Skeleton className="w-full h-64 rounded-3xl" />
+      <div className="flex-1 bg-white rounded-[2rem] border border-gray-100 p-8">
+        <Skeleton className="h-8 w-64 mb-6" />
+        <Skeleton className="h-48 rounded-3xl w-full" />
       </div>
     </div>
   );
@@ -225,13 +246,10 @@ function PetProfileSkeleton() {
 
 function NotFoundState({ onBack }: any) {
   return (
-    <div className="h-full flex flex-col items-center justify-center bg-gray-50 p-6 text-center">
-      <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center mb-4 mx-auto">
-        <Dog className="text-gray-400 w-10 h-10" />
-      </div>
-      <h2 className="text-xl font-bold text-gray-900">Pet Not Found</h2>
-      <Button onClick={onBack} variant="outline" className="mt-4 rounded-full">
-        Back to Dashboard
+    <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
+      <h2 className="text-xl font-bold text-gray-900 mb-2">Pet Not Found</h2>
+      <Button onClick={onBack} variant="outline" className="gap-2">
+        <ChevronLeft size={16} /> Go Back
       </Button>
     </div>
   );
@@ -240,10 +258,23 @@ function NotFoundState({ onBack }: any) {
 const TabBtn = ({ active, onClick, icon, label }: any) => (
   <button
     onClick={onClick}
-    className={`pb-3 text-sm font-bold border-b-[3px] flex items-center gap-2 px-1 transition-all whitespace-nowrap ${
+    className={`snap-start py-3 px-4 text-sm font-bold border-b-2 flex items-center gap-2 transition-all whitespace-nowrap ${
       active
-        ? "border-blue-600 text-blue-600"
-        : "border-transparent text-gray-400 hover:text-gray-600"
+        ? "border-blue-600 text-blue-600 bg-blue-50/50 rounded-t-lg"
+        : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-t-lg"
+    }`}
+  >
+    {icon} {label}
+  </button>
+);
+
+const SubTabBtn = ({ active, onClick, icon, label }: any) => (
+  <button
+    onClick={onClick}
+    className={`flex-1 min-w-[100px] flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs font-bold transition-all ${
+      active
+        ? "bg-gray-900 text-white shadow-md transform scale-[1.02]"
+        : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
     }`}
   >
     {icon} {label}
