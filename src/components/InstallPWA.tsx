@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Share, X, PlusSquare } from "lucide-react";
+import Logo from "../assets/images/PawPal.svg"; // ✅ Import real logo
 
 export default function InstallPWA() {
   const [isVisible, setIsVisible] = useState(false);
@@ -14,7 +15,7 @@ export default function InstallPWA() {
       "(display-mode: standalone)"
     ).matches;
 
-    // ✅ Reverted to production logic: Only show on iOS browsers (not installed)
+    // ✅ Only show on iOS browsers (not installed)
     if (isIOS && !isStandalone) {
       setIsVisible(true);
     }
@@ -34,9 +35,13 @@ export default function InstallPWA() {
         </button>
 
         <div className="flex items-start gap-4">
-          {/* App Icon Preview */}
-          <div className="h-12 w-12 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 text-white font-bold shadow-md">
-            P
+          {/* ✅ App Icon Preview (Updated) */}
+          <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center flex-shrink-0 shadow-md overflow-hidden border border-gray-100 p-1">
+            <img
+              src={Logo}
+              alt="PawPal Logo"
+              className="w-full h-full object-contain"
+            />
           </div>
 
           <div className="flex-1 space-y-2">
