@@ -1,34 +1,11 @@
-import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/context/authContext";
 import { Button } from "@/components/ui/button";
-import {
-  LogOut,
-  Loader2,
-  Mail,
-  Phone,
-  User,
-  ShieldCheck,
-  Edit3,
-  AlignLeft,
-} from "lucide-react";
+import { Mail, Phone, User, ShieldCheck, Edit3, AlignLeft } from "lucide-react";
 import FailedImageIcon from "@/assets/FailedImage.svg";
 
 export default function ProfilePage() {
-  const { user, signOut } = useAuth();
-  const navigate = useNavigate();
-  const [isSigningOut, setIsSigningOut] = useState(false);
-
-  const handleSignOut = async () => {
-    setIsSigningOut(true);
-    try {
-      await signOut();
-      navigate("/SignIn");
-    } catch (error) {
-      console.error("Error signing out:", error);
-      setIsSigningOut(false);
-    }
-  };
+  const { user } = useAuth();
 
   if (!user) return null;
 
@@ -112,7 +89,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Phone (✅ Added) */}
+            {/* Phone */}
             <div className="flex items-center gap-3 group">
               <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:text-blue-500 group-hover:bg-blue-50 transition-colors">
                 <Phone className="w-4 h-4" />
@@ -131,7 +108,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Bio (✅ Styled for better visibility) */}
+            {/* Bio */}
             <div className="flex gap-3 group items-start pt-2 border-t border-gray-50">
               <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:text-blue-500 group-hover:bg-blue-50 transition-colors shrink-0">
                 <AlignLeft className="w-4 h-4" />
@@ -152,7 +129,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Action Buttons */}
-          <div className="p-4 bg-gray-50 border-t border-gray-100 grid gap-3">
+          <div className="p-4 bg-gray-50 border-t border-gray-100">
             <Link to="/ProfilePage/Edit">
               <Button
                 variant="outline"
@@ -161,21 +138,6 @@ export default function ProfilePage() {
                 <Edit3 className="w-4 h-4 mr-2 text-gray-500" /> Edit Profile
               </Button>
             </Link>
-
-            {/* Sign Out (Visible on Mobile, Optional on Desktop based on Sidebar) */}
-            <Button
-              variant="ghost"
-              onClick={handleSignOut}
-              disabled={isSigningOut}
-              className="w-full text-red-600 hover:text-red-700 hover:bg-red-50 h-11 lg:hidden"
-            >
-              {isSigningOut ? (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              ) : (
-                <LogOut className="w-4 h-4 mr-2" />
-              )}
-              {isSigningOut ? "Signing Out..." : "Sign Out"}
-            </Button>
           </div>
         </div>
 
