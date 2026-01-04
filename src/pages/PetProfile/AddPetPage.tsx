@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/context/authContext";
-import { usePets } from "@/lib/usePets";
+import { usePets } from "@/hooks/usePets";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
 import { ArrowLeft, Building2 } from "lucide-react";
 import { toast } from "sonner";

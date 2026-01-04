@@ -14,6 +14,29 @@ export interface UserProfile {
   contact_number?: string | null;
 }
 
+// ✅ UPDATED PET INTERFACE
+export interface Pet {
+  id: string;
+  owner_id: string;
+  name: string;
+  species: string | null;
+  breed: string | null;
+  color: string | null;
+  dob: string | null;
+  sex: string | null;
+  microchip_id: string | null;
+  location: string | null;
+  petimage_url: string | null;
+  is_campus_pet: boolean;
+  created_at: string;
+
+  // 🆕 NEW Admin Fields (Added spayed_neutered & new statuses)
+  spayed_neutered?: boolean;
+  status?: "healthy" | "injured" | "sick" | "missing" | "aggressive" | "unseen";
+  last_fed_at?: string | null;
+  last_seen_at?: string | null;
+}
+
 export interface Comment {
   id: string;
   user_id: string;
@@ -72,7 +95,6 @@ export interface Conversation {
   is_group: boolean;
 }
 
-// ✅ ADDED: Missing Medication Interface
 export interface Medication {
   id: string;
   pet_id: string;
@@ -83,7 +105,6 @@ export interface Medication {
   low_stock_threshold: number;
   unit: string;
   created_at?: string;
-  // This 'pets' property is critical for the "Joined" query in the UI
   pets?: {
     name: string;
     petimage_url: string | null;
