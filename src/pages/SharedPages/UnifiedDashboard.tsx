@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow, isPast, addDays, isBefore } from "date-fns";
 import type { OutreachEvent } from "@/types";
+import { toast } from "react-toastify";
 
 // --- TYPES ---
 type HealthAlert = {
@@ -61,13 +62,14 @@ export function UnifiedDashboard() {
     if (user) fetchData();
   }, [user?.id, filterMode]);
 
-  const fetchData = async () => {
+ const fetchData = async () => {
     setLoading(true);
     try {
       // 1. Base Query: Fetch Events (Feed)
       let query = supabase
         .from("outreach_events")
         .select("*, admin:profiles(id, username, avatar_url)")
+        .eq("is_hidden", false) // Hides events marked as hidden
         .order("created_at", { ascending: false });
 
       if (isAdmin && filterMode === "mine") {
@@ -76,9 +78,37 @@ export function UnifiedDashboard() {
 
       const { data: eventsData, error: eventsError } = await query;
       if (eventsError) throw eventsError;
-      setEvents((eventsData as OutreachEvent[]) || []);
 
-      // 2. Parallel Data Fetching
+      // ✅ 2. ENHANCE EVENTS: Fetch accurate counts & user status for each event
+      const eventsWithDetails = await Promise.all(
+        (eventsData as OutreachEvent[]).map(async (event) => {
+          // A. Get "Going" Count (Approved + Checked In only)
+          const { count } = await supabase
+            .from("event_registrations")
+            .select("id", { count: "exact", head: true })
+            .eq("event_id", event.id)
+            .in("status", ["approved", "checked_in"]); // <--- THE FIX
+
+          // B. Get Current User's Status
+          const { data: myReg } = await supabase
+            .from("event_registrations")
+            .select("status")
+            .eq("event_id", event.id)
+            .eq("user_id", user?.id)
+            .maybeSingle();
+
+          return {
+            ...event,
+            current_attendees: count || 0, // Pass accurate count to card
+            is_registered: !!myReg,
+            registration_status: myReg?.status,
+          };
+        })
+      );
+
+      setEvents(eventsWithDetails);
+
+      // 3. Parallel Data Fetching (Stats or Alerts)
       if (isAdmin) {
         const [postsCount, myCount, usersCount] = await Promise.all([
           supabase
@@ -98,6 +128,7 @@ export function UnifiedDashboard() {
           totalMembers: usersCount.count || 0,
         });
       } else {
+        // User Logic: Fetch Pet Alerts
         const { data: vaxData } = await supabase
           .from("vaccinations")
           .select(
@@ -118,11 +149,12 @@ export function UnifiedDashboard() {
       }
     } catch (err) {
       console.error(err);
+      toast.error("Failed to load dashboard data");
     } finally {
       setLoading(false);
     }
   };
-
+  
   const handleDelete = async () => {
     if (!deleteEventId) return;
     const { error } = await supabase
@@ -140,6 +172,27 @@ export function UnifiedDashboard() {
         }));
     }
   };
+ // ✅ NEW: Handle Hide/Unhide Logic
+const handleHide = async (eventId: string, currentStatus: boolean) => {
+  // 1. Optimistic Update
+  setEvents((prev) => 
+    prev.map((e) => e.id === eventId ? { ...e, is_hidden: !currentStatus } : e)
+  );
+
+  // 2. Database Update
+  const { error } = await supabase
+    .from("outreach_events")
+    .update({ is_hidden: !currentStatus })
+    .eq("id", eventId);
+
+  if (error) {
+    console.error(error);
+    toast.error("Failed to update visibility");
+    fetchData(); // Revert
+  } else {
+    toast.success(currentStatus ? "Event is now visible" : "Event hidden");
+  }
+};
 
   const filteredEvents = activeTag
     ? events.filter((e) =>
@@ -246,7 +299,7 @@ export function UnifiedDashboard() {
   return (
     <div className="w-full max-w-xl mx-auto pb-24 px-0 md:px-4">
       {/* --- HEADER --- */}
-      <div className="sticky top-0 z-30 bg-gray-50/95 backdrop-blur-sm py-4 px-4 flex items-center justify-between border-b border-gray-100 md:border-none">
+      <div className="relative z-10 bg-white py-4 px-4 flex items-center justify-between border-b border-gray-200 shadow-sm md:border-none">
         {loading ? (
           renderHeaderSkeleton()
         ) : (
@@ -461,6 +514,9 @@ export function UnifiedDashboard() {
               key={event.id}
               event={event}
               isAdmin={isAdmin}
+              // ✅ ADD THESE TWO LINES:
+                onHide={() => handleHide(event.id, event.is_hidden || false)}
+                isHidden={event.is_hidden}
               onEdit={() => {
                 const officialTypes = ["official", "pet", "member", "campus"];
                 if (officialTypes.includes(event.event_type || "")) {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
@@ -6,12 +6,11 @@ import { useAuth } from "@/context/authContext";
 import { EventCard } from "@/components/EventCard";
 import { OfficialEventCard } from "@/components/OfficialEventCard";
 import { EventRegistrationModal } from "@/components/EventRegistrationModal";
+import { LikesListModal } from "@/components/LikesListModal"; // ✅ Import new component
 import {
   notifyLike,
-  notifyComment,
   notifyReply,
   notifyMentions,
-  notifyCommentLike,
 } from "@/lib/NotificationService";
 import {
   Loader2,
@@ -36,7 +35,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import FailedImageIcon from "@/assets/FailedImage.svg";
 import type { OutreachEvent, Comment } from "@/types";
-import { format } from "date-fns";
+import { toast } from "sonner";
 
 // --- Interfaces ---
 
@@ -48,6 +47,9 @@ interface FeedPostProps {
   onTagClick?: (tag: string) => void;
   customUsername?: string;
   customAvatar?: string;
+  onRefresh?: () => void;
+  onHide?: () => void;
+  isHidden?: boolean;
 }
 
 interface CommentWithExtras extends Comment {
@@ -56,6 +58,56 @@ interface CommentWithExtras extends Comment {
   is_liked_by_user?: boolean;
   parent_comment_id: string | null;
   updated_at?: string;
+}
+
+// --- Delete Modal Component ---
+
+interface DeleteConfirmationProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title?: string;
+  description?: string;
+}
+
+function DeleteConfirmationModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  title = "Are you sure?",
+  description = "This action cannot be undone.",
+}: DeleteConfirmationProps) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="relative bg-white rounded-lg shadow-xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-200">
+        <div className="flex flex-col gap-2 mb-6">
+          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+          <p className="text-sm text-gray-500">{description}</p>
+        </div>
+        <div className="flex justify-end gap-3">
+          <Button variant="outline" onClick={onClose} className="h-9 px-4">
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => {
+              onConfirm();
+              onClose();
+            }}
+            className="h-9 px-4 bg-red-600 hover:bg-red-700 text-white"
+          >
+            Delete
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // --- Main Component (FeedPost) ---
@@ -68,6 +120,9 @@ export function FeedPost({
   onTagClick,
   customUsername,
   customAvatar,
+  onRefresh,
+  onHide,
+  isHidden,
 }: FeedPostProps) {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -84,6 +139,15 @@ export function FeedPost({
   const [isRegistered, setIsRegistered] = useState(false);
   const [, setIsLoading] = useState(true);
   const [, setError] = useState<string | null>(null);
+  
+  // ✅ State for Post Likes Modal
+  const [showLikesModal, setShowLikesModal] = useState(false);
+  
+  // Status State
+  const [registrationStatus, setRegistrationStatus] = useState<"approved" | "waitlist" | null>(null);
+  
+  // Capacity Logic State
+  const [participantCount, setParticipantCount] = useState(0);
 
   // Visual effect on Like
   const [triggerLikeAnim, setTriggerLikeAnim] = useState(false);
@@ -92,6 +156,49 @@ export function FeedPost({
   const officialTypes = ["official", "pet", "member", "campus"];
   const isOfficialEvent = officialTypes.includes(event.event_type || "");
 
+  // Fetch Participant Count (Memoized)
+  const fetchParticipantCount = useCallback(async () => {
+    if (isOfficialEvent) {
+      try {
+       // ✅ Corrected Query in FeedPost.tsx
+          const { count } = await supabase
+            .from("event_registrations")
+            .select("*", { count: "exact", head: true })
+            .eq("event_id", event.id)
+            .in("status", ["approved", "checked_in"]); // <--- Add this line
+            
+        setParticipantCount(count || 0);
+      } catch (err) {
+        console.error("Failed to load participant count:", err);
+      }
+    }
+  }, [event.id, isOfficialEvent]);
+
+  // Check Registration Logic (Fetches Status)
+  const checkRegistration = async () => {
+    if (!user) return;
+    try {
+      const { data } = await supabase
+        .from("event_registrations")
+        .select("id, status")
+        .eq("event_id", event.id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (data) {
+        setIsRegistered(true);
+        setRegistrationStatus(data.status as "approved" | "waitlist");
+      } else {
+        setIsRegistered(false);
+        setRegistrationStatus(null);
+      }
+    } catch (err) {
+      console.error("Failed to check registration:", err);
+      setIsRegistered(false);
+    }
+  };
+
+  // Initial Data Load
   useEffect(() => {
     const loadInitialData = async () => {
       setIsLoading(true);
@@ -101,6 +208,7 @@ export function FeedPost({
           fetchLikes(),
           fetchCommentsCount(),
           checkRegistration(),
+          fetchParticipantCount(),
         ]);
       } catch (err) {
         setError("Failed to load post data");
@@ -109,8 +217,9 @@ export function FeedPost({
       }
     };
     loadInitialData();
-  }, [event.id]);
+  }, [event.id, fetchParticipantCount, user]); 
 
+  // Deep Linking Effect
   useEffect(() => {
     if (highlightCommentId) {
       setIsCommentsOpen(true);
@@ -177,8 +286,7 @@ export function FeedPost({
       console.error("Feed like error:", err);
       setIsLiked(previousLiked);
       setLikesCount(likesCount);
-      setError("Failed to like post. Try again.");
-      setTimeout(() => setError(null), 3000);
+      toast.error("Failed to like post. Try again.");
     } finally {
       setIsLiking(false);
     }
@@ -197,21 +305,32 @@ export function FeedPost({
     }
   };
 
-  const checkRegistration = async () => {
-    if (!user) return;
+ const handleUnregister = async () => {
+    if (!user || !isRegistered) return;
+    
+    if (!confirm("Are you sure you want to cancel your registration?")) return;
+
     try {
-      const { data } = await supabase
-        .from("event_registrations")
-        .select("id")
-        .eq("event_id", event.id)
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (data) setIsRegistered(true);
+        const { error } = await supabase
+            .from("event_registrations")
+            .delete()
+            .eq("event_id", event.id)
+            .eq("user_id", user.id);
+
+        if (error) throw error;
+
+        setIsRegistered(false);
+        setRegistrationStatus(null);
+        setParticipantCount(prev => Math.max(0, prev - 1));
+        
+        toast.success("Registration cancelled");
     } catch (err) {
-      console.error("Failed to check registration:", err);
-      setIsRegistered(false);
+        console.error("Unregister failed:", err);
+        toast.error("Failed to unregister");
     }
   };
+
+  // --- RENDER ---
 
   if (isOfficialEvent) {
     return (
@@ -219,9 +338,16 @@ export function FeedPost({
         <OfficialEventCard
           event={event}
           isRegistered={isRegistered}
+          registrationStatus={registrationStatus} 
           onRegister={() => setIsRegistrationOpen(true)}
+          onUnregister={handleUnregister}
           onEdit={onEdit}
           isAdmin={isAdmin}
+          onDelete={onDelete}
+          currentCount={participantCount}
+          onSuccess={onRefresh}
+          onHide={onHide}
+          isHidden={isHidden}
         />
         {isRegistrationOpen && (
           <EventRegistrationModal
@@ -235,13 +361,18 @@ export function FeedPost({
             }
             eventType={event.event_type}
             onClose={() => setIsRegistrationOpen(false)}
-            onSuccess={() => setIsRegistered(true)}
+            onSuccess={() => {
+                setIsRegistered(true);
+                setParticipantCount(prev => prev + 1);
+                checkRegistration();
+            }}
           />
         )}
       </>
     );
   }
 
+  // --- Standard Post Card ---
   return (
     <>
       <div className="mb-4">
@@ -256,25 +387,31 @@ export function FeedPost({
         >
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-4">
-              <button
-                onClick={toggleLike}
-                disabled={isLiking}
-                className="flex items-center gap-1.5 group transition-all focus:outline-none disabled:opacity-50"
-              >
-                <Heart
-                  className={`w-6 h-6 transition-transform group-active:scale-90 ${
-                    isLiked || triggerLikeAnim
-                      ? "fill-red-500 text-red-500"
-                      : "text-gray-900 hover:text-gray-600"
-                  } ${triggerLikeAnim ? "animate-bounce" : ""}`}
-                  strokeWidth={isLiked || triggerLikeAnim ? 0 : 2}
-                />
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={toggleLike}
+                  disabled={isLiking}
+                  className="flex items-center group transition-all focus:outline-none disabled:opacity-50"
+                >
+                  <Heart
+                    className={`w-6 h-6 transition-transform group-active:scale-90 ${
+                      isLiked || triggerLikeAnim
+                        ? "fill-red-500 text-red-500"
+                        : "text-gray-900 hover:text-gray-600"
+                    } ${triggerLikeAnim ? "animate-bounce" : ""}`}
+                    strokeWidth={isLiked || triggerLikeAnim ? 0 : 2}
+                  />
+                </button>
+                {/* ✅ Clickable Likes Count */}
                 {likesCount > 0 && (
-                  <span className="text-sm font-bold text-gray-900">
+                  <button 
+                    onClick={() => setShowLikesModal(true)}
+                    className="text-sm font-bold text-gray-900 hover:underline focus:outline-none"
+                  >
                     {likesCount}
-                  </span>
+                  </button>
                 )}
-              </button>
+              </div>
 
               <button
                 onClick={() => setIsCommentsOpen(true)}
@@ -294,6 +431,14 @@ export function FeedPost({
           </div>
         </EventCard>
       </div>
+
+      {/* ✅ Likes List Modal for the Post */}
+      <LikesListModal 
+        isOpen={showLikesModal}
+        onClose={() => setShowLikesModal(false)}
+        targetId={event.id}
+        type="post"
+      />
 
       {isCommentsOpen && (
         <CommentsModal
@@ -358,10 +503,8 @@ function CommentsModal({
   const [expandedComments, setExpandedComments] = useState<Set<string>>(
     new Set()
   );
-  // Carousel State
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-
-  // State to hold fetched author if missing from event data
+  const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
   const [fetchedAuthor, setFetchedAuthor] = useState<any>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -423,6 +566,7 @@ function CommentsModal({
         .order("created_at", { ascending: true });
 
       if (error) {
+        // Fallback
         const { data: retryData, error: retryError } = await supabase
           .from("comments")
           .select("*, user:profiles(id, username, avatar_url)")
@@ -522,7 +666,6 @@ function CommentsModal({
               );
             }
             element.scrollIntoView({ behavior: "smooth", block: "center" });
-            // --- FIX: CHANGED YELLOW CLASSES TO BLUE ---
             element.classList.add(
               "bg-blue-50",
               "ring-2",
@@ -576,6 +719,7 @@ function CommentsModal({
     setNewComment(`@${targetUsername} `);
     setReplyTarget(comment);
     setActiveReplyId(comment.parent_comment_id || comment.id);
+    inputRef.current?.focus();
   };
 
   const handlePostComment = async (e: React.FormEvent) => {
@@ -619,6 +763,7 @@ function CommentsModal({
       100
     );
 
+    // 2. Insert into Database
     const { data: insertedData, error } = await supabase
       .from("comments")
       .insert([
@@ -658,15 +803,6 @@ function CommentsModal({
           );
           notifiedUserIds.push(replyTarget.user_id);
         }
-      } else {
-        if (event.admin_id && event.admin_id !== user.id) {
-          await notifyComment(
-            { id: event.id, admin_id: event.admin_id, title: event.title },
-            { id: user.id, username: user.username },
-            content,
-            insertedData.id
-          );
-        }
       }
 
       await notifyMentions(
@@ -699,11 +835,28 @@ function CommentsModal({
     }
   };
 
-  const handleDeleteComment = async (commentId: string) => {
-    if (!confirm("Delete this comment?")) return;
+  const requestDelete = (commentId: string) => {
+    setCommentToDelete(commentId);
+  };
+
+  const confirmDelete = async () => {
+    if (!commentToDelete) return;
+    const commentId = commentToDelete;
+
     setComments((prev) => prev.filter((c) => c.id !== commentId));
     onCommentDeleted();
-    await supabase.from("comments").delete().eq("id", commentId);
+    setCommentToDelete(null);
+
+    if (commentId.startsWith("temp-")) return;
+
+    const { error } = await supabase
+      .from("comments")
+      .delete()
+      .eq("id", commentId);
+
+    if (error) {
+      console.error("Error deleting comment:", error);
+    }
   };
 
   const repliesByParent = useMemo(() => {
@@ -726,7 +879,7 @@ function CommentsModal({
       event={event}
       comment={comment}
       user={user}
-      onDelete={handleDeleteComment}
+      onDelete={requestDelete} 
       onEdit={handleEditComment}
       onReply={handleReplyClick}
       isReply={isReply}
@@ -739,7 +892,6 @@ function CommentsModal({
         className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
         onClick={onClose}
       />
-      {/* MODAL CONTAINER */}
       <div className="relative w-full md:w-[650px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl flex flex-col max-h-[85vh] md:max-h-[90vh] animate-in slide-in-from-bottom-10 fade-in duration-300">
         
         {/* Header */}
@@ -758,12 +910,11 @@ function CommentsModal({
           </button>
         </div>
 
-        {/* SCROLLABLE CONTENT AREA */}
+        {/* SCROLLABLE CONTENT */}
         <div className="flex-1 overflow-y-auto overscroll-contain">
           
-          {/* POST PREVIEW SECTION (Desktop Only) */}
+          {/* POST PREVIEW */}
           <div className="hidden md:block p-5 border-b border-gray-100 bg-white">
-            {/* Author */}
             <div className="flex items-center gap-3 mb-4">
               {displayAvatar ? (
                 <img
@@ -774,7 +925,6 @@ function CommentsModal({
               ) : (
                 <div className="w-10 h-10 bg-gray-200 animate-pulse rounded-full" />
               )}
-              
               <div className="flex flex-col leading-tight">
                 {displayName ? (
                   <span className="font-bold text-gray-900">{displayName}</span>
@@ -787,7 +937,6 @@ function CommentsModal({
               </div>
             </div>
 
-            {/* Text Content */}
             {event.description && (
               <div className="mb-4 text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
                 {event.title && (
@@ -797,7 +946,6 @@ function CommentsModal({
               </div>
             )}
 
-            {/* IMAGE CAROUSEL SECTION */}
             {images.length > 0 && (
               <div className="relative rounded-xl overflow-hidden border border-gray-100 bg-gray-50 mb-4 group/carousel">
                 <img
@@ -806,10 +954,8 @@ function CommentsModal({
                   className="w-full h-auto max-h-[400px] object-cover"
                 />
                 
-                {/* Carousel Controls */}
                 {images.length > 1 && (
                   <>
-                    {/* Prev Button */}
                     {currentImageIndex > 0 && (
                       <button 
                         onClick={prevImage}
@@ -818,7 +964,6 @@ function CommentsModal({
                         <ChevronLeft size={20} />
                       </button>
                     )}
-                    {/* Next Button */}
                     {currentImageIndex < images.length - 1 && (
                       <button 
                         onClick={nextImage}
@@ -827,7 +972,6 @@ function CommentsModal({
                         <ChevronRight size={20} />
                       </button>
                     )}
-                    {/* Dots */}
                     <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
                       {images.map((_, idx) => (
                         <div 
@@ -841,24 +985,29 @@ function CommentsModal({
               </div>
             )}
 
-            {/* ACTIONS INSIDE MODAL (Desktop Only) */}
+            {/* ACTIONS INSIDE MODAL */}
             <div className="flex items-center gap-6 pt-2 border-t border-gray-50">
-              <button
-                onClick={onToggleLike}
-                className="flex items-center gap-1.5 group transition-all"
-              >
-                <Heart
-                  className={`w-6 h-6 transition-transform group-active:scale-90 ${
-                    isLiked
-                      ? "fill-red-500 text-red-500"
-                      : "text-gray-900 hover:text-gray-600"
-                  }`}
-                  strokeWidth={isLiked ? 0 : 2}
-                />
-                <span className="text-sm font-bold text-gray-900">
-                  {likesCount && likesCount > 0 ? likesCount : "Like"}
-                </span>
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={onToggleLike}
+                  className="flex items-center group transition-all"
+                >
+                  <Heart
+                    className={`w-6 h-6 transition-transform group-active:scale-90 ${
+                      isLiked
+                        ? "fill-red-500 text-red-500"
+                        : "text-gray-900 hover:text-gray-600"
+                    }`}
+                    strokeWidth={isLiked ? 0 : 2}
+                  />
+                </button>
+                {/* Likes count handled by parent */}
+                {likesCount && likesCount > 0 ? (
+                   <span className="text-sm font-bold text-gray-900">{likesCount}</span>
+                ) : (
+                   <span className="text-sm font-bold text-gray-900">Like</span>
+                )}
+              </div>
 
               <button 
                 onClick={() => inputRef.current?.focus()}
@@ -971,6 +1120,14 @@ function CommentsModal({
           </form>
         </div>
       </div>
+
+      <DeleteConfirmationModal
+        isOpen={!!commentToDelete}
+        onClose={() => setCommentToDelete(null)}
+        onConfirm={confirmDelete}
+        title="Delete Comment?"
+        description="Are you sure you want to delete this comment? This cannot be undone."
+      />
     </div>,
     document.body
   );
@@ -1020,11 +1177,12 @@ function CommentItem({
   const [likesCount, setLikesCount] = useState(comment.likes_count || 0);
   const [isLiked, setIsLiked] = useState(comment.is_liked_by_user || false);
   const [isLiking, setIsLiking] = useState(false);
-
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
+  
+  // ✅ State for Comment Likes Modal
+  const [showLikesModal, setShowLikesModal] = useState(false);
 
-  // Check if the comment has been edited
   const isEdited =
     comment.updated_at && comment.updated_at !== comment.created_at;
 
@@ -1032,7 +1190,26 @@ function CommentItem({
     fetchCommentLikes();
   }, [comment.id]);
 
+  const renderContentWithTags = (text: string) => {
+    if (!text) return "";
+    const parts = text.split(/(@[\w.-]+)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith("@")) {
+        return (
+          <span
+            key={i}
+            className="inline-block bg-blue-100 text-blue-700 font-semibold px-1.5 py-0.5 rounded-md mx-0.5 text-[11px]"
+          >
+            {part}
+          </span>
+        );
+      }
+      return <span key={i}>{part}</span>;
+    });
+  };
+
   const fetchCommentLikes = async () => {
+    if (!comment.id || comment.id.startsWith("temp-")) return;
     try {
       const { count } = await supabase
         .from("comment_likes")
@@ -1057,11 +1234,9 @@ function CommentItem({
 
   const toggleCommentLike = async () => {
     if (!user || isLiking) return;
-
     setIsLiking(true);
     const previousLiked = isLiked;
     const previousCount = likesCount;
-
     setIsLiked(!isLiked);
     setLikesCount(previousLiked ? likesCount - 1 : likesCount + 1);
 
@@ -1076,16 +1251,6 @@ function CommentItem({
         await supabase
           .from("comment_likes")
           .insert([{ comment_id: comment.id, user_id: user.id }]);
-
-        if (comment.user_id !== user.id) {
-          await notifyCommentLike(
-            { id: event.id, admin_id: event.admin_id, title: event.title },
-            { id: user.id, username: user.username },
-            comment.user_id,
-            comment.content,
-            comment.id
-          );
-        }
       }
     } catch (err) {
       console.error("Like error:", err);
@@ -1104,125 +1269,142 @@ function CommentItem({
   };
 
   return (
-    <div
-      id={`comment-${comment.id}`}
-      className={`flex gap-3 group animate-in fade-in slide-in-from-bottom-2 duration-300 ${
-        isReply ? "ml-11 mt-3" : "mt-4"
-      }`}
-    >
-      <img
-        src={comment.user?.avatar_url || FailedImageIcon}
-        alt="User"
-        className={`${
-          isReply ? "w-6 h-6" : "w-8 h-8"
-        } rounded-full object-cover border border-gray-100 flex-shrink-0`}
-      />
-      <div className="flex-1 space-y-1">
-        <div className="flex flex-col">
-          <div className="flex items-baseline gap-2">
-            <span className="font-bold text-sm text-gray-900">
-              {comment.user?.username || "Unknown"}
-            </span>
-
-            {isEditing ? (
-              <div className="flex-1">
-                <Input
-                  value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
-                  className="h-8 text-sm"
-                  autoFocus
-                />
-                <div className="flex gap-2 mt-1">
-                  <span
-                    onClick={handleSaveEdit}
-                    className="text-[10px] font-bold text-blue-600 cursor-pointer hover:underline"
-                  >
-                    Save
-                  </span>
-                  <span
-                    onClick={() => {
-                      setIsEditing(false);
-                      setEditContent(comment.content);
-                    }}
-                    className="text-[10px] text-gray-500 cursor-pointer hover:underline"
-                  >
-                    Cancel
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <span className="text-sm text-gray-700 break-words whitespace-pre-wrap">
-                {comment.content}
+    <>
+      <div
+        id={`comment-${comment.id}`}
+        className={`flex gap-3 group animate-in fade-in slide-in-from-bottom-2 duration-300 ${
+          isReply ? "ml-11 mt-3" : "mt-4"
+        }`}
+      >
+        <img
+          src={comment.user?.avatar_url || FailedImageIcon}
+          alt="User"
+          className={`${
+            isReply ? "w-6 h-6" : "w-8 h-8"
+          } rounded-full object-cover border border-gray-100 flex-shrink-0`}
+        />
+        <div className="flex-1 space-y-1">
+          <div className="flex flex-col">
+            <div className="flex items-baseline gap-2">
+              <span className="font-bold text-sm text-gray-900">
+                {comment.user?.username || "Unknown"}
               </span>
-            )}
-          </div>
-        </div>
 
-        {!isEditing && (
-          <div className="flex items-center gap-4 px-1 mt-1">
-            <span className="text-[10px] text-gray-400 font-medium">
-              {formatRelativeTime(comment.created_at)}
-              {isEdited && <span className="ml-1 italic"> (edited)</span>}
-            </span>
-
-            <button
-              onClick={toggleCommentLike}
-              disabled={isLiking}
-              className="flex items-center gap-1 group/like disabled:opacity-50"
-            >
-              <Heart
-                size={12}
-                className={`transition-colors ${
-                  isLiked
-                    ? "fill-red-500 text-red-500"
-                    : "text-gray-400 group-hover/like:text-red-500"
-                }`}
-              />
-              <span className="text-[10px] text-gray-500 font-semibold">
-                {likesCount}
-              </span>
-            </button>
-
-            <button
-              onClick={() => onReply(comment)}
-              className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-blue-600 font-semibold transition-colors"
-            >
-              <Reply size={10} /> Reply
-            </button>
-
-            {(user?.id === comment.user_id || user?.role === "admin") && (
-              <DropdownMenu>
-                <DropdownMenuTrigger className="focus:outline-none opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity">
-                  <MoreHorizontal
-                    size={14}
-                    className="text-gray-400 hover:text-gray-700 transition-colors"
+              {isEditing ? (
+                <div className="flex-1">
+                  <Input
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    className="h-8 text-sm"
+                    autoFocus
                   />
-                </DropdownMenuTrigger>
-
-                <DropdownMenuContent
-                  align="start"
-                  className="w-32 z-[100] bg-white"
-                >
-                  {user?.id === comment.user_id && (
-                    <DropdownMenuItem onClick={() => setIsEditing(true)}>
-                      <Edit size={12} className="mr-2" />
-                      <span className="text-xs">Edit</span>
-                    </DropdownMenuItem>
-                  )}
-
-                  <DropdownMenuItem
-                    onClick={() => onDelete(comment.id)}
-                    className="text-red-600 focus:text-red-600"
-                  >
-                    <Trash2 size={12} className="mr-2" />
-                    <span className="text-xs">Delete</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+                  <div className="flex gap-2 mt-1">
+                    <span
+                      onClick={handleSaveEdit}
+                      className="text-[10px] font-bold text-blue-600 cursor-pointer hover:underline"
+                    >
+                      Save
+                    </span>
+                    <span
+                      onClick={() => {
+                        setIsEditing(false);
+                        setEditContent(comment.content);
+                      }}
+                      className="text-[10px] text-gray-500 cursor-pointer hover:underline"
+                    >
+                      Cancel
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <span className="text-sm text-gray-700 break-words whitespace-pre-wrap">
+                  {renderContentWithTags(comment.content)}
+                </span>
+              )}
+            </div>
           </div>
-        )}
+
+          {!isEditing && (
+            <div className="flex items-center gap-4 px-1 mt-1">
+              <span className="text-[10px] text-gray-400 font-medium">
+                {formatRelativeTime(comment.created_at)}
+                {isEdited && <span className="ml-1 italic"> (edited)</span>}
+              </span>
+
+              <div className="flex items-center gap-1 group/like">
+                <button
+                  onClick={toggleCommentLike}
+                  disabled={isLiking}
+                  className="flex items-center disabled:opacity-50"
+                >
+                  <Heart
+                    size={12}
+                    className={`transition-colors ${
+                      isLiked
+                        ? "fill-red-500 text-red-500"
+                        : "text-gray-400 group-hover/like:text-red-500"
+                    }`}
+                  />
+                </button>
+                {/* ✅ Clickable Comment Likes Count */}
+                <button 
+                  onClick={() => likesCount > 0 && setShowLikesModal(true)}
+                  disabled={likesCount === 0}
+                  className={`text-[10px] font-semibold ${likesCount > 0 ? "text-gray-500 hover:text-gray-900 hover:underline cursor-pointer" : "text-gray-400 cursor-default"}`}
+                >
+                  {likesCount}
+                </button>
+              </div>
+
+              <button
+                onClick={() => onReply(comment)}
+                className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-blue-600 font-semibold transition-colors"
+              >
+                <Reply size={10} /> Reply
+              </button>
+
+              {(user?.id === comment.user_id || user?.role === "admin") && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger className="focus:outline-none opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity">
+                    <MoreHorizontal
+                      size={14}
+                      className="text-gray-400 hover:text-gray-700 transition-colors"
+                    />
+                  </DropdownMenuTrigger>
+
+                  <DropdownMenuContent
+                    align="start"
+                    className="w-32 z-[100] bg-white"
+                  >
+                    {user?.id === comment.user_id && (
+                      <DropdownMenuItem onClick={() => setIsEditing(true)}>
+                        <Edit size={12} className="mr-2" />
+                        <span className="text-xs">Edit</span>
+                      </DropdownMenuItem>
+                    )}
+
+                    <DropdownMenuItem
+                      onClick={() => onDelete(comment.id)}
+                      className="text-red-600 focus:text-red-600"
+                    >
+                      <Trash2 size={12} className="mr-2" />
+                      <span className="text-xs">Delete</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* ✅ Render the Likes Modal for THIS Comment */}
+      <LikesListModal 
+        isOpen={showLikesModal}
+        onClose={() => setShowLikesModal(false)}
+        targetId={comment.id}
+        type="comment"
+      />
+    </>
   );
 }

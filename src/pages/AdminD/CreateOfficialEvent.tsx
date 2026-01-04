@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { LocationPicker } from "@/components/LocationPicker";
+import { notifyAllUsers } from "@/lib/NotificationService";
 
 export default function CreateOfficialEvent() {
   const navigate = useNavigate();
@@ -34,6 +35,7 @@ export default function CreateOfficialEvent() {
   const [endTime, setEndTime] = useState("");
   const [maxAttendees, setMaxAttendees] = useState("");
   const [requiresRegistration, setRequiresRegistration] = useState(true);
+  const [deadline, setDeadline] = useState("");
 
   // ✅ NEW: Event Category State
   const [eventType, setEventType] = useState<"pet" | "member" | "campus">(
@@ -53,23 +55,39 @@ export default function CreateOfficialEvent() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+ const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 1. Basic Validation
     if (!user || !title || !eventDate || !location) {
       toast.error("Please fill in all required fields.");
       return;
     }
 
+    // 2. Deadline Validation
+    if (requiresRegistration && deadline) {
+      const eventDateTimeStr = `${eventDate}T${startTime || "00:00"}`;
+      const eventStart = new Date(eventDateTimeStr);
+      const deadlineDate = new Date(deadline);
+
+      if (deadlineDate > eventStart) {
+        toast.error("Registration deadline cannot be after the event starts!");
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
+      // 3. Upload Image (if exists)
       let imageUrls: string[] = [];
       if (coverImage) {
         const url = await uploadImageToCloudinary(coverImage, "chat");
         imageUrls = [url];
       }
 
-      const { error } = await supabase.from("outreach_events").insert({
+      // 4. Create the Event Data Object (The Payload)
+      const eventPayload = {
         admin_id: user.id,
         title,
         description,
@@ -80,11 +98,28 @@ export default function CreateOfficialEvent() {
         max_attendees: maxAttendees ? parseInt(maxAttendees) : null,
         requires_registration: requiresRegistration,
         images: imageUrls,
-        // ✅ SAVE THE CATEGORY
+        registration_deadline: deadline ? new Date(deadline).toISOString() : null,
         event_type: eventType,
-      });
+      };
+
+      // 5. Insert into Database (Single Source of Truth)
+      const { data: newEvent, error } = await supabase
+        .from("outreach_events")
+        .insert(eventPayload)
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // 6. Trigger Notification (Only if insert succeeded)
+      if (newEvent) {
+        // Run in background
+        void notifyAllUsers({
+          id: newEvent.id,
+          title: newEvent.title || "New Event",
+          admin_id: user.id,
+        });
+      }
 
       toast.success("Event created successfully!");
       navigate("/");
@@ -95,7 +130,7 @@ export default function CreateOfficialEvent() {
       setLoading(false);
     }
   };
-
+  
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* Header */}
@@ -304,21 +339,39 @@ export default function CreateOfficialEvent() {
               />
             </div>
 
-            {requiresRegistration && (
+           {requiresRegistration && (
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
-                  Capacity Limit (Optional)
+                  Capacity Limit
                 </label>
                 <Input
                   type="number"
                   value={maxAttendees}
                   onChange={(e) => setMaxAttendees(e.target.value)}
-                  placeholder="e.g. 50 (Leave empty for unlimited)"
+                  placeholder="e.g. 50"
                   className="bg-white"
                 />
               </div>
-            )}
-          </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                  Registration Deadline
+                </label>
+              <Input
+                  type="datetime-local"
+                  value={deadline}
+                  onChange={(e) => setDeadline(e.target.value)}
+                  className={`bg-white ${deadline && new Date(deadline) > new Date(`${eventDate}T${startTime || "00:00"}`) ? "border-red-500 focus:ring-red-200" 
+                  : ""
+                    }`}
+                  />
+                  {deadline && new Date(deadline) > new Date(`${eventDate}T${startTime || "00:00"}`) && (
+                  <p className="text-[10px] text-red-600 mt-1 font-bold"> Error: Deadline cannot be after the event starts.</p>
+                  )}
+              </div>
+            </div>
+        )}
+        </div>
 
           <Button
             type="submit"

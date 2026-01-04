@@ -26,6 +26,8 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
+
+  // Notification counts
   const adminNotificationCount = userRole === "admin" ? 3 : 0;
   const isMessagesPage = location.pathname.startsWith("/messages");
   const isCollapsed = isNotificationPanelOpen || isMessagesPage;
@@ -44,16 +46,28 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
   const justifyClass = isCollapsed ? "justify-center" : "justify-start";
   const pxClass = isCollapsed ? "px-2" : "px-4";
 
+  // Navigation Data
   const navItems = [
     { path: "/", icon: Home, label: "Home" },
     { path: "/messages", icon: MessageCircle, label: "Messages" },
     ...(userRole === "admin"
       ? [
           { path: "/admin/team", icon: Users, label: "Manage Team" },
-          { path: "/notifications", icon: Bell, label: "Notifications", adminNotificationCount, isButton: true },
+          {
+            path: "/notifications",
+            icon: Bell,
+            label: "Notifications",
+            count: adminNotificationCount,
+            isButton: true,
+          },
         ]
       : [
-          { path: "/notifications", icon: Bell, label: "Notifications", isButton: true },
+          {
+            path: "/notifications",
+            icon: Bell,
+            label: "Notifications",
+            isButton: true,
+          },
         ]),
     { path: "/PetDashboard", icon: PawPrint, label: "Pet Dashboard" },
     { path: "/ProfilePage", icon: User, label: "Profile" }, 
@@ -103,7 +117,9 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
                       {unreadCount > 9 ? "9+" : unreadCount}
                     </span>
                   )}
-                  {item.label === "Notifications" && userRole === "admin" && (item.adminNotificationCount ?? 0) > 0 && (
+
+                  {/* Notification Badge */}
+                  {item.label === "Notifications" && (item.count || 0) > 0 && (
                     <span className="absolute -top-1 -right-1 bg-red-500 w-2 h-2 rounded-full border-2 border-white shadow-sm"></span>
                   )}
                 </div>
@@ -118,6 +134,7 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
               </>
             );
 
+            // Render as Button or Link
             if (item.isButton) {
               return <button key={item.path} onClick={handleNotificationClick} className={buttonClasses}>{content}</button>;
             }

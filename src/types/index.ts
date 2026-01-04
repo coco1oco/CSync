@@ -5,6 +5,7 @@ export interface UserProfile {
   username: string;
   email: string;
   role: UserRole;
+  committee?: string | null; // Mark as optional or nullable
   avatar_url: string | null;
   first_name: string | null;
   last_name: string | null;
@@ -47,6 +48,12 @@ export interface OutreachEvent {
     username: string | null;
     avatar_url: string | null;
   } | null; 
+  registration_deadline?: string | null;
+  registration_closed_manually?: boolean;
+  // ...existing properties...
+  is_hidden?: boolean; // Add this line
+
+// ...existing code...
 }
 
 export type UpdateProfilePayload = {

@@ -38,6 +38,7 @@ export default function EditOfficialEvent() {
   const [eventType, setEventType] = useState<"pet" | "member" | "campus">(
     "pet"
   );
+  const [deadline, setDeadline] = useState("");
 
   // Image State
   const [existingImage, setExistingImage] = useState<string | null>(null);
@@ -64,6 +65,13 @@ export default function EditOfficialEvent() {
         return;
       }
 
+      if (data.registration_deadline) {
+        const d = new Date(data.registration_deadline);
+      // Format for datetime-local input (YYYY-MM-DDTHH:mm)
+        d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+        const formatted = d.toISOString().slice(0, 16); 
+        setDeadline(formatted);
+      }
       // Populate Form
       setTitle(data.title);
       setDescription(data.description || "");
@@ -102,6 +110,21 @@ export default function EditOfficialEvent() {
       return;
     }
 
+    // 2. ✅ LOGIC: Validate Deadline vs Event Start
+    if (requiresRegistration && deadline) {
+      // Create a Date object for the Event Start
+      // If no start time is provided, we default to 00:00 (start of day)
+      const eventDateTimeStr = `${eventDate}T${startTime || "00:00"}`;
+      const eventStart = new Date(eventDateTimeStr);
+      const deadlineDate = new Date(deadline);
+
+      // Check if Deadline is AFTER Event Start
+      if (deadlineDate > eventStart) {
+        toast.error("Registration deadline cannot be after the event starts!");
+        return; // 🛑 Stop the function here
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -127,6 +150,7 @@ export default function EditOfficialEvent() {
           images: imageUrls,
           event_type: eventType,
           updated_at: new Date().toISOString(),
+          registration_deadline: deadline ? new Date(deadline).toISOString() : null, // ✅ Add this line
         })
         .eq("id", id); // ✅ IMPORTANT: Update specific ID
 
@@ -347,7 +371,8 @@ export default function EditOfficialEvent() {
               />
             </div>
 
-            {requiresRegistration && (
+           {requiresRegistration && (
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
                   Capacity Limit
@@ -359,8 +384,27 @@ export default function EditOfficialEvent() {
                   className="bg-white"
                 />
               </div>
-            )}
-          </div>
+
+              {/* ✅ PASTE THIS HERE */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                  Registration Deadline
+                </label>
+                <Input
+                  type="datetime-local"
+                  value={deadline}
+                  onChange={(e) => setDeadline(e.target.value)}
+                  className={`bg-white ${deadline && new Date(deadline) > new Date(`${eventDate}T${startTime || "00:00"}`) ? "border-red-500 focus:ring-red-200" 
+                  : ""
+                    }`}
+                  />
+                  {deadline && new Date(deadline) > new Date(`${eventDate}T${startTime || "00:00"}`) && (
+                  <p className="text-[10px] text-red-600 mt-1 font-bold"> Error: Deadline cannot be after the event starts.</p>
+                  )}
+              </div>
+            </div>
+          )}
+        </div>
 
           <Button
             type="submit"

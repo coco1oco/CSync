@@ -15,14 +15,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import FailedImageIcon from "@/assets/FailedImage.svg";
+import { LikesListModal } from "@/components/LikesListModal"; // ✅ Added
 
 // --- Notification Imports ---
 import {
   notifyLike,
-  notifyComment,
   notifyReply,
   notifyMentions,
-  notifyCommentLike,
 } from "@/lib/NotificationService";
 
 import type { OutreachEvent } from "@/types";
@@ -91,6 +90,9 @@ export default function EventDetails() {
   const [isPostLiked, setIsPostLiked] = useState(false);
   const [isLikingPost, setIsLikingPost] = useState(false);
 
+  // ✅ New: Likes Modal State (For the Post)
+  const [showPostLikesModal, setShowPostLikesModal] = useState(false);
+
   // --- ANIMATION STATES ---
   const [heartBump, setHeartBump] = useState(false);
   const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
@@ -104,7 +106,6 @@ export default function EventDetails() {
   // --- 1. HEART BUMP ANIMATION ---
   useEffect(() => {
     if (loading) return; 
-
     const type = searchParams.get('type');
     if (type === 'like') {
         const startTimer = setTimeout(() => setHeartBump(true), 300);
@@ -116,7 +117,6 @@ export default function EventDetails() {
   // --- 2. COMMENT HIGHLIGHT ANIMATION ---
   useEffect(() => {
     if (loading) return; 
-
     const targetCommentId = searchParams.get('comment_id');
     if (targetCommentId && comments.length > 0) {
         const commentElement = document.getElementById(`comment-${targetCommentId}`);
@@ -141,17 +141,14 @@ export default function EventDetails() {
   // --- DATA FETCHING ---
   useEffect(() => {
     if (!id) return;
-
     async function fetchData() {
       try {
         setLoading(true);
-
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
             const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
             setCurrentUser({ ...user, ...profile });
         }
-
         const { data: eventData, error: eventError } = await supabase
           .from("outreach_events")
           .select(`*, profiles:admin_id (username, avatar_url)`)
@@ -159,6 +156,13 @@ export default function EventDetails() {
           .single();
         if (eventError) throw eventError;
         setEvent(eventData);
+
+        const officialTypes = ["official", "pet", "member", "campus"];
+        if (officialTypes.includes(eventData.event_type)) {
+             // Redirect to the correct page and replace history so "Back" works
+             navigate(`/official-event/${id}`, { replace: true });
+             return; 
+        }
 
         const { count: likesCount } = await supabase
             .from("likes")
@@ -171,12 +175,9 @@ export default function EventDetails() {
            setIsPostLiked(!!myLike);
         }
 
-     // ...existing code...
         if (id) {
             await fetchComments(id, user?.id ?? "");
         }
-// ...existing code...
-
       } catch (err) {
         console.error("Error fetching data:", err);
       } finally {
@@ -189,12 +190,10 @@ export default function EventDetails() {
   // --- REALTIME SUBSCRIPTION ---
   useEffect(() => {
     if (!id) return;
-
     const channel = supabase.channel(`event-details-${id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments', filter: `event_id=eq.${id}` }, 
         async (payload) => {
           if (currentUser && payload.new.user_id === currentUser.id) return; 
-          
           const { data: userData } = await supabase.from("profiles").select("id, username, avatar_url").eq("id", payload.new.user_id).single();
           const newComment = { 
             ...payload.new, 
@@ -202,9 +201,7 @@ export default function EventDetails() {
             likes_count: 0,
             is_liked_by_user: false
           } as CommentWithExtras;
-          
           setComments((prev) => [...prev, newComment]);
-
           setHighlightedCommentId(newComment.id);
           setTimeout(() => {
              const el = document.getElementById(`comment-${newComment.id}`);
@@ -216,12 +213,10 @@ export default function EventDetails() {
         async () => {
             const { count } = await supabase.from("likes").select("*", { count: 'exact', head: true }).eq("event_id", id);
             setPostLikesCount(count || 0);
-            
             setHeartBump(true);
             setTimeout(() => setHeartBump(false), 500);
       })
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [id, currentUser]); 
 
@@ -250,20 +245,13 @@ export default function EventDetails() {
     }
   };
 
-  const handleTagClick = (tag: string) => {
-      navigate(`/feed?search=${encodeURIComponent(tag.replace("#", ""))}`);
-  };
-
   // --- ACTIONS ---
   const togglePostLike = async () => {
       if(!currentUser || isLikingPost) return;
       setIsLikingPost(true);
-      
       const prevLiked = isPostLiked;
       setIsPostLiked(!prevLiked);
       setPostLikesCount(prevLiked ? postLikesCount - 1 : postLikesCount + 1);
-
-      // Trigger local Animation
       setHeartBump(true);
       setTimeout(() => setHeartBump(false), 500);
 
@@ -299,11 +287,9 @@ export default function EventDetails() {
   const handlePostComment = async (e?: React.FormEvent) => {
     if(e) e.preventDefault();
     if (!newComment.trim() || !currentUser) return;
-    
     const content = newComment.trim();
     setNewComment("");
     setIsPosting(true);
-
     const tempId = `temp-${Date.now()}`;
     const optimisticComment: CommentWithExtras = {
         id: tempId,
@@ -316,15 +302,11 @@ export default function EventDetails() {
         likes_count: 0,
         is_liked_by_user: false
     };
-
     setComments(prev => [...prev, optimisticComment]);
-    
     if(activeReplyId) {
         setExpandedComments(prev => new Set(prev).add(activeReplyId));
     }
-    
     setTimeout(() => commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-
     const { data: inserted, error } = await supabase.from("comments").insert([{
         event_id: id,
         user_id: currentUser.id,
@@ -334,7 +316,6 @@ export default function EventDetails() {
 
     if(!error && inserted) {
         setComments(prev => prev.map(c => c.id === tempId ? { ...c, id: inserted.id, created_at: inserted.created_at } : c));
-        
         const notifiedUserIds: string[] = [];
         if (replyTarget && replyTarget.user_id !== currentUser.id) {
             await notifyReply(
@@ -345,15 +326,7 @@ export default function EventDetails() {
                 inserted.id
             );
             notifiedUserIds.push(replyTarget.user_id);
-        } else if (event?.admin_id && event.admin_id !== currentUser.id) {
-            await notifyComment(
-                { id: event!.id, admin_id: event!.admin_id, title: event!.title },
-                { id: currentUser.id, username: currentUser.username },
-                content,
-                inserted.id
-            );
-        }
-
+        } 
         await notifyMentions(
             { id: event!.id, admin_id: event!.admin_id, title: event!.title },
             { id: currentUser.id, username: currentUser.username },
@@ -361,7 +334,6 @@ export default function EventDetails() {
             inserted.id,
             notifiedUserIds
         );
-
         setActiveReplyId(null);
         setReplyTarget(null);
     } else {
@@ -397,7 +369,6 @@ export default function EventDetails() {
       });
   };
 
-  // Carousel Handlers
   const nextImage = () => {
       if (event?.images && currentImageIndex < event.images.length - 1) {
           setCurrentImageIndex(prev => prev + 1);
@@ -425,25 +396,23 @@ export default function EventDetails() {
   const getReplies = (parentId: string) => repliesByParent.get(parentId) || [];
 
   const renderContentWithTags = (text: string) => {
-      if (!text) return "";
-      const parts = text.split(/((?:@|#)\w+)/g);
-      return parts.map((part, i) => {
-          if (part.startsWith("@")) {
-              return <span key={i} className="text-blue-600 font-bold mr-1 cursor-pointer hover:underline">{part}</span>;
-          } else if (part.startsWith("#")) {
-              return (
-                <span 
-                    key={i} 
-                    onClick={(e) => { e.stopPropagation(); handleTagClick(part); }}
-                    className="text-blue-500 mr-1 cursor-pointer hover:underline hover:text-blue-700"
-                >
-                    {part}
-                </span>
-              );
-          }
-          return <span key={i}>{part}</span>;
-      });
-  };
+        if (!text) return "";
+        const parts = text.split(/(@[\w.-]+)/g);
+        return parts.map((part, i) => {
+            if (part.startsWith("@")) {
+                return (
+                    <span
+                        key={i}
+                        style={{ color: "#1d4ed8", backgroundColor: "#dbeafe", fontWeight: "600", borderRadius: "4px", padding: "1px 4px" }}
+                        className="inline-block mx-0.5 text-[11px]"
+                    >
+                        {part}
+                    </span>
+                );
+            }
+            return <span key={i}>{part}</span>;
+        });
+    };
 
   const renderCommentRow = (comment: CommentWithExtras, isReply = false) => (
       <CommentItem 
@@ -466,14 +435,8 @@ export default function EventDetails() {
   const hasImages = images.length > 0;
   const isOwner = currentUser?.id === event.admin_id;
 
-  // --- RETURN JSX ---
- // ... existing code ...
-
-  // --- RETURN JSX ---
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      
-      {/* Universal Mobile Header */}
       <div className="bg-white border-b px-4 py-3 sticky top-0 z-50 flex items-center gap-3 shadow-sm lg:hidden">
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
           <ArrowLeft className="w-5 h-5" />
@@ -483,128 +446,79 @@ export default function EventDetails() {
 
       {isMobile ? (
         <div className="w-full max-w-xl mx-auto pt-4 px-0 pb-20">
-           {/* Manually rendering FeedPost content here to ensure styles match Desktop */}
-           <FeedPost event={event} isAdmin={false} onDelete={() => navigate(-1)} onEdit={() => {}} onTagClick={handleTagClick} />
+           <FeedPost event={event} isAdmin={false} onDelete={() => navigate(-1)} onEdit={() => {}} />
         </div>
       ) : (
-        /* 1. DESKTOP WRAPPER (UPDATED: Removed bg-black/40) */
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 lg:p-6 lg:pl-64 overflow-hidden">
-            
-            {/* OPTIONAL: If you want to click outside to close, add an absolute div here with onClick={() => navigate(-1)} */}
             <div className="absolute inset-0 bg-white/50 backdrop-blur-sm" onClick={() => navigate(-1)} />
-
-            {/* 2. MODAL */}
             <div className="relative bg-white w-full max-w-[1000px] h-[85vh] rounded-xl shadow-2xl border border-gray-200 flex overflow-hidden z-10">
-            
-            {/* ... rest of your modal content (Left Column, Right Column) remains exactly the same ... */}
-            {/* LEFT COLUMN: Media + Caption (60% Width) */}
             <div className="w-[60%] h-full flex flex-col border-r border-gray-200 bg-white relative">
-               {/* ... same content ... */}
                <Button 
                     variant="ghost" 
                     size="icon" 
-                    className={`absolute top-4 left-4 z-10 rounded-full border ${hasImages ? "bg-black/50 hover:bg-black/70 text-white border-white/10" : "bg-white hover:bg-gray-100 text-gray-700 border-gray-200"}`}
+                    className={`absolute top-4 left-4 z-20 rounded-full border ${hasImages ? "bg-black/50 hover:bg-black/70 text-white border-white/10" : "bg-white hover:bg-gray-100 text-gray-700 border-gray-200"}`}
                     onClick={() => navigate(-1)}
                 >
                     <ArrowLeft className="w-5 h-5" />
                 </Button>
 
-               {hasImages ? (
-                   // ... same image logic ...
-                   <>
-                        <div className="flex-1 relative group/carousel bg-black flex items-center justify-center min-h-0">
-                            <img 
-                                src={images[currentImageIndex]} 
-                                alt="Post" 
-                                className="max-w-full max-h-full object-contain" 
-                            />
-                            {/* ... carousel controls ... */}
-                            {images.length > 1 && (
-                                <>
-                                    {currentImageIndex > 0 && (
-                                        <button 
-                                                onClick={(e) => { e.stopPropagation(); prevImage(); }}
-                                                className="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/20 hover:bg-white/40 text-white backdrop-blur-sm transition-all"
-                                        >
-                                                <ChevronLeft size={24} />
-                                        </button>
-                                    )}
-                                    {currentImageIndex < images.length - 1 && (
-                                        <button 
-                                                onClick={(e) => { e.stopPropagation(); nextImage(); }}
-                                                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/20 hover:bg-white/40 text-white backdrop-blur-sm transition-all"
-                                        >
-                                                <ChevronRight size={24} />
-                                        </button>
-                                    )}
-                                    <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5">
-                                            {images.map((_, idx) => (
-                                                <div 
-                                                    key={idx}
-                                                    className={`w-1.5 h-1.5 rounded-full ${idx === currentImageIndex ? 'bg-white' : 'bg-white/40'}`}
-                                                />
-                                            ))}
-                                    </div>
-                                </>
-                            )}
+             {hasImages ? (
+              <>
+                <div className="flex-1 relative group/carousel bg-gray-900 flex items-center justify-center min-h-0 overflow-hidden">
+                  <div className="absolute inset-0 z-0">
+                    <img key={images[currentImageIndex]} src={images[currentImageIndex]} alt="Post Blur" className="w-full h-full object-cover blur-3xl opacity-60 scale-110" />
+                    <div className="absolute inset-0 bg-black/20" />
+                  </div>
+                  <img src={images[currentImageIndex]} alt="Post" className="max-w-full max-h-full object-contain relative z-10 shadow-lg" />
+                  {images.length > 1 && (
+                    <>
+                      {currentImageIndex > 0 && (
+                        <button onClick={(e) => { e.stopPropagation(); prevImage(); }} className="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/20 hover:bg-black/40 text-white backdrop-blur-md transition-all z-20">
+                          <ChevronLeft size={24} />
+                        </button>
+                      )}
+                      {currentImageIndex < images.length - 1 && (
+                        <button onClick={(e) => { e.stopPropagation(); nextImage(); }} className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/20 hover:bg-black/40 text-white backdrop-blur-md transition-all z-20">
+                          <ChevronRight size={24} />
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+                {(event.title || event.description) && (
+                    <div className="shrink-0 bg-white border-t border-gray-100 p-4 max-h-[30%] overflow-y-auto">
+                        <h1 className="text-sm font-bold text-gray-900 mb-1">{event.title}</h1>
+                        <div className={`text-xs text-gray-700 whitespace-pre-wrap leading-relaxed ${isCaptionExpanded ? '' : 'line-clamp-2'}`}>
+                            {renderContentWithTags(event.description || "")}
                         </div>
-
-                        {(event.title || event.description) && (
-                            <div className="shrink-0 bg-white border-t border-gray-100 p-4 max-h-[30%] overflow-y-auto">
-                                <h1 className="text-sm font-bold text-gray-900 mb-1">{event.title}</h1>
-                                <div className={`text-xs text-gray-700 whitespace-pre-wrap leading-relaxed ${isCaptionExpanded ? '' : 'line-clamp-2'}`}>
-                                    {renderContentWithTags(event.description || "")}
-                                </div>
-                                {(event.description || "").length > 100 && (
-                                    <button 
-                                            onClick={() => setIsCaptionExpanded(!isCaptionExpanded)}
-                                            className="text-[10px] text-gray-400 font-medium mt-1 self-start hover:text-gray-600 focus:outline-none"
-                                    >
-                                            {isCaptionExpanded ? 'See less' : 'See more'}
-                                    </button>
-                                )}
-                            </div>
+                        {(event.description || "").length > 100 && (
+                            <button onClick={() => setIsCaptionExpanded(!isCaptionExpanded)} className="text-[10px] text-gray-400 font-medium mt-1 self-start hover:text-gray-600 focus:outline-none">
+                                {isCaptionExpanded ? 'See less' : 'See more'}
+                            </button>
                         )}
-                   </>
-               ) : (
-                   // ... same no-image logic ...
-                   <div className="flex-1 w-full h-full flex flex-col justify-start items-start p-8 pt-20 overflow-y-auto bg-white text-left">
-                        <div className="w-full">
-                            {event.title && <h1 className="text-2xl font-bold text-gray-900 mb-4">{event.title}</h1>}
-                            <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap">
-                                {renderContentWithTags(event.description || "")}
-                            </p>
-                        </div>
-                   </div>
-               )}
+                    </div>
+                )}
+               </>
+             ) : (
+                <div className="flex-1 w-full h-full flex flex-col justify-start items-start p-8 pt-20 overflow-y-auto bg-white">
+                    {event.title && <h1 className="text-2xl font-bold text-gray-900 mb-4">{event.title}</h1>}
+                    <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap">{renderContentWithTags(event.description || "")}</p>
+                </div>
+             )}
             </div>
 
-            {/* RIGHT COLUMN: Social */}
             <div className="w-[40%] h-full flex flex-col bg-white">
-                
-                {/* 1. Header */}
                 <div className="p-4 border-b border-gray-100 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-3">
-                        {event.profiles?.avatar_url ? (
-                            <img src={event.profiles.avatar_url} className="w-9 h-9 rounded-full object-cover border border-gray-100" />
-                        ) : (
-                            <div className="w-9 h-9 bg-gray-200 animate-pulse rounded-full" />
-                        )}
-                        
+                        {event.profiles?.avatar_url ? <img src={event.profiles.avatar_url} className="w-9 h-9 rounded-full object-cover border border-gray-100" /> : <div className="w-9 h-9 bg-gray-200 animate-pulse rounded-full" />}
                         <div className="flex flex-col justify-center">
-                            {event.profiles?.username ? (
-                                <p className="font-bold text-sm text-gray-900">{event.profiles.username}</p>
-                            ) : (
-                                <div className="h-4 w-24 bg-gray-200 animate-pulse rounded mb-1" />
-                            )}
+                            {event.profiles?.username ? <p className="font-bold text-sm text-gray-900">{event.profiles.username}</p> : <div className="h-4 w-24 bg-gray-200 animate-pulse rounded mb-1" />}
                             <p className="text-[10px] text-gray-500">{event.created_at ? formatRelativeTime(event.created_at) : ""}</p>
                         </div>
                     </div>
                     {isOwner && (
                         <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="w-4 h-4" /></Button>
-                            </DropdownMenuTrigger>
+                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="w-4 h-4" /></Button></DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                                 <DropdownMenuItem onClick={handleEditPost}><Edit className="w-3 h-3 mr-2"/>Edit</DropdownMenuItem>
                                 <DropdownMenuItem onClick={handleDeletePost} className="text-red-600"><Trash2 className="w-3 h-3 mr-2"/>Delete</DropdownMenuItem>
@@ -613,24 +527,20 @@ export default function EventDetails() {
                     )}
                 </div>
 
-                {/* 2. Comments */}
-                <div className="flex-1 overflow-y-auto pl-4 py-4 pr-6 space-y-4 bg-white [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                <div className="flex-1 overflow-y-auto pl-4 py-4 pr-6 space-y-4 bg-white [scrollbar-width:none]">
                     {rootComments.length === 0 ? (
                         <div className="flex flex-col items-center justify-center text-gray-400 py-10 h-full">
-                            <MessageCircle size={40} className="mb-2 opacity-20" />
-                            <p className="text-sm">No comments yet.</p>
-                            <p className="text-xs">Start the conversation.</p>
+                            <MessageCircle size={40} className="mb-2 opacity-20" /><p className="text-sm">No comments yet.</p>
                         </div>
                     ) : (
                         <>
                             {rootComments.map(comment => {
                                 const replies = getReplies(comment.id);
-                                const hasReplies = replies.length > 0;
                                 const isExpanded = expandedComments.has(comment.id);
                                 return (
                                     <div key={comment.id}>
                                         {renderCommentRow(comment)}
-                                        {hasReplies && (
+                                        {replies.length > 0 && (
                                             <div className="ml-12 mt-2 flex items-center">
                                                 <div className="w-6 h-[1px] bg-gray-300 mr-2" />
                                                 <button onClick={() => toggleReplies(comment.id)} className="text-[10px] font-semibold text-gray-500 hover:text-gray-800">
@@ -647,63 +557,60 @@ export default function EventDetails() {
                     )}
                 </div>
 
-                {/* 3. DESKTOP FOOTER (FIXED) */}
                 <div className="border-t border-gray-100 bg-white p-4 shrink-0 z-20">
                     <div className="flex items-center justify-between mb-4">
                          <div className="flex gap-4">
-                             {/* LIKE BUTTON */}
-                             <button onClick={togglePostLike} className="group flex items-center gap-1.5 hover:opacity-80 transition-opacity">
-                                 {/* FORCE STYLE FOR ANIMATION */}
-                                 <Heart 
-                                    className={`w-6 h-6 transition-transform duration-300 ${isPostLiked ? "fill-red-500 text-red-500" : "text-gray-900 group-hover:text-gray-600"}`}
-                                    style={{ transform: heartBump ? "scale(1.5)" : "scale(1)", transition: "transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)" }} 
-                                    strokeWidth={isPostLiked || heartBump ? 0 : 1.5}
-                                 />
-                                 <span className="text-sm font-semibold text-gray-900">{postLikesCount > 0 ? postLikesCount : ""}</span>
-                             </button>
-
-                             {/* COMMENT BUTTON - Now showing count */}
+                             {/* LIKE BUTTON GROUP */}
+                             <div className="flex items-center gap-1.5">
+                                <button onClick={togglePostLike} className="group flex items-center hover:opacity-80 transition-opacity focus:outline-none">
+                                    <Heart className={`w-6 h-6 transition-transform duration-300 ${isPostLiked ? "fill-red-500 text-red-500" : "text-gray-900 group-hover:text-gray-600"}`}
+                                        style={{ transform: heartBump ? "scale(1.5)" : "scale(1)", transition: "transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)" }} 
+                                        strokeWidth={isPostLiked || heartBump ? 0 : 1.5}
+                                    />
+                                </button>
+                                {postLikesCount > 0 && (
+                                    <button onClick={() => setShowPostLikesModal(true)} className="text-sm font-semibold text-gray-900 hover:underline focus:outline-none">
+                                        {postLikesCount}
+                                    </button>
+                                )}
+                             </div>
                              <button onClick={() => inputRef.current?.focus()} className="group flex items-center gap-1.5 hover:opacity-80 transition-opacity">
                                  <MessageCircle className="w-6 h-6 text-gray-900 group-hover:text-gray-600" strokeWidth={1.5}/>
                                  <span className="text-sm font-semibold text-gray-900">{comments.length > 0 ? comments.length : ""}</span>
                              </button>
                          </div>
                     </div>
-                    
                     <div className="relative">
                         {activeReplyId && (
-                           <div className="absolute -top-8 left-0 right-0 bg-gray-100 text-[10px] px-2 py-1 flex justify-between items-center rounded-t border">
-                               <span>Replying to <span className="font-bold">{replyTarget?.user.username}</span></span>
-                               <button onClick={() => { setActiveReplyId(null); setReplyTarget(null); }}><X size={10}/></button>
-                           </div>
+                            <div className="absolute -top-8 left-0 right-0 bg-gray-100 text-[10px] px-2 py-1 flex justify-between items-center rounded-t border">
+                                <span>Replying to <span className="font-bold">{replyTarget?.user.username}</span></span>
+                                <button onClick={() => { setActiveReplyId(null); setReplyTarget(null); }}><X size={10}/></button>
+                            </div>
                         )}
                         <form onSubmit={handlePostComment} className="flex items-center gap-2">
-                            <Input 
-                                ref={inputRef}
-                                value={newComment}
-                                onChange={e => setNewComment(e.target.value)}
-                                placeholder="Add a comment..." 
-                                className="bg-transparent border-none focus:ring-0 px-0 h-9 transition-all text-sm w-full focus-visible:ring-0 focus-visible:ring-offset-0"
-                            />
-                            <Button 
-                                type="submit" 
-                                variant="ghost"
-                                disabled={!newComment.trim() || isPosting} 
-                                className="text-blue-500 font-bold hover:text-blue-700 hover:bg-transparent px-2 disabled:text-blue-300"
-                            >
-                                Post
-                            </Button>
+                            <Input ref={inputRef} value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Add a comment..." className="bg-transparent border-none focus:ring-0 px-0 h-9 text-sm focus-visible:ring-0" />
+                            <Button type="submit" variant="ghost" disabled={!newComment.trim() || isPosting} className="text-blue-500 font-bold hover:bg-transparent px-2 disabled:text-blue-300">Post</Button>
                         </form>
                     </div>
                 </div>
-
             </div>
           </div>
         </div>
       )}
+
+      {/* ✅ Post Likes Modal */}
+      {event && (
+        <LikesListModal 
+            isOpen={showPostLikesModal}
+            onClose={() => setShowPostLikesModal(false)}
+            targetId={event.id}
+            type="post"
+        />
+      )}
     </div>
   );
 }
+
 // --- SUB-COMPONENT: Individual Comment Item ---
 interface CommentItemProps {
   event: OutreachEvent;
@@ -722,12 +629,11 @@ function CommentItem({ event, comment, user, onDelete, onReply, onEdit, isReply 
     const [isLiking, setIsLiking] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState(comment.content);
+    
+    // ✅ New: Local state for comment likes modal
+    const [showCommentLikesModal, setShowCommentLikesModal] = useState(false);
 
     const isEdited = comment.updated_at && comment.updated_at !== comment.created_at;
-
-    useEffect(() => {
-        // Fetch comment likes if needed
-    }, [comment.id]);
 
     const toggleLike = async () => {
         if(!user || isLiking) return;
@@ -735,27 +641,14 @@ function CommentItem({ event, comment, user, onDelete, onReply, onEdit, isReply 
         const prevLiked = isLiked;
         setIsLiked(!prevLiked);
         setLikesCount(prevLiked ? likesCount - 1 : likesCount + 1);
-
         try {
             if(prevLiked) {
                 await supabase.from("comment_likes").delete().eq("comment_id", comment.id).eq("user_id", user.id);
             } else {
                 await supabase.from("comment_likes").insert({ comment_id: comment.id, user_id: user.id });
-                if (comment.user_id !== user.id) {
-                     await notifyCommentLike(
-                        { id: event.id, admin_id: event.admin_id, title: event.title },
-                        { id: user.id, username: user.username },
-                        comment.user_id,
-                        comment.content,
-                        comment.id
-                      );
-                }
             }
-        } catch(e) {
-            setIsLiked(prevLiked);
-        } finally {
-            setIsLiking(false);
-        }
+        } catch(e) { setIsLiked(prevLiked); }
+        finally { setIsLiking(false); }
     };
 
     const handleSave = () => {
@@ -765,14 +658,19 @@ function CommentItem({ event, comment, user, onDelete, onReply, onEdit, isReply 
         }
     };
 
-    const canManage = user?.id === comment.user_id || user?.role === 'admin';
+    const renderContentWithTags = (text: string) => {
+        if (!text) return "";
+        const parts = text.split(/(@[\w.-]+)/g);
+        return parts.map((part, i) => {
+            if (part.startsWith("@")) {
+                return <span key={i} style={{ color: "#1d4ed8", backgroundColor: "#dbeafe", fontWeight: "600", borderRadius: "4px", padding: "1px 4px" }} className="inline-block mx-0.5 text-[11px]">{part}</span>;
+            }
+            return <span key={i}>{part}</span>;
+        });
+    };
 
     return (
-        <div 
-            id={`comment-${comment.id}`}
-            // FIXED: Using blue styling for highlight
-            className={`flex gap-2 group animate-in fade-in slide-in-from-bottom-2 duration-300 rounded p-1 transition-colors ${isReply ? "ml-12 mt-2" : "mt-3"} ${isHighlighted ? "bg-blue-50 ring-1 ring-blue-100" : ""}`}
-        >
+        <div id={`comment-${comment.id}`} className={`flex gap-2 group animate-in fade-in duration-300 rounded p-1 transition-colors ${isReply ? "ml-12 mt-2" : "mt-3"} ${isHighlighted ? "bg-blue-50 ring-1 ring-blue-100" : ""}`}>
              <img src={comment.user?.avatar_url || FailedImageIcon} className={`${isReply ? "w-5 h-5" : "w-7 h-7"} rounded-full object-cover border border-gray-100 flex-shrink-0`} />
              <div className="flex-1 space-y-0.5">
                  <div className="flex flex-col">
@@ -786,48 +684,47 @@ function CommentItem({ event, comment, user, onDelete, onReply, onEdit, isReply 
                                      <span onClick={() => { setIsEditing(false); setEditContent(comment.content); }} className="text-[10px] text-gray-500 cursor-pointer hover:underline">Cancel</span>
                                  </div>
                              </div>
-                          ) : (
-                             <span className="text-xs text-gray-700 break-words whitespace-pre-wrap">{comment.content}</span>
-                          )}
-                      </div>
+                         ) : (
+                             <span className="text-xs text-gray-700 break-words whitespace-pre-wrap">{renderContentWithTags(comment.content)}</span>
+                         )}
+                     </div>
                  </div>
-                 
                  {!isEditing && (
                     <div className="flex items-center gap-3 px-0.5 mt-0.5">
-                        <span className="text-[10px] text-gray-400 font-medium">
-                            {formatRelativeTime(comment.created_at)}
-                            {isEdited && <span className="ml-1 italic"> (edited)</span>}
-                        </span>
+                        <span className="text-[10px] text-gray-400 font-medium">{formatRelativeTime(comment.created_at)}{isEdited && <span className="ml-1 italic"> (edited)</span>}</span>
                         
-                        <button onClick={toggleLike} disabled={isLiking} className="flex items-center gap-1 group/like disabled:opacity-50">
-                            <Heart size={10} className={`transition-colors ${isLiked ? "fill-red-500 text-red-500" : "text-gray-400 group-hover/like:text-red-500"}`} />
-                            <span className="text-[10px] text-gray-500 font-semibold">{likesCount > 0 ? likesCount : ""}</span>
-                        </button>
+                        <div className="flex items-center gap-1 group/like">
+                            <button onClick={toggleLike} disabled={isLiking} className="flex items-center disabled:opacity-50">
+                                <Heart size={10} className={`transition-colors ${isLiked ? "fill-red-500 text-red-500" : "text-gray-400 group-hover/like:text-red-500"}`} />
+                            </button>
+                            {/* ✅ Clickable Comment Likes */}
+                            <button onClick={() => likesCount > 0 && setShowCommentLikesModal(true)} disabled={likesCount === 0} className={`text-[10px] font-semibold ${likesCount > 0 ? "text-gray-500 hover:text-gray-900 hover:underline cursor-pointer" : "text-gray-400 cursor-default"}`}>
+                                {likesCount > 0 ? likesCount : ""}
+                            </button>
+                        </div>
+
+                        <button onClick={() => onReply(comment)} className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-blue-600 font-semibold transition-colors"><Reply size={9} /> Reply</button>
                         
-                        <button onClick={() => onReply(comment)} className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-blue-600 font-semibold transition-colors">
-                            <Reply size={9} /> Reply
-                        </button>
-                        
-                        {canManage && (
+                        {(user?.id === comment.user_id || user?.role === 'admin') && (
                             <DropdownMenu>
-                                <DropdownMenuTrigger className="focus:outline-none opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity">
-                                    <MoreHorizontal size={12} className="text-gray-400 hover:text-gray-700 transition-colors" />
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="start" className="w-28 z-[100] bg-white">
-                                    {user?.id === comment.user_id && (
-                                        <DropdownMenuItem onClick={() => setIsEditing(true)}>
-                                            <Edit size={10} className="mr-2" /><span className="text-[10px]">Edit</span>
-                                        </DropdownMenuItem>
-                                    )}
-                                    <DropdownMenuItem onClick={() => onDelete(comment.id)} className="text-red-600 focus:text-red-600">
-                                        <Trash2 size={10} className="mr-2" /><span className="text-[10px]">Delete</span>
-                                    </DropdownMenuItem>
+                                <DropdownMenuTrigger className="focus:outline-none opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity"><MoreHorizontal size={12} className="text-gray-400 hover:text-gray-700" /></DropdownMenuTrigger>
+                                <DropdownMenuContent align="start" className="w-28 bg-white">
+                                    {user?.id === comment.user_id && <DropdownMenuItem onClick={() => setIsEditing(true)}><Edit size={10} className="mr-2" /><span className="text-[10px]">Edit</span></DropdownMenuItem>}
+                                    <DropdownMenuItem onClick={() => onDelete(comment.id)} className="text-red-600"><Trash2 size={10} className="mr-2" /><span className="text-[10px]">Delete</span></DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         )}
                     </div>
                  )}
              </div>
+
+             {/* ✅ Render the Modal for THIS Comment */}
+             <LikesListModal 
+                isOpen={showCommentLikesModal}
+                onClose={() => setShowCommentLikesModal(false)}
+                targetId={comment.id}
+                type="comment"
+             />
         </div>
     );
 }

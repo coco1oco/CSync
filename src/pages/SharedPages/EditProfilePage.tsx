@@ -14,6 +14,7 @@ import {
   Phone,
   ShieldCheck,
   AlignLeft,
+  Trash2, // ✅ Added for Delete Icon
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -22,7 +23,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
-import { updateProfile } from "@/lib/profileApi";
+// ✅ Make sure 'deleteUserAccount' is exported from your profileApi.ts as discussed
+import { updateProfile, deleteUserAccount } from "@/lib/profileApi";
 import FailedImageIcon from "@/assets/FailedImage.svg";
 
 // --- VALIDATION SCHEMA ---
@@ -49,6 +51,8 @@ export default function EditProfilePage() {
 
   const [avatarUrl, setAvatarUrl] = useState<string>("");
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  // ✅ New State for Deletion
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // --- FORM INITIALIZATION ---
   const {
@@ -124,6 +128,26 @@ export default function EditProfilePage() {
     }
   };
 
+  // ✅ NEW: Handle Account Deletion
+  const handleDeleteAccount = async () => {
+    const confirmDelete = window.confirm(
+      "Are you sure you want to delete your account? This action cannot be undone."
+    );
+
+    if (!confirmDelete) return;
+
+    try {
+      setIsDeleting(true);
+      await deleteUserAccount();
+      toast.success("Account deleted successfully");
+      navigate("/SignIn");
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Failed to delete account");
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50/50 pb-20 pt-6 px-4">
       {/* === TRANSPARENT HEADER (Matching ProfilePage) === */}
@@ -168,178 +192,207 @@ export default function EditProfilePage() {
         </div>
       </div>
 
-      {/* === MAIN CARD CONTENT === */}
-      <div className="max-w-4xl mx-auto bg-white rounded-[2rem] border border-gray-100 shadow-xl shadow-gray-200/50 overflow-hidden flex flex-col md:flex-row">
-        {/* LEFT SIDE: VISUAL IDENTITY */}
-        <div className="md:w-72 bg-gradient-to-b from-blue-50/50 to-transparent border-b md:border-b-0 md:border-r border-gray-100 p-8 flex flex-col items-center text-center shrink-0">
-          <div className="relative group mb-4">
-            <div className="w-32 h-32 rounded-full border-[4px] border-white shadow-lg overflow-hidden bg-gray-200 ring-1 ring-gray-100">
-              <img
-                src={avatarUrl || FailedImageIcon}
-                alt="Avatar"
-                className={`w-full h-full object-cover transition-all duration-300 ${
-                  isUploadingImage ? "opacity-50 blur-sm" : ""
-                }`}
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* === MAIN CARD CONTENT === */}
+        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-xl shadow-gray-200/50 overflow-hidden flex flex-col md:flex-row">
+          {/* LEFT SIDE: VISUAL IDENTITY */}
+          <div className="md:w-72 bg-gradient-to-b from-blue-50/50 to-transparent border-b md:border-b-0 md:border-r border-gray-100 p-8 flex flex-col items-center text-center shrink-0">
+            <div className="relative group mb-4">
+              <div className="w-32 h-32 rounded-full border-[4px] border-white shadow-lg overflow-hidden bg-gray-200 ring-1 ring-gray-100">
+                <img
+                  src={avatarUrl || FailedImageIcon}
+                  alt="Avatar"
+                  className={`w-full h-full object-cover transition-all duration-300 ${
+                    isUploadingImage ? "opacity-50 blur-sm" : ""
+                  }`}
+                />
+                {isUploadingImage && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                    <Loader2 className="w-8 h-8 text-white animate-spin" />
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => document.getElementById("avatarInput")?.click()}
+                disabled={isSubmitting || isUploadingImage}
+                type="button"
+                className="absolute bottom-1 right-1 bg-gray-900 text-white p-2.5 rounded-full border-[3px] border-white shadow-md hover:bg-black transition-transform hover:scale-105 active:scale-95"
+              >
+                <Camera className="w-4 h-4" />
+              </button>
+              <input
+                id="avatarInput"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarChange}
               />
-              {isUploadingImage && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/10">
-                  <Loader2 className="w-8 h-8 text-white animate-spin" />
+            </div>
+
+            <div className="space-y-1 w-full break-words">
+              <h2 className="font-bold text-gray-900 text-lg leading-tight">
+                {watch("first_name") || "Your"} {watch("last_name") || "Name"}
+              </h2>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100/50 border border-blue-200 text-blue-700 text-[11px] font-bold uppercase tracking-wider mt-1">
+                <ShieldCheck className="w-3 h-3" />
+                {user?.role === "admin" ? "Administrator" : "Member"}
+              </div>
+            </div>
+
+            <div className="mt-6 w-full pt-6 border-t border-gray-200/60">
+              <div className="flex items-center gap-3 text-sm text-gray-500 bg-white/50 p-2.5 rounded-lg border border-gray-100 overflow-hidden">
+                <Mail className="w-4 h-4 shrink-0 opacity-50" />
+                <span className="truncate text-xs font-medium">
+                  {user?.email}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT SIDE: FORM FIELDS (STACKED LAYOUT) */}
+          <div className="flex-1 p-6 md:p-8 space-y-5">
+            {/* NAME STACK */}
+            <div className="space-y-5">
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                  First Name
+                </Label>
+                <Input
+                  {...register("first_name")}
+                  className="bg-gray-50/50 border-gray-200 focus:bg-white transition-all h-11 rounded-xl"
+                  placeholder="Jane"
+                />
+                {errors.first_name && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {errors.first_name.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                  Last Name
+                </Label>
+                <Input
+                  {...register("last_name")}
+                  className="bg-gray-50/50 border-gray-200 focus:bg-white transition-all h-11 rounded-xl"
+                  placeholder="Doe"
+                />
+                {errors.last_name && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {errors.last_name.message}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* USERNAME & PRONOUNS STACK */}
+            <div className="space-y-5 pt-2">
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                  Username
+                </Label>
+                <div className="relative">
+                  <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Input
+                    {...register("username")}
+                    className="pl-9 bg-gray-50/50 border-gray-200 focus:bg-white transition-all h-11 rounded-xl"
+                    placeholder="username"
+                  />
                 </div>
+                {errors.username && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {errors.username.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                  Pronouns
+                </Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Input
+                    {...register("pronouns")}
+                    className="pl-9 bg-gray-50/50 border-gray-200 focus:bg-white transition-all h-11 rounded-xl"
+                    placeholder="e.g. they/them"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* CONTACT INFO */}
+            <div className="space-y-2 pt-2">
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                Contact Number
+              </Label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  {...register("contact_number")}
+                  className="pl-9 bg-gray-50/50 border-gray-200 focus:bg-white transition-all h-11 rounded-xl"
+                  placeholder="09XX-XXX-XXXX"
+                />
+              </div>
+              <p className="text-[10px] text-gray-400 flex items-center gap-1.5 px-1">
+                <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                Only shown to admins or when reporting a lost pet.
+              </p>
+            </div>
+
+            {/* BIO */}
+            <div className="space-y-2 pt-2">
+              <div className="flex justify-between items-center">
+                <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+                  <AlignLeft className="w-3.5 h-3.5" /> Bio
+                </Label>
+                <span
+                  className={`text-[10px] font-medium ${
+                    bioValue.length > 120 ? "text-red-500" : "text-gray-400"
+                  }`}
+                >
+                  {bioValue.length}/120
+                </span>
+              </div>
+              <textarea
+                {...register("bio")}
+                rows={4}
+                className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all resize-none"
+                placeholder="Share a little about yourself..."
+              />
+              {errors.bio && (
+                <p className="text-red-500 text-xs mt-1">
+                  {errors.bio.message}
+                </p>
               )}
-            </div>
-            <button
-              onClick={() => document.getElementById("avatarInput")?.click()}
-              disabled={isSubmitting || isUploadingImage}
-              type="button"
-              className="absolute bottom-1 right-1 bg-gray-900 text-white p-2.5 rounded-full border-[3px] border-white shadow-md hover:bg-black transition-transform hover:scale-105 active:scale-95"
-            >
-              <Camera className="w-4 h-4" />
-            </button>
-            <input
-              id="avatarInput"
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleAvatarChange}
-            />
-          </div>
-
-          <div className="space-y-1 w-full break-words">
-            <h2 className="font-bold text-gray-900 text-lg leading-tight">
-              {watch("first_name") || "Your"} {watch("last_name") || "Name"}
-            </h2>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100/50 border border-blue-200 text-blue-700 text-[11px] font-bold uppercase tracking-wider mt-1">
-              <ShieldCheck className="w-3 h-3" />
-              {user?.role === "admin" ? "Administrator" : "Member"}
-            </div>
-          </div>
-
-          <div className="mt-6 w-full pt-6 border-t border-gray-200/60">
-            <div className="flex items-center gap-3 text-sm text-gray-500 bg-white/50 p-2.5 rounded-lg border border-gray-100 overflow-hidden">
-              <Mail className="w-4 h-4 shrink-0 opacity-50" />
-              <span className="truncate text-xs font-medium">
-                {user?.email}
-              </span>
             </div>
           </div>
         </div>
 
-        {/* RIGHT SIDE: FORM FIELDS (STACKED LAYOUT) */}
-        <div className="flex-1 p-6 md:p-8 space-y-5">
-          {/* NAME STACK */}
-          <div className="space-y-5">
-            <div className="space-y-2">
-              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
-                First Name
-              </Label>
-              <Input
-                {...register("first_name")}
-                className="bg-gray-50/50 border-gray-200 focus:bg-white transition-all h-11 rounded-xl"
-                placeholder="Jane"
-              />
-              {errors.first_name && (
-                <p className="text-red-500 text-xs mt-1">
-                  {errors.first_name.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
-                Last Name
-              </Label>
-              <Input
-                {...register("last_name")}
-                className="bg-gray-50/50 border-gray-200 focus:bg-white transition-all h-11 rounded-xl"
-                placeholder="Doe"
-              />
-              {errors.last_name && (
-                <p className="text-red-500 text-xs mt-1">
-                  {errors.last_name.message}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* USERNAME & PRONOUNS STACK */}
-          <div className="space-y-5 pt-2">
-            <div className="space-y-2">
-              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
-                Username
-              </Label>
-              <div className="relative">
-                <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input
-                  {...register("username")}
-                  className="pl-9 bg-gray-50/50 border-gray-200 focus:bg-white transition-all h-11 rounded-xl"
-                  placeholder="username"
-                />
-              </div>
-              {errors.username && (
-                <p className="text-red-500 text-xs mt-1">
-                  {errors.username.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
-                Pronouns
-              </Label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input
-                  {...register("pronouns")}
-                  className="pl-9 bg-gray-50/50 border-gray-200 focus:bg-white transition-all h-11 rounded-xl"
-                  placeholder="e.g. they/them"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* CONTACT INFO */}
-          <div className="space-y-2 pt-2">
-            <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
-              Contact Number
-            </Label>
-            <div className="relative">
-              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                {...register("contact_number")}
-                className="pl-9 bg-gray-50/50 border-gray-200 focus:bg-white transition-all h-11 rounded-xl"
-                placeholder="09XX-XXX-XXXX"
-              />
-            </div>
-            <p className="text-[10px] text-gray-400 flex items-center gap-1.5 px-1">
-              <ShieldCheck className="w-3 h-3 text-emerald-600" />
-              Only shown to admins or when reporting a lost pet.
-            </p>
-          </div>
-
-          {/* BIO */}
-          <div className="space-y-2 pt-2">
-            <div className="flex justify-between items-center">
-              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
-                <AlignLeft className="w-3.5 h-3.5" /> Bio
-              </Label>
-              <span
-                className={`text-[10px] font-medium ${
-                  bioValue.length > 120 ? "text-red-500" : "text-gray-400"
-                }`}
-              >
-                {bioValue.length}/120
-              </span>
-            </div>
-            <textarea
-              {...register("bio")}
-              rows={4}
-              className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all resize-none"
-              placeholder="Share a little about yourself..."
-            />
-            {errors.bio && (
-              <p className="text-red-500 text-xs mt-1">{errors.bio.message}</p>
+        {/* ✅ DANGER ZONE SECTION */}
+        <div className="bg-red-50 rounded-[2rem] border border-red-100 p-6 md:p-8">
+          <h3 className="text-red-900 font-bold text-lg mb-2 flex items-center gap-2">
+            <Trash2 className="w-5 h-5" /> Danger Zone
+          </h3>
+          <p className="text-red-700/80 text-sm mb-6 max-w-xl">
+            Deleting your account will remove your access to the platform. Your
+            profile will be deactivated immediately. This action cannot be
+            undone.
+          </p>
+          <Button
+            onClick={handleDeleteAccount}
+            disabled={isDeleting}
+            variant="destructive"
+            className="bg-red-600 hover:bg-red-700 text-white rounded-xl h-11 px-6 shadow-sm shadow-red-200"
+          >
+            {isDeleting ? (
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            ) : (
+              <Trash2 className="w-4 h-4 mr-2" />
             )}
-          </div>
+            Delete Account
+          </Button>
         </div>
       </div>
     </div>

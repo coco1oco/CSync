@@ -7,20 +7,14 @@ import React, {
 } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
-// Define strict types to match your other files
-type UserRole = "user" | "admin";
-
 type UserProfile = {
   id: string;
   email: string;
   username?: string;
   avatar_url?: string;
-  role?: UserRole;
+  role?: "user" | "admin";
   first_name?: string;
   last_name?: string;
-  bio?: string;
-  contact_number?: string;
-  pronouns?: string;
   [key: string]: any;
 };
 
@@ -37,7 +31,9 @@ const AuthContext = createContext<AuthContextProps>({
   loading: true,
   signOut: async () => {},
   refreshProfile: async () => {},
-  updatePassword: async () => {},
+  updatePassword: async (currentPassword: string, newPassword: string) => {},
+
+// ...existing code...
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -48,7 +44,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Helper: Extract basic metadata from the session
+  const ADMIN_EMAILS = ["kmirafelix@gmail.com", "admin@pawpal.com"];
+
   const getUserFromSession = (sessionUser: any): UserProfile => {
     const meta = sessionUser.user_metadata || {};
     return {
@@ -60,9 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       first_name: meta.full_name?.split(" ")[0] || meta.first_name,
       last_name: meta.full_name?.split(" ")[1] || meta.last_name,
       pronouns: meta.pronouns,
-      contact_number: meta.contact_number,
-      bio: meta.bio,
-      role: (meta.role as UserRole) || "user",
+      role: meta.role || "user",
     };
   };
 
@@ -70,7 +65,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     userId: string,
     sessionUser: any,
     retries = 1
-  ): Promise<any> => {
+  ) => {
     try {
       const fetchPromise = supabase
         .from("profiles")
@@ -78,52 +73,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         .eq("id", userId)
         .maybeSingle();
 
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Profile fetch timeout")), 5000)
-      );
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error("Profile fetch timeout")), 5000)
+  );
 
       const result: any = await Promise.race([fetchPromise, timeoutPromise]);
 
-      if (result.error) {
-        throw new Error(result.error.message || "Failed to fetch profile");
-      }
+  // ✅ FIX IS HERE: Do not throw 'result.error' directly.
+  if (result.error) {
+    throw new Error(result.error.message || "Failed to fetch profile");
+  }
 
-      const db = result.data;
-      const meta = sessionUser.user_metadata || {};
+  const db = result.data;
+  const meta = sessionUser.user_metadata || {};
 
-      if (db) {
-        const needsSync =
-          db.role !== meta.role ||
-          db.avatar_url !== meta.avatar_url ||
-          db.username !== meta.username ||
-          db.first_name !== meta.first_name ||
-          db.contact_number !== meta.contact_number;
+  if (db) {
+    // Sync critical fields from DB to Session Metadata if they differ
+    const needsSync =
+      db.role !== meta.role ||
+      db.avatar_url !== meta.avatar_url ||
+      db.username !== meta.username ||
+      db.first_name !== meta.first_name ||
+      db.contact_number !== meta.contact_number;
 
-        if (needsSync) {
-          console.log("♻️ Syncing full profile to session cache...");
-          await supabase.auth.updateUser({
-            data: {
-              role: db.role,
-              avatar_url: db.avatar_url,
-              username: db.username,
-              first_name: db.first_name,
-              last_name: db.last_name,
-              pronouns: db.pronouns,
-              bio: db.bio,
-              contact_number: db.contact_number,
-            },
-          });
-        }
-      }
-
-      return result.data || null;
-    } catch (err: any) {
-      if (retries > 0) {
-        console.warn(`Profile fetch failed, retrying... (${retries} left)`);
-        return fetchProfileSafe(userId, sessionUser, retries - 1);
-      }
-      return null;
+    if (needsSync) {
+      console.log("♻️ Syncing full profile to session cache...");
+      await supabase.auth.updateUser({
+        data: {
+          role: db.role,
+          avatar_url: db.avatar_url,
+          username: db.username,
+          first_name: db.first_name,
+          last_name: db.last_name,
+          pronouns: db.pronouns,
+          bio: db.bio,
+          contact_number: db.contact_number,
+        },
+      });
     }
+  }
+
+  return result.data || null;
+
+} catch (err: any) {
+  // ✅ FIX IS HERE: Retry logic must be safe
+  if (retries > 0) {
+    console.warn(`Profile fetch failed, retrying... (${retries} left)`);
+    return fetchProfileSafe(userId, sessionUser, retries - 1);
+  }
+  // REMOVED: The hardcoded fallback block
+  return null;
+}
   };
 
   useEffect(() => {
@@ -137,28 +137,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
         if (session?.user) {
           const instantUser = getUserFromSession(session.user);
-          if (mounted) {
-            setUser(instantUser);
-            setLoading(false);
-          }
+          if (mounted) setUser(instantUser);
 
           const dbProfile = await fetchProfileSafe(
             session.user.id,
             session.user
           );
 
-          if (mounted && dbProfile) {
+          if (mounted) {
             setUser((prev) => ({
-              ...instantUser,
-              ...(prev || {}),
-              ...dbProfile,
+              ...(prev || instantUser),
+              ...(dbProfile || {}),
             }));
           }
-        } else {
-          if (mounted) setLoading(false);
         }
       } catch (error) {
         console.error("Session check error:", error);
+      } finally {
         if (mounted) setLoading(false);
       }
     };
@@ -173,22 +168,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (event === "SIGNED_IN" && session?.user) {
         const instantUser = getUserFromSession(session.user);
         setUser(instantUser);
-        setLoading(false);
 
         const dbProfile = await fetchProfileSafe(session.user.id, session.user);
         if (mounted && dbProfile) {
-          setUser((prev) => ({
-            ...instantUser,
-            ...(prev || {}),
-            ...dbProfile,
-          }));
+          setUser((prev) => ({ ...prev, ...instantUser, ...dbProfile }));
         }
+        setLoading(false);
       } else if (event === "SIGNED_OUT") {
         setUser(null);
         setLoading(false);
-      } else if (event === "USER_UPDATED" && session?.user) {
-        const instantUser = getUserFromSession(session.user);
-        setUser((prev) => ({ ...prev, ...instantUser }));
       }
     });
 
@@ -201,21 +189,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
-  };
-
-  const refreshProfile = async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (session?.user) {
-      const instantUser = getUserFromSession(session.user);
-      const dbProfile = await fetchProfileSafe(session.user.id, session.user);
-      if (dbProfile) {
-        setUser({ ...instantUser, ...dbProfile });
-      } else {
-        setUser(instantUser);
-      }
-    }
   };
 
   // ✅ ADD THIS FUNCTION
@@ -249,6 +222,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     } catch (error: any) {
       throw new Error(error.message || "Failed to change password");
+    }
+  };
+
+
+  const refreshProfile = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (session?.user) {
+      const instantUser = getUserFromSession(session.user);
+      const dbProfile = await fetchProfileSafe(session.user.id, session.user);
+      if (dbProfile) {
+        setUser({ ...instantUser, ...dbProfile });
+      } else {
+        setUser(instantUser);
+      }
     }
   };
 
