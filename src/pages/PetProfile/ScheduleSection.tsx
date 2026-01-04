@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { useAuth } from "@/context/authContext";
-import { useSchedules } from "@/lib/useSchedules";
+import { useSchedules } from "@/hooks/useSchedules";
 import { supabase } from "@/lib/supabaseClient";
-import { useDialog } from "@/context/DialogContext"; // ✅ Custom Dialog Hook
+import { useDialog } from "@/context/DialogContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -55,7 +55,7 @@ const typeConfig: Record<string, { icon: any; color: string; bg: string }> = {
 
 export default function ScheduleSection({ petId }: ScheduleSectionProps) {
   const { user } = useAuth();
-  const { confirm } = useDialog(); // ✅ Init hook
+  const { confirm } = useDialog();
   const {
     schedules,
     addSchedule,
@@ -135,7 +135,6 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
         },
       });
 
-      // ✅ Custom Confirmation Dialog
       if (schedule.type === "vaccine") {
         const shouldLog = await confirm(
           `Do you want to add "${schedule.title}" to the Health Passport automatically?`,
@@ -223,7 +222,6 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
   };
 
   const handleDelete = async (id: string) => {
-    // ✅ Custom Danger Confirm
     const isConfirmed = await confirm(
       "Are you sure you want to delete this event?",
       {
@@ -240,7 +238,6 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
   };
 
   const getGoogleCalendarLink = (schedule: any) => {
-    // ... same google calendar logic ...
     const dateStr = schedule.scheduled_date;
     const timeStr = schedule.scheduled_time || "09:00";
     const start = new Date(`${dateStr}T${timeStr}`)
@@ -381,7 +378,11 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
                     )}
                   </div>
                 </div>
-                <div className="p-4 flex md:flex-col items-center justify-center gap-2 border-t md:border-t-0 md:border-l border-gray-50 bg-gray-50/30">
+                {/* ✅ FIX: Changed "flex md:flex-col" to "flex flex-col md:flex-col"
+                   This ensures that on mobile, the buttons stack vertically (Done button on top of actions),
+                   preventing the "Done" button from being squeezed/cut-off by the side-by-side layout.
+                */}
+                <div className="p-4 flex flex-col md:flex-col items-center justify-center gap-3 border-t md:border-t-0 md:border-l border-gray-50 bg-gray-50/30">
                   {schedule.status === "pending" && (
                     <Button
                       size="sm"
@@ -398,7 +399,7 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
                       {isProcessing ? "Saving..." : "Done"}
                     </Button>
                   )}
-                  <div className="flex gap-1 w-full md:w-auto justify-end">
+                  <div className="flex gap-1 w-full md:w-auto justify-end md:justify-center">
                     <a
                       href={getGoogleCalendarLink(schedule)}
                       target="_blank"

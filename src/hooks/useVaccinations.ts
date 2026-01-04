@@ -15,28 +15,34 @@ export interface Vaccination {
   updated_at: string;
 }
 
-export function useVaccinations(petId: string | undefined, userId: string | undefined) {
+export function useVaccinations(
+  petId: string | undefined,
+  userId: string | undefined
+) {
   const [vaccinations, setVaccinations] = useState<Vaccination[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!petId || !userId) {
+    // ✅ FIX: Only check for petId.
+    // We want to fetch vaccines even if we don't know the viewer (public/member).
+    if (!petId) {
       setLoading(false);
       return;
     }
 
     fetchVaccinations();
-  }, [petId, userId]);
+  }, [petId]); // ✅ FIX: Removed userId dependency so re-login doesn't hide data
 
   const fetchVaccinations = async () => {
     try {
       setLoading(true);
+      // ✅ FIX: Removed .eq("owner_id", userId)
+      // This allows ANY authorized user (Members/Admins) to see the vaccines for this pet.
       const { data, error: fetchError } = await supabase
         .from("vaccinations")
         .select("*")
         .eq("pet_id", petId)
-        .eq("owner_id", userId)
         .order("next_due_date", { ascending: true });
 
       if (fetchError) throw fetchError;
@@ -64,15 +70,24 @@ export function useVaccinations(petId: string | undefined, userId: string | unde
   };
 
   const addVaccination = async (
-    vaccinationData: Omit<Vaccination, "id" | "created_at" | "updated_at" | "owner_id" | "status">
+    vaccinationData: Omit<
+      Vaccination,
+      "id" | "created_at" | "updated_at" | "owner_id" | "status"
+    >
   ) => {
+    // ✅ Keep userId check here. Only logged-in users (Admins) can ADD.
+    if (!userId) {
+      setError("You must be logged in to add records.");
+      return null;
+    }
+
     try {
       const { data, error } = await supabase
         .from("vaccinations")
         .insert([
           {
             ...vaccinationData,
-            owner_id: userId,
+            owner_id: userId, // The Admin logging it becomes the "owner" of the record
             status: "pending",
           },
         ])
@@ -88,7 +103,10 @@ export function useVaccinations(petId: string | undefined, userId: string | unde
     }
   };
 
-  const updateVaccination = async (id: string, updates: Partial<Vaccination>) => {
+  const updateVaccination = async (
+    id: string,
+    updates: Partial<Vaccination>
+  ) => {
     try {
       const { data, error } = await supabase
         .from("vaccinations")
@@ -111,7 +129,10 @@ export function useVaccinations(petId: string | undefined, userId: string | unde
 
   const deleteVaccination = async (id: string) => {
     try {
-      const { error } = await supabase.from("vaccinations").delete().eq("id", id);
+      const { error } = await supabase
+        .from("vaccinations")
+        .delete()
+        .eq("id", id);
 
       if (error) throw error;
       setVaccinations(vaccinations.filter((v) => v.id !== id));

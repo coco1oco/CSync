@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/authContext";
 import { supabase } from "@/lib/supabaseClient";
-import { useDialog } from "@/context/DialogContext"; // ✅ Custom Dialog Hook
+import { useDialog } from "@/context/DialogContext";
+import { useQuery } from "@tanstack/react-query";
+import { formatDistanceToNow } from "date-fns";
 
 // Components
 import PetProfileCard from "./components/PetProfileCard";
@@ -25,59 +27,53 @@ import {
   Scale,
   FileText,
   ChevronLeft,
+  Siren,
+  Scissors,
+  Eye,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export default function PetProfilePage() {
   const { petId } = useParams<{ petId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { confirm, alert } = useDialog(); // ✅ Init Hooks
+  const { confirm, alert } = useDialog();
 
-  const [pet, setPet] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  // 1. MAIN TABS
   const [activeTab, setActiveTab] = useState("passport");
-
-  // 2. SUB TABS (Health Section)
   const [healthSubTab, setHealthSubTab] = useState("vaccines");
-
   const [showQR, setShowQR] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => {
-    async function fetchPet() {
-      if (!petId) return;
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from("pets")
-          .select("*")
-          .eq("id", petId)
-          .single();
-        if (error) throw error;
-        setPet(data);
-      } catch (err) {
-        console.error("Error fetching pet:", err);
-      } finally {
-        setTimeout(() => setLoading(false), 300);
-      }
-    }
-    fetchPet();
-  }, [petId]);
+  const { data: pet, isLoading: loading } = useQuery({
+    queryKey: ["pet-profile", petId],
+    queryFn: async () => {
+      if (!petId) throw new Error("No Pet ID");
+
+      const { data, error } = await supabase
+        .from("pets")
+        .select("*, vaccinations(*)")
+        .eq("id", petId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!petId,
+  });
 
   const isOwner = user?.id === pet?.owner_id;
   const isCampusPet = pet?.is_campus_pet;
   const isAdmin = (user as any)?.role === "admin";
+
+  // ✅ Logic: Owners can manage their pets. Admins can manage Campus Pets.
   const canManage = isOwner || (isCampusPet && isAdmin);
 
   if (loading) return <PetProfileSkeleton />;
-
   if (!pet) return <NotFoundState onBack={() => navigate("/PetDashboard")} />;
 
   const handleDelete = async () => {
-    // ✅ Custom Danger Confirmation
     const isConfirmed = await confirm(
       `This action cannot be undone. All data for ${pet.name} will be lost permanently.`,
       {
@@ -94,7 +90,6 @@ export default function PetProfilePage() {
         await supabase.from("pets").delete().eq("id", pet.id);
         navigate("/PetDashboard");
       } catch (err) {
-        // ✅ Custom Alert
         await alert("Failed to delete profile. Please try again.");
         setIsDeleting(false);
       }
@@ -130,11 +125,94 @@ export default function PetProfilePage() {
               </h2>
               <p className="text-gray-500 text-sm font-medium">
                 {isCampusPet
-                  ? "Monitoring resident."
+                  ? "Monitoring resident profile."
                   : `Official records for ${pet.name}.`}
               </p>
             </div>
           </div>
+
+          {isCampusPet && (
+            <div className="px-4 lg:px-8 mb-4">
+              <div className="bg-blue-50/50 rounded-2xl p-4 border border-blue-100 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={cn(
+                      "w-10 h-10 rounded-full flex items-center justify-center",
+                      pet.spayed_neutered
+                        ? "bg-green-100 text-green-600"
+                        : "bg-orange-100 text-orange-600"
+                    )}
+                  >
+                    <Scissors size={20} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-gray-500 uppercase">
+                      CNVR Status
+                    </p>
+                    <p
+                      className={cn(
+                        "text-sm font-black",
+                        pet.spayed_neutered
+                          ? "text-green-700"
+                          : "text-orange-600"
+                      )}
+                    >
+                      {pet.spayed_neutered
+                        ? "Spayed / Neutered"
+                        : "Intact (Needs Kapon)"}
+                    </p>
+                  </div>
+                </div>
+                <div className="w-px h-8 bg-blue-200 hidden md:block"></div>
+                <div className="flex items-center gap-3">
+                  <div
+                    className={cn(
+                      "w-10 h-10 rounded-full flex items-center justify-center",
+                      pet.status === "missing"
+                        ? "bg-red-100 text-red-600 animate-pulse"
+                        : pet.status === "injured"
+                        ? "bg-red-100 text-red-600"
+                        : "bg-blue-100 text-blue-600"
+                    )}
+                  >
+                    {pet.status === "missing" ? (
+                      <Siren size={20} />
+                    ) : pet.status === "injured" ? (
+                      <AlertTriangle size={20} />
+                    ) : (
+                      <Eye size={20} />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-gray-500 uppercase">
+                      Current Status
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          "px-2 py-0.5 rounded text-[10px] font-black uppercase",
+                          pet.status === "healthy"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-red-100 text-red-700"
+                        )}
+                      >
+                        {pet.status || "Healthy"}
+                      </span>
+                      {pet.last_seen_at && (
+                        <span className="text-xs font-medium text-gray-600">
+                          Seen{" "}
+                          {formatDistanceToNow(new Date(pet.last_seen_at), {
+                            addSuffix: true,
+                          })}{" "}
+                          ago
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="flex gap-2 px-4 lg:px-8 pb-3 overflow-x-auto scrollbar-hide snap-x">
             <TabBtn
@@ -143,23 +221,27 @@ export default function PetProfilePage() {
               icon={<ShieldCheck size={18} />}
               label="Passport"
             />
-            <TabBtn
-              active={activeTab === "schedule"}
-              onClick={() => setActiveTab("schedule")}
-              icon={<Calendar size={18} />}
-              label="Schedule"
-            />
+            {!isCampusPet && (
+              <>
+                <TabBtn
+                  active={activeTab === "schedule"}
+                  onClick={() => setActiveTab("schedule")}
+                  icon={<Calendar size={18} />}
+                  label="Schedule"
+                />
+                <TabBtn
+                  active={activeTab === "routine"}
+                  onClick={() => setActiveTab("routine")}
+                  icon={<Settings2 size={18} />}
+                  label="Routine"
+                />
+              </>
+            )}
             <TabBtn
               active={activeTab === "health"}
               onClick={() => setActiveTab("health")}
               icon={<HeartPulse size={18} />}
               label="Health"
-            />
-            <TabBtn
-              active={activeTab === "routine"}
-              onClick={() => setActiveTab("routine")}
-              icon={<Settings2 size={18} />}
-              label="Routine"
             />
             <TabBtn
               active={activeTab === "timeline"}
@@ -175,7 +257,12 @@ export default function PetProfilePage() {
             <HealthPassport pet={pet} userId={pet.owner_id} />
           )}
 
-          {activeTab === "schedule" && <ScheduleSection petId={pet.id} />}
+          {activeTab === "schedule" && !isCampusPet && (
+            <ScheduleSection petId={pet.id} />
+          )}
+          {activeTab === "routine" && !isCampusPet && (
+            <RoutineSection petId={pet.id} />
+          )}
 
           {activeTab === "health" && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
@@ -201,10 +288,13 @@ export default function PetProfilePage() {
               </div>
 
               <div className="mt-4">
+                {/* ✅ PASSED canManage to all sub-sections */}
                 {healthSubTab === "vaccines" && (
-                  <VaccinationSection petId={pet.id} />
+                  <VaccinationSection petId={pet.id} canManage={canManage} />
                 )}
-                {healthSubTab === "weight" && <WeightSection petId={pet.id} />}
+                {healthSubTab === "weight" && (
+                  <WeightSection petId={pet.id} canManage={canManage} />
+                )}
                 {healthSubTab === "docs" && (
                   <DocumentsSection petId={pet.id} canManage={canManage} />
                 )}
@@ -212,9 +302,13 @@ export default function PetProfilePage() {
             </div>
           )}
 
-          {activeTab === "routine" && <RoutineSection petId={pet.id} />}
-
-          {activeTab === "timeline" && <LifeTimeline petId={pet.id} />}
+          {activeTab === "timeline" && (
+            <LifeTimeline
+              petId={pet.id}
+              isCampusPet={isCampusPet}
+              canManage={canManage}
+            />
+          )}
         </div>
       </div>
 
@@ -229,7 +323,7 @@ export default function PetProfilePage() {
   );
 }
 
-// Helpers
+// Helpers (unchanged)
 function PetProfileSkeleton() {
   return (
     <div className="w-full min-h-screen bg-gray-50 flex flex-col lg:flex-row p-4 lg:p-6 gap-6">
@@ -261,7 +355,7 @@ const TabBtn = ({ active, onClick, icon, label }: any) => (
     className={`snap-start py-3 px-4 text-sm font-bold border-b-2 flex items-center gap-2 transition-all whitespace-nowrap ${
       active
         ? "border-blue-600 text-blue-600 bg-blue-50/50 rounded-t-lg"
-        : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-t-lg"
+        : "border-transparent text-gray-400 hover:text-gray-600 hover:text-gray-600 hover:bg-gray-50 rounded-t-lg"
     }`}
   >
     {icon} {label}

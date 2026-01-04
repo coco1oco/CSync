@@ -5,7 +5,7 @@ import { Header } from "./Header";
 import { useAuth } from "@/context/authContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/hooks/utils";
 
 export default function AppLayout() {
   const { user, loading } = useAuth();
@@ -16,8 +16,11 @@ export default function AppLayout() {
   // 🔍 ROUTE DETECTION
   const isMessagesPage = location.pathname.startsWith("/messages");
 
-  // Detect any PetDashboard route (Dashboard, Add Pet, Edit Pet, etc.)
-  const isPetDashboard = location.pathname.startsWith("/PetDashboard");
+  // Detect any PetDashboard route OR Campus Pets
+  // ✅ FIX: Added "/campus-pets" check so it gets full width and no padding
+  const isPetDashboard =
+    location.pathname.startsWith("/PetDashboard") ||
+    location.pathname.startsWith("/campus-pets");
 
   // Detect Admin pages
   const isAdminPage =

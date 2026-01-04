@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { useVaccinations } from "@/lib/useVaccinations";
+import { useVaccinations } from "@/hooks/useVaccinations";
 import { format, isAfter, isBefore } from "date-fns";
 import {
   ShieldCheck,

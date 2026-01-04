@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useAuth } from "@/context/authContext";
-import { useVaccinations, type Vaccination } from "@/lib/useVaccinations";
-import { useDialog } from "@/context/DialogContext"; // ✅ Custom Dialog Hook
+import { useVaccinations, type Vaccination } from "@/hooks/useVaccinations";
+import { useDialog } from "@/context/DialogContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,17 +17,22 @@ import {
   ShieldCheck,
   History,
   Clock,
+  Loader2,
 } from "lucide-react";
 import { format, isBefore, parseISO } from "date-fns";
 import { toast } from "sonner";
 
 interface VaccinationSectionProps {
   petId: string;
+  canManage?: boolean; // ✅ Added prop
 }
 
-export default function VaccinationSection({ petId }: VaccinationSectionProps) {
+export default function VaccinationSection({
+  petId,
+  canManage,
+}: VaccinationSectionProps) {
   const { user } = useAuth();
-  const { confirm } = useDialog(); // ✅ Init Hook
+  const { confirm } = useDialog();
   const {
     vaccinations,
     addVaccination,
@@ -47,6 +52,8 @@ export default function VaccinationSection({ petId }: VaccinationSectionProps) {
     notes: "",
   });
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleReset = () => {
     setFormData({
       vaccine_name: "",
@@ -57,6 +64,7 @@ export default function VaccinationSection({ petId }: VaccinationSectionProps) {
     });
     setEditingId(null);
     setShowForm(false);
+    setIsSubmitting(false);
   };
 
   const handleEdit = (vac: Vaccination) => {
@@ -82,6 +90,9 @@ export default function VaccinationSection({ petId }: VaccinationSectionProps) {
       return;
     }
 
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
     try {
       if (editingId) {
         await updateVaccination(editingId, { ...formData, pet_id: petId });
@@ -93,11 +104,11 @@ export default function VaccinationSection({ petId }: VaccinationSectionProps) {
       handleReset();
     } catch (err) {
       toast.error("Operation failed");
+      setIsSubmitting(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    // ✅ Custom Danger Confirm
     const isConfirmed = await confirm("Permanently remove this record?", {
       title: "Delete Vaccine",
       variant: "danger",
@@ -139,12 +150,15 @@ export default function VaccinationSection({ petId }: VaccinationSectionProps) {
               Track shots, set reminders, and keep digital proof handy.
             </p>
           </div>
-          <Button
-            onClick={() => setShowForm(true)}
-            className="relative z-10 bg-white text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-bold shadow-lg rounded-xl h-12 px-6 transition-all active:scale-95"
-          >
-            <Plus className="w-5 h-5 mr-2" /> Add Record
-          </Button>
+          {/* ✅ Check canManage before showing Add Button */}
+          {canManage && (
+            <Button
+              onClick={() => setShowForm(true)}
+              className="relative z-10 bg-white text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-bold shadow-lg rounded-xl h-12 px-6 transition-all active:scale-95"
+            >
+              <Plus className="w-5 h-5 mr-2" /> Add Record
+            </Button>
+          )}
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
           <Syringe className="absolute -bottom-6 right-20 w-40 h-40 text-white/5 rotate-12 pointer-events-none" />
         </div>
@@ -184,6 +198,7 @@ export default function VaccinationSection({ petId }: VaccinationSectionProps) {
                   onEdit={() => handleEdit(vac)}
                   onDelete={() => handleDelete(vac.id)}
                   onComplete={() => markCompleted(vac.id)}
+                  canManage={canManage} // ✅ Pass canManage
                 />
               ))}
             </div>
@@ -202,6 +217,7 @@ export default function VaccinationSection({ petId }: VaccinationSectionProps) {
                   onEdit={() => handleEdit(vac)}
                   onDelete={() => handleDelete(vac.id)}
                   onComplete={() => markCompleted(vac.id)}
+                  canManage={canManage} // ✅ Pass canManage
                 />
               ))}
             </div>
@@ -219,6 +235,7 @@ export default function VaccinationSection({ petId }: VaccinationSectionProps) {
                   variant="completed"
                   onEdit={() => handleEdit(vac)}
                   onDelete={() => handleDelete(vac.id)}
+                  canManage={canManage} // ✅ Pass canManage
                 />
               ))}
             </div>
@@ -229,6 +246,7 @@ export default function VaccinationSection({ petId }: VaccinationSectionProps) {
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white p-6 rounded-[2rem] w-full max-w-lg shadow-2xl relative animate-in zoom-in-95">
+            {/* Form Content (Unchanged) */}
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h3 className="text-2xl font-black text-gray-900">
@@ -263,7 +281,6 @@ export default function VaccinationSection({ petId }: VaccinationSectionProps) {
                   autoFocus
                 />
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-gray-400 uppercase ml-1">
@@ -295,7 +312,6 @@ export default function VaccinationSection({ petId }: VaccinationSectionProps) {
                   />
                 </div>
               </div>
-
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-400 uppercase ml-1">
                   Veterinarian / Clinic
@@ -312,7 +328,6 @@ export default function VaccinationSection({ petId }: VaccinationSectionProps) {
                   <User className="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
                 </div>
               </div>
-
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-400 uppercase ml-1">
                   Notes
@@ -327,13 +342,19 @@ export default function VaccinationSection({ petId }: VaccinationSectionProps) {
                   rows={3}
                 />
               </div>
-
               <div className="pt-2 flex gap-3">
                 <Button
                   type="submit"
+                  disabled={isSubmitting}
                   className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-12 font-bold shadow-lg shadow-emerald-200"
                 >
-                  {editingId ? "Save Changes" : "Save Record"}
+                  {isSubmitting ? (
+                    <Loader2 className="animate-spin" />
+                  ) : editingId ? (
+                    "Save Changes"
+                  ) : (
+                    "Save Record"
+                  )}
                 </Button>
               </div>
             </form>
@@ -344,7 +365,14 @@ export default function VaccinationSection({ petId }: VaccinationSectionProps) {
   );
 }
 
-function VaccineCard({ vac, variant, onEdit, onDelete, onComplete }: any) {
+function VaccineCard({
+  vac,
+  variant,
+  onEdit,
+  onDelete,
+  onComplete,
+  canManage,
+}: any) {
   const isOverdue = variant === "overdue";
   const isCompleted = variant === "completed";
 
@@ -424,32 +452,36 @@ function VaccineCard({ vac, variant, onEdit, onDelete, onComplete }: any) {
           )}
         </div>
       </div>
-      <div className="bg-gray-50/50 p-3 flex md:flex-col items-center justify-center gap-2 border-t md:border-t-0 md:border-l border-gray-100">
-        {!isCompleted && onComplete && (
-          <Button
-            onClick={onComplete}
-            variant="outline"
-            size="sm"
-            className="w-full md:w-auto h-8 text-xs font-bold text-emerald-600 border-emerald-200 hover:bg-emerald-50"
-          >
-            <CheckCircle2 size={14} className="mr-1" /> Done
-          </Button>
-        )}
-        <div className="flex gap-1">
-          <button
-            onClick={onEdit}
-            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-          >
-            <Edit2 size={16} />
-          </button>
-          <button
-            onClick={onDelete}
-            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-          >
-            <Trash2 size={16} />
-          </button>
+
+      {/* ✅ Only show Action Buttons if canManage is true */}
+      {canManage && (
+        <div className="bg-gray-50/50 p-3 flex md:flex-col items-center justify-center gap-2 border-t md:border-t-0 md:border-l border-gray-100">
+          {!isCompleted && onComplete && (
+            <Button
+              onClick={onComplete}
+              variant="outline"
+              size="sm"
+              className="w-full md:w-auto h-8 text-xs font-bold text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+            >
+              <CheckCircle2 size={14} className="mr-1" /> Done
+            </Button>
+          )}
+          <div className="flex gap-1">
+            <button
+              onClick={onEdit}
+              className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            >
+              <Edit2 size={16} />
+            </button>
+            <button
+              onClick={onDelete}
+              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

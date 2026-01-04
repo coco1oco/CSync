@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { useDialog } from "@/context/DialogContext"; // ✅ Custom Dialog Hook
+import { useDialog } from "@/context/DialogContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,8 +28,15 @@ interface WeightLog {
 
 const ITEMS_PER_PAGE = 10;
 
-export default function WeightSection({ petId }: { petId: string }) {
-  const { confirm } = useDialog(); // ✅ Init Hook
+// ✅ Added canManage prop
+export default function WeightSection({
+  petId,
+  canManage,
+}: {
+  petId: string;
+  canManage?: boolean;
+}) {
+  const { confirm } = useDialog();
   const [weights, setWeights] = useState<WeightLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -39,6 +46,7 @@ export default function WeightSection({ petId }: { petId: string }) {
   const [showBCS, setShowBCS] = useState(false);
   const [tempBCS, setTempBCS] = useState<number | null>(null);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const observerTarget = useRef(null);
@@ -99,44 +107,40 @@ export default function WeightSection({ petId }: { petId: string }) {
   }, [hasMore, loading, loadingMore, page, fetchWeights, weights]);
 
   const handleAdd = async () => {
-    if (!newWeight) return;
-    const weightNum = parseFloat(newWeight);
-    const today = new Date().toISOString().split("T")[0];
+    if (!newWeight || isSubmitting) return;
+    setIsSubmitting(true);
 
-    const tempId = Math.random().toString();
-    const newEntry = {
-      id: tempId,
-      weight: weightNum,
-      bcs: tempBCS || undefined,
-      date_logged: today,
-    };
+    try {
+      const weightNum = parseFloat(newWeight);
+      const today = new Date().toISOString().split("T")[0];
 
-    setWeights([newEntry, ...weights]);
-    setIsAdding(false);
-    setNewWeight("");
-    setTempBCS(null);
+      const { data, error } = await supabase
+        .from("pet_weights")
+        .insert({
+          pet_id: petId,
+          weight: weightNum,
+          bcs: tempBCS,
+          date_logged: today,
+        })
+        .select()
+        .single();
 
-    const { data, error } = await supabase
-      .from("pet_weights")
-      .insert({
-        pet_id: petId,
-        weight: weightNum,
-        bcs: tempBCS,
-        date_logged: today,
-      })
-      .select()
-      .single();
+      if (error) throw error;
 
-    if (error) {
-      toast.error("Failed to save weight");
-    } else {
-      setWeights((prev) => prev.map((w) => (w.id === tempId ? data : w)));
+      setWeights((prev) => [data, ...prev]);
+      setIsAdding(false);
+      setNewWeight("");
+      setTempBCS(null);
       toast.success("Weight logged");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to save weight. Check DB permissions.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    // ✅ Custom Danger Confirm
     const isConfirmed = await confirm("Remove this weight entry?", {
       title: "Delete Log",
       variant: "danger",
@@ -177,7 +181,6 @@ export default function WeightSection({ petId }: { petId: string }) {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-      {/* 1. STATUS CARD */}
       <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center justify-between relative overflow-hidden">
         <div className="relative z-10">
           <div className="flex items-center gap-2 text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">
@@ -218,23 +221,27 @@ export default function WeightSection({ petId }: { petId: string }) {
             </div>
           )}
         </div>
-        <div className="z-10">
-          <Button
-            size="icon"
-            className={`rounded-full h-12 w-12 shadow-lg transition-transform ${
-              isAdding
-                ? "rotate-45 bg-red-50 text-red-600 hover:bg-red-100"
-                : "bg-gray-900 text-white hover:bg-gray-800"
-            }`}
-            onClick={() => setIsAdding(!isAdding)}
-          >
-            <Plus size={24} />
-          </Button>
-        </div>
+
+        {/* ✅ Check canManage for Add Button */}
+        {canManage && (
+          <div className="z-10">
+            <Button
+              size="icon"
+              className={`rounded-full h-12 w-12 shadow-lg transition-transform ${
+                isAdding
+                  ? "rotate-45 bg-red-50 text-red-600 hover:bg-red-100"
+                  : "bg-gray-900 text-white hover:bg-gray-800"
+              }`}
+              onClick={() => setIsAdding(!isAdding)}
+            >
+              <Plus size={24} />
+            </Button>
+          </div>
+        )}
         <div className="absolute -right-6 -bottom-10 w-32 h-32 bg-gray-50 rounded-full z-0" />
       </div>
 
-      {isAdding && (
+      {isAdding && canManage && (
         <div className="bg-white p-4 rounded-2xl border border-blue-100 shadow-lg animate-in slide-in-from-top-2 space-y-4">
           <div>
             <p className="text-xs font-bold text-gray-500 mb-1 ml-1">
@@ -284,10 +291,14 @@ export default function WeightSection({ petId }: { petId: string }) {
           </div>
           <Button
             onClick={handleAdd}
-            disabled={!newWeight}
+            disabled={!newWeight || isSubmitting}
             className="w-full h-12 bg-blue-600 hover:bg-blue-700 rounded-xl"
           >
-            Save Log
+            {isSubmitting ? (
+              <Loader2 className="animate-spin w-5 h-5" />
+            ) : (
+              "Save Log"
+            )}
           </Button>
         </div>
       )}
@@ -337,14 +348,17 @@ export default function WeightSection({ petId }: { petId: string }) {
                       {format(new Date(log.date_logged), "MMMM d, yyyy")}
                     </p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDelete(log.id)}
-                    className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all"
-                  >
-                    <Trash2 size={16} />
-                  </Button>
+                  {/* ✅ Check canManage for Delete Button */}
+                  {canManage && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(log.id)}
+                      className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  )}
                 </div>
               );
             })}
@@ -360,8 +374,7 @@ export default function WeightSection({ petId }: { petId: string }) {
             !hasMore &&
             weights.length > 5 && (
               <div className="flex items-center gap-2 text-gray-300 text-xs font-medium uppercase tracking-widest">
-                <CheckCircle2 size={14} />
-                You've reached the start
+                <CheckCircle2 size={14} /> You've reached the start
               </div>
             )
           )}
