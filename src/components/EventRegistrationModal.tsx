@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/authContext";
-import { X, Loader2, MapPin, Calendar, CheckCircle2, User } from "lucide-react";
+import { X, Loader2, MapPin, Calendar, CheckCircle2, User, Hourglass } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import FailedImageIcon from "@/assets/FailedImage.svg";
@@ -12,7 +12,7 @@ interface EventRegistrationModalProps {
   eventTitle: string;
   eventLocation?: string;
   eventDate?: string;
-  eventType?: string; // ✅ NEW PROP
+  eventType?: string;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -40,17 +40,16 @@ export function EventRegistrationModal({
   const [selectedPetId, setSelectedPetId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchingPets, setFetchingPets] = useState(true);
-  const [isSuccess, setIsSuccess] = useState(false);
+  
+  // ✅ Track the resulting status for UI feedback (Approved vs Waitlist)
+  const [resultStatus, setResultStatus] = useState<"approved" | "waitlist" | null>(null);
 
-  // ✅ CHECK: Is this explicitly a pet event?
   const isPetEvent = eventType === "pet";
 
-  // 1. Fetch Pets (Only if it's a pet event)
+  // 1. Fetch Pets
   useEffect(() => {
     const fetchPets = async () => {
       if (!user) return;
-
-      // Optimization: Don't fetch pets for general assemblies
       if (!isPetEvent) {
         setFetchingPets(false);
         return;
@@ -69,12 +68,13 @@ export function EventRegistrationModal({
     fetchPets();
   }, [user, isPetEvent]);
 
-  // 2. Handle Registration
+  // 2. Handle Registration with CAPACITY CHECK
   const handleRegister = async () => {
     if (!user) return;
     setLoading(true);
 
     try {
+      // A. Check for existing registration first
       const { data: existing } = await supabase
         .from("event_registrations")
         .select("id")
@@ -89,20 +89,52 @@ export function EventRegistrationModal({
         return;
       }
 
+      // B. 🔍 FETCH FRESH CAPACITY DATA
+      // 1. Get the max limit
+      const { data: eventData, error: eventError } = await supabase
+        .from("outreach_events")
+        .select("max_attendees")
+        .eq("id", eventId)
+        .single();
+
+      if (eventError) throw eventError;
+
+      // 2. Count current confirmed participants (Ignore waitlisted ones)
+      const { count: currentCount, error: countError } = await supabase
+        .from("event_registrations")
+        .select("*", { count: "exact", head: true })
+        .eq("event_id", eventId)
+        .in("status", ["approved", "checked_in"]);
+
+      if (countError) throw countError;
+
+      // C. 🧮 CALCULATE STATUS
+      const max = eventData?.max_attendees;
+      // If a limit exists AND we reached it, user goes to waitlist
+      const isFull = max ? (currentCount || 0) >= max : false;
+      const statusToSave = isFull ? "waitlist" : "approved";
+
+      // D. INSERT WITH CALCULATED STATUS
       const { error } = await supabase.from("event_registrations").insert({
         event_id: eventId,
         user_id: user.id,
-        pet_id: selectedPetId, // Will be null for non-pet events
-        status: "approved",
+        pet_id: selectedPetId,
+        status: statusToSave, // ✅ Saves correct status
       });
 
       if (error) throw error;
 
-      setIsSuccess(true);
+      // E. Success UI
+      setResultStatus(statusToSave);
+      
+      // Trigger parent update immediately
+      onSuccess();
+
+      // Close modal after a short delay to show the success message
       setTimeout(() => {
-        onSuccess();
         onClose();
-      }, 2000);
+      }, 2500);
+
     } catch (err) {
       console.error(err);
       toast.error("Failed to register");
@@ -118,16 +150,33 @@ export function EventRegistrationModal({
       />
 
       <div className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-        {isSuccess && (
-          <div className="absolute inset-0 bg-green-500 z-10 flex flex-col items-center justify-center text-white p-6 text-center animate-in fade-in">
-            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-lg text-green-600">
-              <CheckCircle2 size={32} strokeWidth={3} />
+        
+        {/* ✅ SUCCESS OVERLAY (Dynamic based on status) */}
+        {resultStatus && (
+          <div className={`absolute inset-0 z-10 flex flex-col items-center justify-center text-white p-6 text-center animate-in fade-in ${
+            resultStatus === 'waitlist' ? 'bg-amber-500' : 'bg-green-500'
+          }`}>
+            <div className={`w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-lg ${
+               resultStatus === 'waitlist' ? 'text-amber-600' : 'text-green-600'
+            }`}>
+              {resultStatus === 'waitlist' ? (
+                <Hourglass size={32} strokeWidth={3} />
+              ) : (
+                <CheckCircle2 size={32} strokeWidth={3} />
+              )}
             </div>
-            <h2 className="text-2xl font-black mb-1">You're In!</h2>
-            <p className="font-medium opacity-90">See you there!</p>
+            <h2 className="text-2xl font-black mb-1">
+              {resultStatus === 'waitlist' ? "Added to Waitlist" : "You're In!"}
+            </h2>
+            <p className="font-medium opacity-90">
+              {resultStatus === 'waitlist' 
+                ? "The event is full, but we'll notify you if a spot opens!" 
+                : "See you there!"}
+            </p>
           </div>
         )}
 
+        {/* HEADER */}
         <div
           className={`h-32 relative p-6 flex flex-col justify-end text-white ${
             isPetEvent
@@ -156,8 +205,8 @@ export function EventRegistrationModal({
           </div>
         </div>
 
+        {/* CONTENT */}
         <div className="p-6">
-          {/* ✅ CONDITIONAL UI BASED ON EVENT TYPE */}
           {isPetEvent ? (
             <>
               <p className="text-sm font-bold text-gray-500 uppercase mb-4">
@@ -234,7 +283,6 @@ export function EventRegistrationModal({
               )}
             </>
           ) : (
-            // 🚫 NON-PET EVENT UI (Simpler)
             <div className="text-center py-2 space-y-4">
               <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto text-gray-400 border border-gray-100">
                 <User size={40} />

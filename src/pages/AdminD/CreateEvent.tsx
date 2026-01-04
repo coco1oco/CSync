@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/authContext";
 import { motion } from "framer-motion";
+import { notifyNewPost } from "@/lib/NotificationService";
 
 export default function CreateEvent() {
   const navigate = useNavigate();
@@ -73,7 +74,7 @@ export default function CreateEvent() {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  const handleSubmit = async () => {
+ const handleSubmit = async () => {
     if (!title.trim() || !description.trim()) return;
 
     setError("");
@@ -82,14 +83,14 @@ export default function CreateEvent() {
     try {
       if (!user) throw new Error("You must be logged in.");
 
-      // 1. Upload all images concurrently
+      // 1. Upload images
       const uploadPromises = imageFiles.map((file) =>
         uploadImageToCloudinary(file)
       );
       const uploadedImageUrls = await Promise.all(uploadPromises);
 
-      // 2. Insert into Supabase
-      const { error: insertError } = await supabase
+      // 2. Insert into Supabase AND Select the result
+      const { data: newPost, error: insertError } = await supabase
         .from("outreach_events")
         .insert([
           {
@@ -97,11 +98,23 @@ export default function CreateEvent() {
             title,
             location,
             description,
-            images: uploadedImageUrls, // Save the array of URLs
+            images: uploadedImageUrls,
+            event_type: "standard", // Ensure this exists or is default
           },
-        ]);
+        ])
+        .select() // <--- Important: Select the data back
+        .single();
 
       if (insertError) throw insertError;
+
+      // 3. ✅ Trigger Notification manually
+      if (newPost) {
+        void notifyNewPost({
+          id: newPost.id,
+          admin_id: user.id,
+          username: user.username || "Someone", // Fallback if username isn't in user object
+        });
+      }
 
       setTimeout(() => {
         navigate("/");
@@ -112,7 +125,7 @@ export default function CreateEvent() {
       setLoading(false);
     }
   };
-
+  
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center lg:p-4 isolate">
       <motion.div
@@ -167,10 +180,7 @@ export default function CreateEvent() {
             </div>
 
             <div className="flex-1 space-y-3 pt-1">
-              <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-blue-200 text-blue-600 text-xs font-bold mb-1">
-                <Globe className="w-3 h-3" />
-                <span>Everyone</span>
-              </div>
+            
 
               {error && (
                 <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100">

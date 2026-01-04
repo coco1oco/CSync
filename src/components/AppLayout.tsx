@@ -31,15 +31,15 @@ export default function AppLayout() {
   const isFixedPage = isMessagesPage;
 
   // 2. Wide Page: Uses full width (max-w-full) instead of constrained width
-
   // 3. Edge-to-Edge: Removes AppLayout padding so the child page can control it
   const isEdgeToEdge = isPetDashboard;
 
 const isSettingsPage = location.pathname.startsWith("/settings") || location.pathname.startsWith("/Settings"); 
-
+const isOfficialEventDetails = location.pathname.startsWith("/official-event");
 // 2. UPDATE THIS VARIABLE
 // Add || isSettingsPage to the end
-const isWidePage = isFixedPage || isAdminPage || isPetDashboard || isSettingsPage;
+// ✅ UPDATE THIS:
+const isWidePage = isFixedPage || isAdminPage || isPetDashboard || isSettingsPage || isOfficialEventDetails;
 
   if (loading)
     return (
