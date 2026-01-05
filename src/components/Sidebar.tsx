@@ -1,13 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import {
-  Home,
-  MessageCircle,
-  Bell,
-  PawPrint,
-  User,
-  Users,
-} from "lucide-react";
+import { Home, MessageCircle, Bell, PawPrint, User, Users } from "lucide-react";
 import { useAuth } from "@/context/authContext";
 import { useChat } from "@/context/ChatContext";
 import logo from "@/assets/images/Pawpal.svg";
@@ -35,9 +28,9 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
   const handleNotificationClick = (e: React.MouseEvent) => {
     e.preventDefault();
     if (isMessagesPage) {
-        setIsNotificationPanelOpen(true); 
+      setIsNotificationPanelOpen(true);
     } else {
-        setIsNotificationPanelOpen(!isNotificationPanelOpen);
+      setIsNotificationPanelOpen(!isNotificationPanelOpen);
     }
   };
 
@@ -70,7 +63,7 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
           },
         ]),
     { path: "/PetDashboard", icon: PawPrint, label: "Pet Dashboard" },
-    { path: "/ProfilePage", icon: User, label: "Profile" }, 
+    { path: "/ProfilePage", icon: User, label: "Profile" },
   ];
 
   return (
@@ -103,13 +96,17 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
               <>
                 <div className="relative flex items-center justify-center">
                   {item.label === "Profile" && user?.avatar_url ? (
-                    <img 
-                      src={user.avatar_url} 
+                    <img
+                      src={user.avatar_url}
                       alt="Profile"
                       className="w-6 h-6 rounded-full object-cover border border-gray-200 transition-transform group-hover:scale-105"
                     />
                   ) : (
-                    <Icon size={24} strokeWidth={active ? 2.5 : 2} className="transition-transform group-hover:scale-105" />
+                    <Icon
+                      size={24}
+                      strokeWidth={active ? 2.5 : 2}
+                      className="transition-transform group-hover:scale-105"
+                    />
                   )}
 
                   {item.label === "Messages" && unreadCount > 0 && (
@@ -144,31 +141,41 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
 
         {/* --- FOOTER SECTION --- */}
         <div className={`border-t border-gray-100 p-3 space-y-2`}>
-          
           {/* Use the new MoreMenu Component */}
-          <MoreMenu 
-             isCollapsed={isCollapsed} 
-             justifyClass={justifyClass} 
-             hideTextClass={hideTextClass} 
+          <MoreMenu
+            isCollapsed={isCollapsed}
+            justifyClass={justifyClass}
+            hideTextClass={hideTextClass}
           />
 
           {/* AFFILIATION */}
-          <div className={`pt-2 flex items-center opacity-60 hover:opacity-100 transition-opacity ${justifyClass} ${isCollapsed ? 'justify-center' : 'gap-3 px-2'}`}>
-            <img src="/Paws2.jpg" alt="PAWS Logo" className="w-8 h-8 grayscale flex-shrink-0" />
+          <div
+            className={`pt-2 flex items-center opacity-60 hover:opacity-100 transition-opacity ${justifyClass} ${
+              isCollapsed ? "justify-center" : "gap-3 px-2"
+            }`}
+          >
+            <img
+              src="/Paws2.jpg"
+              alt="PAWS Logo"
+              className="w-8 h-8 grayscale flex-shrink-0"
+            />
             <div className={hideTextClass}>
-                <p className="text-[10px] uppercase font-bold text-gray-400">Affiliated with</p>
-                <p className="text-xs font-bold text-gray-700">PAWS Philippines</p>
+              <p className="text-[10px] uppercase font-bold text-gray-400">
+                Affiliated with
+              </p>
+              <p className="text-xs font-bold text-gray-700">
+                PAWS Philippines
+              </p>
             </div>
           </div>
-
         </div>
       </aside>
 
       {/* RENDER NOTIFICATION PANEL */}
-      <NotificationCenter 
-        variant="panel" 
-        isOpen={isNotificationPanelOpen} 
-        onClose={() => setIsNotificationPanelOpen(false)} 
+      <NotificationCenter
+        variant="panel"
+        isOpen={isNotificationPanelOpen}
+        onClose={() => setIsNotificationPanelOpen(false)}
       />
     </>
   );

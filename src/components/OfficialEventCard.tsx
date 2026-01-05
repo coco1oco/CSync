@@ -1,6 +1,6 @@
 import { format, isPast, isSameDay } from "date-fns";
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom"; // ✅ Added
+import { useNavigate } from "react-router-dom"; 
 import {
   MapPin,
   Clock,
@@ -22,6 +22,7 @@ import {
   Loader2,
   Eye,
   EyeOff,
+  Timer // ✅ Added Timer icon for deadline
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -66,7 +67,7 @@ export function OfficialEventCard({
   currentCount = 0,
   onSuccess,
 }: OfficialEventCardProps) {
-  const navigate = useNavigate(); // ✅ Initialize navigation
+  const navigate = useNavigate(); 
   const [isHoveringRegistered, setIsHoveringRegistered] = useState(false);
   const { user } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -77,7 +78,6 @@ export function OfficialEventCard({
     return () => clearInterval(timer);
   }, []);
 
-  // ✅ New: Handle opening the details page
   const handleCardClick = () => {
     navigate(`/official-event/${event.id}`);
   };
@@ -97,8 +97,29 @@ export function OfficialEventCard({
   const month = format(eventDate, "MMM").toUpperCase();
   const day = format(eventDate, "d");
 
+  // --- 📅 DEADLINE LOGIC ---
   const deadlineDate = event.registration_deadline ? new Date(event.registration_deadline) : null;
   const isDeadlinePassed = deadlineDate ? isPast(deadlineDate) : false;
+  const isClosedManually = event.registration_closed_manually;
+  
+  // Determine Deadline Badge State
+  const getDeadlineBadge = () => {
+    if (isClosedManually) {
+      return { label: "Registration Closed", color: "text-red-600 bg-red-50 border-red-100", icon: XCircle };
+    }
+    if (isDeadlinePassed) {
+      return { label: "Deadline Passed", color: "text-gray-500 bg-gray-100 border-gray-200", icon: Timer };
+    }
+    if (deadlineDate) {
+      return { label: `Register by ${format(deadlineDate, "MMM d")}`, color: "text-green-600 bg-green-50 border-green-100", icon: Clock };
+    }
+    return null; // No deadline set
+  };
+
+  const deadlineBadge = getDeadlineBadge();
+  const DeadlineIcon = deadlineBadge?.icon;
+  // --------------------------
+
   const isEventToday = isSameDay(eventDate, new Date());
 
   const isHappeningNow = (() => {
@@ -112,7 +133,6 @@ export function OfficialEventCard({
     return currentMinutes >= startTotal && currentMinutes <= endTotal;
   })();
 
-  const isClosedManually = event.registration_closed_manually;
   const max = event.max_attendees;
   const isWaitlistMode = max ? currentCount >= max : false;
   const googleCalendarUrl = createGoogleCalendarLink(event);
@@ -120,26 +140,22 @@ export function OfficialEventCard({
   const isCheckedIn = registrationStatus === "checked_in";
   const isRejected = registrationStatus === "rejected";
 
-const handleRegisterInternal = async (e: React.MouseEvent) => {
+  const handleRegisterInternal = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!user || isRegistering) return;
     setIsRegistering(true);
     
-    // 1. Calculate logic
     const isWaitlist = event.max_attendees && (currentCount || 0) >= event.max_attendees;
-    
-    // 2. Database Status (What saves to DB)
     const dbStatus = isWaitlist ? "waitlist" : "approved"; 
 
     try {
       const { error } = await supabase.from("event_registrations").insert({
         event_id: event.id,
         user_id: user.id,
-        status: dbStatus, // Save "waitlist" to DB
+        status: dbStatus,
       });
 
       if (error) {
-        // Handle "Already Registered" error (Code 23505)
         if (error.code === '23505') {
              toast.info("You are already registered for this event.");
              if (onSuccess) onSuccess(); 
@@ -148,16 +164,13 @@ const handleRegisterInternal = async (e: React.MouseEvent) => {
         throw error;
       }
 
-      // 3. Notification Status (What decides the text)
-      // ✅ IF waitlist, send "joined_waitlist" so it says "Added to Waitlist"
-      // ✅ IF approved, send "approved" so it says "Registration Confirmed"
       const notificationStatus = isWaitlist ? "joined_waitlist" : "approved";
 
       await notifyRegistrationUpdate(
           user.id, 
           event.id, 
           event.title, 
-          notificationStatus, // <--- USE THIS VARIABLE
+          notificationStatus, 
           user.id
       );
       
@@ -171,8 +184,9 @@ const handleRegisterInternal = async (e: React.MouseEvent) => {
       setIsRegistering(false);
     }
   };
+
   const handleUnregisterInternal = async (e: React.MouseEvent) => {
-    e.stopPropagation(); // ✋ Stop navigation
+    e.stopPropagation(); 
     if (!user) return;
     if (!window.confirm("Are you sure you want to leave this event?")) return;
     setIsRegistering(true);
@@ -197,7 +211,7 @@ const handleRegisterInternal = async (e: React.MouseEvent) => {
 
   return (
     <div
-      onClick={handleCardClick} // ✅ Click anywhere to view details
+      onClick={handleCardClick} 
       className={`bg-white rounded-2xl border shadow-sm hover:shadow-md transition-all overflow-hidden mb-4 group relative cursor-pointer ${
         isEventToday ? "border-red-200 shadow-red-50 ring-1 ring-red-100" : "border-gray-200"
       } ${isHidden ? "opacity-75 bg-gray-50" : ""}`}
@@ -207,7 +221,7 @@ const handleRegisterInternal = async (e: React.MouseEvent) => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
-                onClick={(e) => e.stopPropagation()} // ✋ Prevent detail view
+                onClick={(e) => e.stopPropagation()} 
                 className="p-1.5 bg-white/90 backdrop-blur rounded-full text-gray-500 hover:text-blue-600 shadow-sm transition-colors focus:outline-none"
               >
                 <MoreHorizontal size={18} />
@@ -253,15 +267,26 @@ const handleRegisterInternal = async (e: React.MouseEvent) => {
       {event.images && event.images.length > 0 && (
         <div className="h-40 w-full relative">
           <img src={event.images[0]} className={`w-full h-full object-cover ${isHidden ? "grayscale" : ""}`} alt="Event Cover" />
-          {isHappeningNow ? (
-            <div className="absolute top-3 left-3 px-2.5 py-1 rounded-md border border-red-500 bg-red-600 text-white text-[10px] font-bold uppercase tracking-wide flex items-center gap-1.5 shadow-sm">
-              <Radio size={12} className="relative inline-flex" /> HAPPENING NOW
-            </div>
-          ) : (
-            <div className={`absolute top-3 left-3 px-2 py-1 rounded-md border text-[10px] font-bold uppercase tracking-wide flex items-center gap-1.5 shadow-sm bg-white/95 ${badge.color.replace("bg-", "text-")}`}>
-              <BadgeIcon size={12} /> {badge.label}
-            </div>
-          )}
+          
+          <div className="absolute top-3 left-3 flex flex-col gap-1.5 items-start">
+             {/* 1. Happening Now or Category Badge */}
+             {isHappeningNow ? (
+                <div className="px-2.5 py-1 rounded-md border border-red-500 bg-red-600 text-white text-[10px] font-bold uppercase tracking-wide flex items-center gap-1.5 shadow-sm">
+                  <Radio size={12} className="relative inline-flex" /> HAPPENING NOW
+                </div>
+              ) : (
+                <div className={`px-2 py-1 rounded-md border text-[10px] font-bold uppercase tracking-wide flex items-center gap-1.5 shadow-sm bg-white/95 ${badge.color.replace("bg-", "text-")}`}>
+                  <BadgeIcon size={12} /> {badge.label}
+                </div>
+              )}
+
+             {/* 2. ✅ NEW: Deadline Badge */}
+             {deadlineBadge && (
+                <div className={`px-2 py-1 rounded-md border text-[10px] font-bold uppercase tracking-wide flex items-center gap-1.5 shadow-sm ${deadlineBadge.color}`}>
+                   {DeadlineIcon && <DeadlineIcon size={12} />} {deadlineBadge.label}
+                </div>
+             )}
+          </div>
         </div>
       )}
 
@@ -303,7 +328,7 @@ const handleRegisterInternal = async (e: React.MouseEvent) => {
                   href={googleCalendarUrl} 
                   target="_blank" 
                   rel="noreferrer" 
-                  onClick={(e) => e.stopPropagation()} // ✋ Stop navigation
+                  onClick={(e) => e.stopPropagation()} 
                   className="inline-flex"
                 >
                   <Button size="sm" variant="outline" className="h-9 w-9 p-0 rounded-full border-gray-200 text-gray-500 hover:text-blue-600 hover:bg-blue-50">
@@ -330,7 +355,7 @@ const handleRegisterInternal = async (e: React.MouseEvent) => {
                           : isWaitlisted
                           ? "bg-amber-50 text-amber-600 border-amber-200"
                           : isRejected 
-                          ? "bg-red-100 text-red-700 border-red-200 opacity-100" // <--- 4. ✅ Red Style for Rejected
+                          ? "bg-red-100 text-red-700 border-red-200 opacity-100" 
                           : "bg-green-50 text-green-600 border-green-200"
                       }`}
                     >
@@ -341,7 +366,6 @@ const handleRegisterInternal = async (e: React.MouseEvent) => {
                       ) : isWaitlisted ? (
                         <> <Hourglass size={16} /> Waitlisted </>
                       ) :  isRejected ? (
-                        // 5. ✅ Display Declined Text
                         <> <XCircle size={16} /> Declined </> 
                       ):(
                         <> <CheckCircle2 size={16} /> Going </>
@@ -349,12 +373,12 @@ const handleRegisterInternal = async (e: React.MouseEvent) => {
                     </Button>
                   ) : (
                     <Button
-                      onClick={handleRegisterInternal} // ✅ Using Internal with e.stopPropagation
+                      onClick={handleRegisterInternal} 
                       disabled={isRegistering || isClosedManually || isDeadlinePassed}
                       size="sm"
                       className={`h-9 px-6 font-bold rounded-full shadow-sm transition-all ${
                         isClosedManually || isDeadlinePassed
-                          ? "bg-gray-100 text-gray-400"
+                          ? "bg-gray-100 text-gray-400 border border-gray-200" // Grayed out style
                           : isWaitlistMode
                           ? "bg-amber-100 text-amber-700 border border-amber-200"
                           : "bg-black text-white"

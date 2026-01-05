@@ -23,7 +23,10 @@ type AuthContextProps = {
   loading: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
-  updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  updatePassword: (
+    currentPassword: string,
+    newPassword: string
+  ) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextProps>({
@@ -38,6 +41,21 @@ const AuthContext = createContext<AuthContextProps>({
 
 export const useAuth = () => useContext(AuthContext);
 
+const getUserFromSession = (sessionUser: any): UserProfile => {
+  const meta = sessionUser.user_metadata || {};
+  return {
+    ...sessionUser,
+    id: sessionUser.id,
+    email: sessionUser.email,
+    avatar_url: meta.avatar_url || null,
+    username: meta.username || sessionUser.email?.split("@")[0],
+    first_name: meta.full_name?.split(" ")[0] || meta.first_name,
+    last_name: meta.full_name?.split(" ")[1] || meta.last_name,
+    pronouns: meta.pronouns,
+    role: meta.role || "user",
+  };
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -46,21 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const ADMIN_EMAILS = ["kmirafelix@gmail.com", "admin@pawpal.com"];
 
-  const getUserFromSession = (sessionUser: any): UserProfile => {
-    const meta = sessionUser.user_metadata || {};
-    return {
-      ...sessionUser,
-      id: sessionUser.id,
-      email: sessionUser.email,
-      avatar_url: meta.avatar_url || null,
-      username: meta.username || sessionUser.email?.split("@")[0],
-      first_name: meta.full_name?.split(" ")[0] || meta.first_name,
-      last_name: meta.full_name?.split(" ")[1] || meta.last_name,
-      pronouns: meta.pronouns,
-      role: meta.role || "user",
-    };
-  };
-
+  // Move fetchProfileSafe inside AuthProvider so setUser is in scope
   const fetchProfileSafe = async (
     userId: string,
     sessionUser: any,
@@ -73,57 +77,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         .eq("id", userId)
         .maybeSingle();
 
-  const timeoutPromise = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error("Profile fetch timeout")), 5000)
-  );
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Profile fetch timeout")), 5000)
+      );
 
       const result: any = await Promise.race([fetchPromise, timeoutPromise]);
 
-  // ✅ FIX IS HERE: Do not throw 'result.error' directly.
-  if (result.error) {
-    throw new Error(result.error.message || "Failed to fetch profile");
-  }
+      if (result.error) {
+        throw new Error(result.error.message || "Failed to fetch profile");
+      }
 
-  const db = result.data;
-  const meta = sessionUser.user_metadata || {};
+      const db = result.data;
+      const meta = sessionUser.user_metadata || {};
 
-  if (db) {
-    // Sync critical fields from DB to Session Metadata if they differ
-    const needsSync =
-      db.role !== meta.role ||
-      db.avatar_url !== meta.avatar_url ||
-      db.username !== meta.username ||
-      db.first_name !== meta.first_name ||
-      db.contact_number !== meta.contact_number;
+      if (db) {
+        const needsSync =
+          db.role !== meta.role ||
+          db.avatar_url !== meta.avatar_url ||
+          db.username !== meta.username ||
+          db.first_name !== meta.first_name ||
+          db.contact_number !== meta.contact_number ||
+          db.banned_at !== meta.banned_at ||
+          db.deleted_at !== meta.deleted_at;
 
-    if (needsSync) {
-      console.log("♻️ Syncing full profile to session cache...");
-      await supabase.auth.updateUser({
-        data: {
-          role: db.role,
-          avatar_url: db.avatar_url,
-          username: db.username,
-          first_name: db.first_name,
-          last_name: db.last_name,
-          pronouns: db.pronouns,
-          bio: db.bio,
-          contact_number: db.contact_number,
-        },
-      });
+        if (needsSync) {
+          console.log("♻️ Syncing full profile to session cache...");
+          await supabase.auth.updateUser({
+            data: {
+              role: db.role,
+              avatar_url: db.avatar_url,
+              username: db.username,
+              first_name: db.first_name,
+              last_name: db.last_name,
+              pronouns: db.pronouns,
+              bio: db.bio,
+              contact_number: db.contact_number,
+              banned_at: db.banned_at,
+              deleted_at: db.deleted_at,
+            },
+          });
+        }
+      }
+
+      return result.data || null;
+    } catch (err: any) {
+      if (retries > 0) {
+        console.warn(`Profile fetch failed, retrying... (${retries} left)`);
+        return fetchProfileSafe(userId, sessionUser, retries - 1);
+      }
+      return null;
     }
-  }
-
-  return result.data || null;
-
-} catch (err: any) {
-  // ✅ FIX IS HERE: Retry logic must be safe
-  if (retries > 0) {
-    console.warn(`Profile fetch failed, retrying... (${retries} left)`);
-    return fetchProfileSafe(userId, sessionUser, retries - 1);
-  }
-  // REMOVED: The hardcoded fallback block
-  return null;
-}
   };
 
   useEffect(() => {

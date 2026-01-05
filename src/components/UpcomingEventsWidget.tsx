@@ -14,7 +14,6 @@ import {
   Radio,
   XCircle,
 } from "lucide-react"; 
-
 // ... Type Definitions remain the same ...
 type MyEvent = {
   registration_id: string;

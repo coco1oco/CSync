@@ -5,13 +5,16 @@ import {
   requestNotificationPermission,
   setupForegroundNotificationHandler,
 } from "./lib/NotificationService";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // Providers
 import { AuthProvider } from "./context/authContext";
 import { ChatProvider } from "./context/ChatContext";
 import { NotificationProvider } from "./context/NotificationContext";
 import { Toaster } from "sonner";
+import { DialogProvider } from "./context/DialogContext";
 
+const queryClient = new QueryClient();
 export default function App() {
   useEffect(() => {
     // Delay notification setup to not block app load
@@ -38,15 +41,19 @@ export default function App() {
   }, []);
 
   return (
-    <AuthProvider>
-      <ChatProvider>
-        <NotificationProvider>
-          <InstallPWA />
-          <AppRouter />
-          {/* ✅ FIXED: Changed to 'top-center' and added offset */}
-          <Toaster position="top-center" richColors offset={toastOffset} />
-        </NotificationProvider>
-      </ChatProvider>
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <DialogProvider>
+          <ChatProvider>
+            <NotificationProvider>
+              <InstallPWA />
+              <AppRouter />
+              {/* ✅ FIXED: Changed to 'top-center' and added offset */}
+              <Toaster position="top-center" richColors offset={toastOffset} />
+            </NotificationProvider>
+          </ChatProvider>
+        </DialogProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }

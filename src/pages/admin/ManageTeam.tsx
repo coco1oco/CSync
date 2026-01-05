@@ -17,8 +17,12 @@ import {
   Trash2,
   AlertTriangle,
   CheckCircle2,
+  MoreHorizontal,
+  Info, // ✅ Added Info Icon
+  MessageCircle, // ✅ Added Message Icon
 } from "lucide-react";
 import { toast } from "sonner";
+
 
 // ✅ SYSTEM ROLE (Strict DB Enum)
 type SystemRole = "user" | "admin" | "member";
@@ -156,7 +160,6 @@ export default function ManageTeam() {
         .eq("id", selectedMember.id);
 
       if (error) throw error;
-
       // 2. ✅ Check & Send Notifications
       const notificationsToSend = [];
 
@@ -232,15 +235,12 @@ export default function ManageTeam() {
     }
   };
 
-  // ... (Rest of executeConfirmationAction, getBadgeStyles, stats, etc. remains the same) ...
-  // ✅ EXECUTE ACTION (Ban or Delete)
   const executeConfirmationAction = async () => {
     if (!selectedMember || !confirmAction) return;
     setIsProcessingAction(true);
 
     try {
       if (confirmAction === "ban") {
-        // Toggle Ban Status using TIMESTAMP
         const isBanned = !!selectedMember.banned_at;
         const updates = {
           banned_at: isBanned ? null : new Date().toISOString(),
@@ -265,10 +265,9 @@ export default function ManageTeam() {
             : `${selectedMember.first_name} has been banned.`
         );
       } else if (confirmAction === "delete") {
-        // Soft Delete using TIMESTAMP
         const updates = {
           deleted_at: new Date().toISOString(),
-          banned_at: new Date().toISOString(), // Optional: also ban them just in case
+          banned_at: new Date().toISOString(),
         };
 
         const { error } = await supabase
@@ -278,7 +277,6 @@ export default function ManageTeam() {
 
         if (error) throw error;
 
-        // Remove from local list immediately
         setMembers((prev) => prev.filter((m) => m.id !== selectedMember.id));
         toast.success("User account deleted successfully.");
       }
@@ -311,7 +309,7 @@ export default function ManageTeam() {
   const stats = useMemo(() => {
     const total = members.length;
     const admins = members.filter((m) => m.role === "admin").length;
-    const banned = members.filter((m) => m.banned_at).length; // ✅ Use banned_at
+    const banned = members.filter((m) => m.banned_at).length;
     const lastWeek = new Date();
     lastWeek.setDate(lastWeek.getDate() - 7);
     const active = members.filter(
@@ -360,7 +358,7 @@ export default function ManageTeam() {
         <div className="w-full md:w-auto relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
-            placeholder="Search by name or email..."
+            placeholder="Search team..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-9 w-full md:w-64 bg-white border-gray-200 focus:ring-blue-500 rounded-xl"
@@ -369,49 +367,107 @@ export default function ManageTeam() {
       </div>
 
       {/* STATS */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-blue-50 text-blue-600 rounded-full">
-            <User className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-xs font-bold text-gray-500 uppercase">
-              Total Users
-            </p>
-            <p className="text-xl font-bold text-gray-900">{stats.total}</p>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-purple-50 text-purple-600 rounded-full">
-            <ShieldCheck className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-xs font-bold text-gray-500 uppercase">Admins</p>
-            <p className="text-xl font-bold text-gray-900">{stats.admins}</p>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-red-50 text-red-600 rounded-full">
-            <Ban className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-xs font-bold text-gray-500 uppercase">Banned</p>
-            <p className="text-xl font-bold text-gray-900">{stats.banned}</p>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-green-50 text-green-600 rounded-full">
-            <Activity className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-xs font-bold text-gray-500 uppercase">Active</p>
-            <p className="text-xl font-bold text-gray-900">{stats.active}</p>
-          </div>
-        </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+        <StatsCard
+          icon={<User className="w-5 h-5" />}
+          label="Total Users"
+          value={stats.total}
+          color="blue"
+        />
+        <StatsCard
+          icon={<ShieldCheck className="w-5 h-5" />}
+          label="Admins"
+          value={stats.admins}
+          color="purple"
+        />
+        <StatsCard
+          icon={<Ban className="w-5 h-5" />}
+          label="Banned"
+          value={stats.banned}
+          color="red"
+        />
+        <StatsCard
+          icon={<Activity className="w-5 h-5" />}
+          label="Active Now"
+          value={stats.active}
+          color="green"
+        />
       </div>
 
-      {/* MEMBER TABLE */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      {/* === MOBILE LIST VIEW (Visible on small screens) === */}
+      <div className="md:hidden space-y-3">
+        {filteredMembers.map((member) => {
+          const isBanned = !!member.banned_at;
+          const initials = getInitials(member.first_name, member.last_name);
+          const name = getDisplayName(
+            member.first_name,
+            member.last_name,
+            member.email
+          );
+
+          return (
+            <div
+              key={member.id}
+              onClick={() => handleEditClick(member)}
+              className={`bg-white p-4 rounded-xl border border-gray-200 shadow-sm active:scale-[0.98] transition-transform flex items-center justify-between ${
+                isBanned ? "bg-red-50/50 border-red-100" : ""
+              }`}
+            >
+              <div className="flex items-center gap-3 overflow-hidden">
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
+                    isBanned
+                      ? "bg-red-100 text-red-600"
+                      : "bg-blue-100 text-blue-600"
+                  }`}
+                >
+                  {member.avatar_url ? (
+                    <img
+                      src={member.avatar_url}
+                      alt={initials}
+                      className="w-full h-full rounded-full object-cover"
+                    />
+                  ) : (
+                    initials
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h4
+                      className={`font-bold text-sm truncate ${
+                        isBanned ? "text-red-700 line-through" : "text-gray-900"
+                      }`}
+                    >
+                      {name}
+                    </h4>
+                    {isBanned && <Ban size={12} className="text-red-500" />}
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs text-gray-500 truncate block max-w-[120px]">
+                      {member.email}
+                    </span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded border font-bold uppercase ${getBadgeStyles(
+                        isBanned,
+                        member.role,
+                        member.position || ""
+                      )}`}
+                    >
+                      {member.role === "admin" ? "Admin" : "Member"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="text-gray-300">
+                <MoreHorizontal size={20} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* === DESKTOP TABLE VIEW (Visible on medium+ screens) === */}
+      <div className="hidden md:block bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 font-medium">
@@ -434,15 +490,19 @@ export default function ManageTeam() {
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div
-                          className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
-                            isBanned
-                              ? "bg-red-100 text-red-600"
-                              : "bg-blue-100 text-blue-600"
-                          }`}
-                        >
-                          {getInitials(member.first_name, member.last_name)}
-                        </div>
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden ${
+                      isBanned ? "bg-red-100 text-red-600" : "bg-blue-100 text-blue-600"
+                    }`}>
+                    {member.avatar_url ? (
+                      <img 
+                        src={member.avatar_url} 
+                        alt={member.username} 
+                        className="w-full h-full object-cover" 
+                      />
+                    ) : (
+                      getInitials(member.first_name, member.last_name)
+                    )}
+                  </div>
                         <div>
                           <div
                             className={`font-bold ${
@@ -450,7 +510,7 @@ export default function ManageTeam() {
                                 ? "text-red-600 line-through"
                                 : "text-gray-900"
                             }`}
-                          >
+                          > 
                             {getDisplayName(
                               member.first_name,
                               member.last_name,
@@ -513,9 +573,7 @@ export default function ManageTeam() {
       {isDialogOpen && selectedMember && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-            {/* CONDITIONAL CONTENT: SHOW CONFIRMATION OR EDIT FORM */}
             {confirmAction ? (
-              // === CONFIRMATION VIEW ===
               <div className="p-6 text-center">
                 <div
                   className={`w-12 h-12 rounded-full mx-auto flex items-center justify-center mb-4 ${
@@ -537,10 +595,10 @@ export default function ManageTeam() {
 
                 <p className="text-sm text-gray-500 mb-6">
                   {confirmAction === "delete"
-                    ? `Are you sure you want to delete ${selectedMember.first_name}? This action cannot be undone and will prevent them from accessing the app.`
+                    ? `Are you sure you want to delete ${selectedMember.first_name}? This action cannot be undone.`
                     : !!selectedMember.banned_at
-                    ? `This will restore ${selectedMember.first_name}'s ability to log in and use the app.`
-                    : `This will immediately block ${selectedMember.first_name} from logging in. You can unban them later.`}
+                    ? `This will restore ${selectedMember.first_name}'s ability to log in.`
+                    : `This will immediately block ${selectedMember.first_name} from logging in.`}
                 </p>
 
                 <div className="flex gap-3 justify-center">
@@ -578,7 +636,6 @@ export default function ManageTeam() {
                 </div>
               </div>
             ) : (
-              // === EDIT FORM VIEW ===
               <>
                 <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-white sticky top-0 z-10">
                   <h3 className="font-bold text-lg text-gray-900">
@@ -669,10 +726,23 @@ export default function ManageTeam() {
                           </option>
                         ))}
                       </select>
+
+                      {/* ✅ ADDED: UI Message about Group Chat */}
+                      {formData.committee && (
+                        <div className="flex items-start gap-2 p-3 bg-blue-50 text-blue-700 rounded-xl text-xs font-medium animate-in fade-in slide-in-from-top-1">
+                          <MessageCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                          <p>
+                            Adding a user to the{" "}
+                            <span className="font-bold">
+                              {formData.committee}
+                            </span>{" "}
+                            automatically adds them to the committee group chat.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* DANGER ZONE */}
                   <div className="border-t border-gray-100 pt-6 mt-6">
                     <div className="flex items-center gap-2 mb-4 text-red-600">
                       <AlertTriangle className="w-5 h-5" />
@@ -682,7 +752,6 @@ export default function ManageTeam() {
                     </div>
 
                     <div className="space-y-3">
-                      {/* BAN BUTTON TRIGGER */}
                       <button
                         onClick={() => setConfirmAction("ban")}
                         className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all ${
@@ -706,7 +775,6 @@ export default function ManageTeam() {
                         <Ban className="w-5 h-5" />
                       </button>
 
-                      {/* DELETE BUTTON TRIGGER */}
                       <button
                         onClick={() => setConfirmAction("delete")}
                         className="w-full flex items-center justify-between p-3 rounded-xl border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-all"
@@ -750,6 +818,28 @@ export default function ManageTeam() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ✅ HELPER: Compact Stats Card
+function StatsCard({ icon, label, value, color }: any) {
+  const colors = {
+    blue: "bg-blue-50 text-blue-600",
+    purple: "bg-purple-50 text-purple-600",
+    red: "bg-red-50 text-red-600",
+    green: "bg-green-50 text-green-600",
+  };
+
+  return (
+    <div className={`bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4`}>
+      <div className={`w-12 h-12 rounded-full flex items-center justify-center ${colors[color as keyof typeof colors] || colors.blue}`}>
+        {icon}
+      </div>
+      <div>
+        <p className="text-2xl font-bold text-gray-900">{value}</p>
+        <p className="text-sm text-gray-500">{label}</p>
+      </div>
     </div>
   );
 }
@@ -816,3 +906,4 @@ function ManageTeamSkeleton() {
     </div>
   );
 }
+

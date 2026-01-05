@@ -1,19 +1,47 @@
 import React, { useState } from "react";
 import { useAuth } from "@/context/authContext";
-import { useVaccinations, type Vaccination } from "@/lib/useVaccinations";
+import { useVaccinations, type Vaccination } from "@/hooks/useVaccinations";
+import { useDialog } from "@/context/DialogContext";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, Edit2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Plus,
+  Trash2,
+  Edit2,
+  Syringe,
+  AlertTriangle,
+  CheckCircle2,
+  User,
+  ShieldCheck,
+  History,
+  Clock,
+  Loader2,
+} from "lucide-react";
+import { format, isBefore, parseISO } from "date-fns";
+import { toast } from "sonner";
 
 interface VaccinationSectionProps {
   petId: string;
+  canManage?: boolean; // ✅ Added prop
 }
 
-export default function VaccinationSection({ petId }: VaccinationSectionProps) {
+export default function VaccinationSection({
+  petId,
+  canManage,
+}: VaccinationSectionProps) {
   const { user } = useAuth();
-  const { vaccinations, addVaccination, updateVaccination, deleteVaccination, markCompleted } = useVaccinations(
-    petId,
-    user?.id
-  );
+  const { confirm } = useDialog();
+  const {
+    vaccinations,
+    addVaccination,
+    updateVaccination,
+    deleteVaccination,
+    markCompleted,
+    loading,
+  } = useVaccinations(petId, user?.id);
+
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -23,6 +51,8 @@ export default function VaccinationSection({ petId }: VaccinationSectionProps) {
     vet_name: "",
     notes: "",
   });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleReset = () => {
     setFormData({
@@ -34,230 +64,423 @@ export default function VaccinationSection({ petId }: VaccinationSectionProps) {
     });
     setEditingId(null);
     setShowForm(false);
+    setIsSubmitting(false);
   };
 
-  const handleEdit = (vaccination: Vaccination) => {
+  const handleEdit = (vac: Vaccination) => {
     setFormData({
-      vaccine_name: vaccination.vaccine_name,
-      last_date: vaccination.last_date,
-      next_due_date: vaccination.next_due_date,
-      vet_name: vaccination.vet_name || "",
-      notes: vaccination.notes || "",
+      vaccine_name: vac.vaccine_name,
+      last_date: vac.last_date,
+      next_due_date: vac.next_due_date,
+      vet_name: vac.vet_name || "",
+      notes: vac.notes || "",
     });
-    setEditingId(vaccination.id);
+    setEditingId(vac.id);
     setShowForm(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!formData.vaccine_name || !formData.last_date || !formData.next_due_date) {
-      alert("Please fill in required fields");
+    if (
+      !formData.vaccine_name ||
+      !formData.last_date ||
+      !formData.next_due_date
+    ) {
+      toast.error("Please fill in required fields");
       return;
     }
 
-    if (editingId) {
-      await updateVaccination(editingId, {
-        vaccine_name: formData.vaccine_name,
-        last_date: formData.last_date,
-        next_due_date: formData.next_due_date,
-        vet_name: formData.vet_name || undefined,
-        notes: formData.notes || undefined,
-        pet_id: petId,
-      } as any);
-    } else {
-      await addVaccination({
-        pet_id: petId,
-        vaccine_name: formData.vaccine_name,
-        last_date: formData.last_date,
-        next_due_date: formData.next_due_date,
-        vet_name: formData.vet_name || undefined,
-        notes: formData.notes || undefined,
-      });
-    }
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
-    handleReset();
+    try {
+      if (editingId) {
+        await updateVaccination(editingId, { ...formData, pet_id: petId });
+        toast.success("Record updated");
+      } else {
+        await addVaccination({ ...formData, pet_id: petId });
+        toast.success("Vaccination recorded");
+      }
+      handleReset();
+    } catch (err) {
+      toast.error("Operation failed");
+      setIsSubmitting(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this vaccination record?")) {
+    const isConfirmed = await confirm("Permanently remove this record?", {
+      title: "Delete Vaccine",
+      variant: "danger",
+      confirmText: "Delete",
+    });
+
+    if (isConfirmed) {
       await deleteVaccination(id);
+      toast.success("Record deleted");
     }
   };
 
-  const getStatusBadge = (vac: Vaccination) => {
-    if (vac.status === "completed") {
-      return (
-        <span className="text-xs px-2 py-1 rounded-full bg-green-200 text-green-800 font-semibold">
-          ✓ COMPLETED
-        </span>
-      );
-    } else if (vac.status === "overdue") {
-      return (
-        <span className="text-xs px-2 py-1 rounded-full bg-red-200 text-red-800 font-semibold">
-          ⚠️ OVERDUE
-        </span>
-      );
-    } else {
-      return (
-        <span className="text-xs px-2 py-1 rounded-full bg-blue-200 text-blue-800 font-semibold">
-          PENDING
-        </span>
-      );
-    }
-  };
+  const overdue = vaccinations.filter(
+    (v) =>
+      v.status === "overdue" ||
+      (v.status !== "completed" &&
+        isBefore(parseISO(v.next_due_date), new Date()))
+  );
+
+  const active = vaccinations.filter(
+    (v) => v.status !== "completed" && !overdue.find((o) => o.id === v.id)
+  );
+
+  const completed = vaccinations.filter((v) => v.status === "completed");
 
   return (
-    <div className="space-y-4">
-      {/* Vaccination List */}
-      {vaccinations.length > 0 && (
-        <div className="space-y-3">
-          {vaccinations.map((vac) => (
-            <div
-              key={vac.id}
-              className={`p-4 rounded-lg border-2 transition ${
-                vac.status === "overdue"
-                  ? "bg-red-50 border-red-200"
-                  : vac.status === "completed"
-                  ? "bg-green-50 border-green-200"
-                  : "bg-blue-50 border-blue-200"
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+      {!showForm && (
+        <div className="bg-gradient-to-br from-emerald-600 to-teal-600 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden flex justify-between items-end">
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 mb-2 opacity-80">
+              <ShieldCheck size={18} />
+              <span className="text-xs font-bold uppercase tracking-widest">
+                Immunizations
+              </span>
+            </div>
+            <h2 className="text-3xl font-black mb-1">Vaccines</h2>
+            <p className="text-emerald-100 text-sm max-w-xs leading-relaxed">
+              Track shots, set reminders, and keep digital proof handy.
+            </p>
+          </div>
+          {/* ✅ Check canManage before showing Add Button */}
+          {canManage && (
+            <Button
+              onClick={() => setShowForm(true)}
+              className="relative z-10 bg-white text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-bold shadow-lg rounded-xl h-12 px-6 transition-all active:scale-95"
+            >
+              <Plus className="w-5 h-5 mr-2" /> Add Record
+            </Button>
+          )}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+          <Syringe className="absolute -bottom-6 right-20 w-40 h-40 text-white/5 rotate-12 pointer-events-none" />
+        </div>
+      )}
+
+      {loading && (
+        <div className="space-y-4">
+          <Skeleton className="h-24 w-full rounded-2xl" />
+          <Skeleton className="h-24 w-full rounded-2xl" />
+        </div>
+      )}
+
+      {!loading && vaccinations.length === 0 && !showForm && (
+        <div className="flex flex-col items-center justify-center py-16 bg-white border-2 border-dashed border-gray-100 rounded-3xl text-center">
+          <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mb-4 text-emerald-300">
+            <ShieldCheck size={32} />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900">No Records Found</h3>
+          <p className="text-gray-400 text-sm max-w-xs mx-auto mt-1">
+            Keep your pet safe by logging their vaccination history.
+          </p>
+        </div>
+      )}
+
+      {!showForm && !loading && (
+        <div className="space-y-8">
+          {overdue.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-red-600 flex items-center gap-2 uppercase tracking-wider">
+                <AlertTriangle size={16} /> Action Required
+              </h3>
+              {overdue.map((vac) => (
+                <VaccineCard
+                  key={vac.id}
+                  vac={vac}
+                  variant="overdue"
+                  onEdit={() => handleEdit(vac)}
+                  onDelete={() => handleDelete(vac.id)}
+                  onComplete={() => markCompleted(vac.id)}
+                  canManage={canManage} // ✅ Pass canManage
+                />
+              ))}
+            </div>
+          )}
+
+          {active.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-gray-400 flex items-center gap-2 uppercase tracking-wider">
+                <Clock size={16} /> Upcoming
+              </h3>
+              {active.map((vac) => (
+                <VaccineCard
+                  key={vac.id}
+                  vac={vac}
+                  variant="active"
+                  onEdit={() => handleEdit(vac)}
+                  onDelete={() => handleDelete(vac.id)}
+                  onComplete={() => markCompleted(vac.id)}
+                  canManage={canManage} // ✅ Pass canManage
+                />
+              ))}
+            </div>
+          )}
+
+          {completed.length > 0 && (
+            <div className="space-y-3 opacity-60 hover:opacity-100 transition-opacity">
+              <h3 className="text-sm font-bold text-gray-400 flex items-center gap-2 uppercase tracking-wider">
+                <History size={16} /> History
+              </h3>
+              {completed.map((vac) => (
+                <VaccineCard
+                  key={vac.id}
+                  vac={vac}
+                  variant="completed"
+                  onEdit={() => handleEdit(vac)}
+                  onDelete={() => handleDelete(vac.id)}
+                  canManage={canManage} // ✅ Pass canManage
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white p-6 rounded-[2rem] w-full max-w-lg shadow-2xl relative animate-in zoom-in-95">
+            {/* Form Content (Unchanged) */}
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-2xl font-black text-gray-900">
+                  {editingId ? "Edit Record" : "Log Vaccine"}
+                </h3>
+                <p className="text-gray-500 text-xs mt-1">
+                  Enter details from your vet's record.
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleReset}
+                className="rounded-full bg-gray-100 hover:bg-gray-200"
+              >
+                <span className="text-xl font-bold">×</span>
+              </Button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-400 uppercase ml-1">
+                  Vaccine Name
+                </label>
+                <Input
+                  placeholder="e.g. Rabies, DHPP"
+                  value={formData.vaccine_name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, vaccine_name: e.target.value })
+                  }
+                  className="bg-gray-50 border-gray-200 font-bold"
+                  autoFocus
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-400 uppercase ml-1">
+                    Date Given
+                  </label>
+                  <Input
+                    type="date"
+                    value={formData.last_date}
+                    onChange={(e) =>
+                      setFormData({ ...formData, last_date: e.target.value })
+                    }
+                    className="bg-gray-50 border-gray-200"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-400 uppercase ml-1">
+                    Next Due
+                  </label>
+                  <Input
+                    type="date"
+                    value={formData.next_due_date}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        next_due_date: e.target.value,
+                      })
+                    }
+                    className="bg-gray-50 border-gray-200"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-400 uppercase ml-1">
+                  Veterinarian / Clinic
+                </label>
+                <div className="relative">
+                  <Input
+                    placeholder="e.g. Dr. Smith"
+                    value={formData.vet_name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, vet_name: e.target.value })
+                    }
+                    className="pl-9 bg-gray-50 border-gray-200"
+                  />
+                  <User className="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-400 uppercase ml-1">
+                  Notes
+                </label>
+                <Textarea
+                  placeholder="Batch number, side effects, etc..."
+                  value={formData.notes}
+                  onChange={(e) =>
+                    setFormData({ ...formData, notes: e.target.value })
+                  }
+                  className="bg-gray-50 border-gray-200 resize-none"
+                  rows={3}
+                />
+              </div>
+              <div className="pt-2 flex gap-3">
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-12 font-bold shadow-lg shadow-emerald-200"
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="animate-spin" />
+                  ) : editingId ? (
+                    "Save Changes"
+                  ) : (
+                    "Save Record"
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VaccineCard({
+  vac,
+  variant,
+  onEdit,
+  onDelete,
+  onComplete,
+  canManage,
+}: any) {
+  const isOverdue = variant === "overdue";
+  const isCompleted = variant === "completed";
+
+  return (
+    <div
+      className={`group relative bg-white rounded-2xl border transition-all hover:shadow-lg flex flex-col md:flex-row overflow-hidden ${
+        isOverdue
+          ? "border-red-100 shadow-sm shadow-red-50"
+          : "border-gray-100 shadow-sm"
+      }`}
+    >
+      <div
+        className={`w-full md:w-2 ${
+          isOverdue
+            ? "bg-red-500"
+            : isCompleted
+            ? "bg-gray-200"
+            : "bg-emerald-500"
+        }`}
+      />
+      <div className="flex-1 p-5 flex flex-col justify-center">
+        <div className="flex justify-between items-start mb-2">
+          <div>
+            <h4
+              className={`font-bold text-lg text-gray-900 ${
+                isCompleted && "line-through text-gray-400"
               }`}
             >
-              <div className="flex justify-between items-start mb-3">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="font-semibold text-base">{vac.vaccine_name}</p>
-                    {getStatusBadge(vac)}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleEdit(vac)}
-                    className="p-1 hover:bg-blue-100 rounded-lg transition"
-                  >
-                    <Edit2 className="w-4 h-4 text-blue-600" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(vac.id)}
-                    className="p-1 hover:bg-red-100 rounded-lg transition"
-                  >
-                    <Trash2 className="w-4 h-4 text-red-600" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-1 text-sm text-gray-700">
-                <p>Last: {new Date(vac.last_date).toLocaleDateString()}</p>
-                <p>Next Due: {new Date(vac.next_due_date).toLocaleDateString()}</p>
-                {vac.vet_name && <p>🏥 {vac.vet_name}</p>}
-                {vac.notes && <p className="text-gray-600 mt-2 italic">"{vac.notes}"</p>}
-              </div>
-
-              {vac.status !== "completed" && (
-                <button
-                  onClick={() => markCompleted(vac.id)}
-                  className="mt-3 text-xs bg-green-500 text-white px-3 py-1 rounded-full hover:bg-green-600 transition"
+              {vac.vaccine_name}
+            </h4>
+            {vac.vet_name && (
+              <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                <User size={12} /> {vac.vet_name}
+              </p>
+            )}
+          </div>
+          {isOverdue && (
+            <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wide">
+              Overdue
+            </span>
+          )}
+          {isCompleted && (
+            <span className="bg-gray-100 text-gray-500 text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wide">
+              Completed
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-4 mt-2 text-sm">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-bold text-gray-400 uppercase">
+              Given
+            </span>
+            <span className="font-semibold text-gray-700">
+              {format(parseISO(vac.last_date), "MMM d, yyyy")}
+            </span>
+          </div>
+          {!isCompleted && (
+            <>
+              <div className="w-px h-8 bg-gray-100" />
+              <div className="flex flex-col">
+                <span
+                  className={`text-[10px] font-bold uppercase ${
+                    isOverdue ? "text-red-400" : "text-gray-400"
+                  }`}
                 >
-                  Mark as Completed
-                </button>
-              )}
-            </div>
-          ))}
+                  Next Due
+                </span>
+                <span
+                  className={`font-bold ${
+                    isOverdue ? "text-red-600" : "text-emerald-600"
+                  }`}
+                >
+                  {format(parseISO(vac.next_due_date), "MMM d, yyyy")}
+                </span>
+              </div>
+            </>
+          )}
         </div>
-      )}
+      </div>
 
-      {/* Empty State */}
-      {vaccinations.length === 0 && !showForm && (
-        <div className="text-center py-8 text-gray-500">
-          <p>No vaccinations recorded yet. Add one to get started!</p>
-        </div>
-      )}
-
-      {/* Form */}
-      {showForm && (
-        <div className="bg-gray-50 p-4 rounded-lg border-2 border-green-200 space-y-3">
-          <h3 className="font-semibold text-lg">
-            {editingId ? "Edit Vaccination" : "Add Vaccination Record"}
-          </h3>
-
-          <div>
-            <label className="text-sm font-medium block mb-1">Vaccine Name *</label>
-            <input
-              type="text"
-              placeholder="e.g., Rabies Vaccine"
-              value={formData.vaccine_name}
-              onChange={(e) => setFormData({ ...formData, vaccine_name: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-green-500"
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-sm font-medium block mb-1">Last Date *</label>
-              <input
-                type="date"
-                value={formData.last_date}
-                onChange={(e) => setFormData({ ...formData, last_date: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-green-500"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium block mb-1">Next Due Date *</label>
-              <input
-                type="date"
-                value={formData.next_due_date}
-                onChange={(e) => setFormData({ ...formData, next_due_date: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-green-500"
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium block mb-1">Vet Name</label>
-            <input
-              type="text"
-              placeholder="e.g., Dr. Emily Chan"
-              value={formData.vet_name}
-              onChange={(e) => setFormData({ ...formData, vet_name: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-green-500"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium block mb-1">Notes</label>
-            <textarea
-              placeholder="Any additional notes..."
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-green-500 resize-none"
-              rows={2}
-            />
-          </div>
-
-          <div className="flex gap-2">
-            <Button onClick={handleSubmit} className="flex-1 bg-green-600 hover:bg-green-700">
-              {editingId ? "Update" : "Add"} Vaccination
+      {/* ✅ Only show Action Buttons if canManage is true */}
+      {canManage && (
+        <div className="bg-gray-50/50 p-3 flex md:flex-col items-center justify-center gap-2 border-t md:border-t-0 md:border-l border-gray-100">
+          {!isCompleted && onComplete && (
+            <Button
+              onClick={onComplete}
+              variant="outline"
+              size="sm"
+              className="w-full md:w-auto h-8 text-xs font-bold text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+            >
+              <CheckCircle2 size={14} className="mr-1" /> Done
             </Button>
-            <Button onClick={handleReset} variant="outline" className="flex-1">
-              Cancel
-            </Button>
+          )}
+          <div className="flex gap-1">
+            <button
+              onClick={onEdit}
+              className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            >
+              <Edit2 size={16} />
+            </button>
+            <button
+              onClick={onDelete}
+              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            >
+              <Trash2 size={16} />
+            </button>
           </div>
         </div>
-      )}
-
-      {!showForm && (
-        <Button
-          onClick={() => setShowForm(true)}
-          variant="outline"
-          className="w-full flex items-center justify-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Add Vaccination
-        </Button>
       )}
     </div>
   );
