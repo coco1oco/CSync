@@ -23,7 +23,7 @@ import {
   MoreHorizontal,
   Edit,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -219,7 +219,7 @@ export function FeedPost({
     loadInitialData();
   }, [event.id, fetchParticipantCount, user]); 
 
-  // Deep Linking Effect
+
   useEffect(() => {
     if (highlightCommentId) {
       setIsCommentsOpen(true);
@@ -511,7 +511,7 @@ function CommentsModal({
   const inputRef = useRef<HTMLInputElement>(null);
   const commentsTopRef = useRef<HTMLDivElement>(null);
 
-  // Identity Resolution
+
   const getEmbeddedProfile = () => {
     const p = (event as any).profiles;
     if (Array.isArray(p) && p.length > 0) return p[0];
@@ -533,23 +533,21 @@ function CommentsModal({
     fetchedAuthor?.avatar_url ||
     null;
 
-  // Normalize Images Logic
-  const images = event.images && event.images.length > 0 
-    ? event.images 
-    : (event as any).image_url ? [(event as any).image_url] : [];
+  const images =
+    event.images && event.images.length > 0
+      ? event.images
+      : (event as any).image_url
+      ? [(event as any).image_url]
+      : [];
 
   const nextImage = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (currentImageIndex < images.length - 1) {
-      setCurrentImageIndex((prev) => prev + 1);
-    }
+    setCurrentImageIndex((prev) => Math.min(prev + 1, images.length - 1));
   };
 
   const prevImage = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (currentImageIndex > 0) {
-      setCurrentImageIndex((prev) => prev - 1);
-    }
+    setCurrentImageIndex((prev) => Math.max(prev - 1, 0));
   };
 
   const fetchComments = async () => {
@@ -566,7 +564,7 @@ function CommentsModal({
         .order("created_at", { ascending: true });
 
       if (error) {
-        // Fallback
+        console.warn("Explicit FK join failed, trying implicit...", error);
         const { data: retryData, error: retryError } = await supabase
           .from("comments")
           .select("*, user:profiles(id, username, avatar_url)")
@@ -586,7 +584,15 @@ function CommentsModal({
           is_liked_by_user: false,
         }));
         setComments(formatted as unknown as CommentWithExtras[]);
+        return;
       }
+
+      const formatted = (data || []).map((c) => ({
+        ...c,
+        likes_count: 0,
+        is_liked_by_user: false,
+      }));
+      setComments(formatted as unknown as CommentWithExtras[]);
     } catch (err) {
       console.error("Fetch comments failed:", err);
       setComments([]);
@@ -652,7 +658,6 @@ function CommentsModal({
     };
   }, [event.id]);
 
-  // SCROLL LOGIC
   useEffect(() => {
     if (!loading) {
       if (highlightId && comments.length > 0) {
@@ -731,6 +736,7 @@ function CommentsModal({
     const tempId = `temp-${Date.now()}-${Math.random()
       .toString(36)
       .substr(2, 9)}`;
+
     const optimisticComment: any = {
       id: tempId,
       event_id: event.id,
@@ -763,7 +769,6 @@ function CommentsModal({
       100
     );
 
-    // 2. Insert into Database
     const { data: insertedData, error } = await supabase
       .from("comments")
       .insert([
@@ -785,6 +790,7 @@ function CommentsModal({
         prev.map(c => 
           c.id === tempId ? { ...c, id: insertedData.id, created_at: insertedData.created_at } : c
         )
+
       );
 
       setActiveReplyId(null);
@@ -893,8 +899,6 @@ function CommentsModal({
         onClick={onClose}
       />
       <div className="relative w-full md:w-[650px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl flex flex-col max-h-[85vh] md:max-h-[90vh] animate-in slide-in-from-bottom-10 fade-in duration-300">
-        
-        {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-100 shrink-0">
           <div className="w-8" />
           {displayName ? (
@@ -909,11 +913,8 @@ function CommentsModal({
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
-
         {/* SCROLLABLE CONTENT */}
         <div className="flex-1 overflow-y-auto overscroll-contain">
-          
-          {/* POST PREVIEW */}
           <div className="hidden md:block p-5 border-b border-gray-100 bg-white">
             <div className="flex items-center gap-3 mb-4">
               {displayAvatar ? (
@@ -925,6 +926,7 @@ function CommentsModal({
               ) : (
                 <div className="w-10 h-10 bg-gray-200 animate-pulse rounded-full" />
               )}
+
               <div className="flex flex-col leading-tight">
                 {displayName ? (
                   <span className="font-bold text-gray-900">{displayName}</span>
@@ -953,11 +955,11 @@ function CommentsModal({
                   alt="Post content"
                   className="w-full h-auto max-h-[400px] object-cover"
                 />
-                
+
                 {images.length > 1 && (
                   <>
                     {currentImageIndex > 0 && (
-                      <button 
+                      <button
                         onClick={prevImage}
                         className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white opacity-0 group-hover/carousel:opacity-100 transition-opacity"
                       >
@@ -965,7 +967,7 @@ function CommentsModal({
                       </button>
                     )}
                     {currentImageIndex < images.length - 1 && (
-                      <button 
+                      <button
                         onClick={nextImage}
                         className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white opacity-0 group-hover/carousel:opacity-100 transition-opacity"
                       >
@@ -974,9 +976,13 @@ function CommentsModal({
                     )}
                     <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
                       {images.map((_, idx) => (
-                        <div 
+                        <div
                           key={idx}
-                          className={`w-1.5 h-1.5 rounded-full shadow-sm transition-all ${idx === currentImageIndex ? 'bg-white scale-125' : 'bg-white/50'}`}
+                          className={`w-1.5 h-1.5 rounded-full shadow-sm transition-all ${
+                            idx === currentImageIndex
+                              ? "bg-white scale-125"
+                              : "bg-white/50"
+                          }`}
                         />
                       ))}
                     </div>
@@ -985,7 +991,6 @@ function CommentsModal({
               </div>
             )}
 
-            {/* ACTIONS INSIDE MODAL */}
             <div className="flex items-center gap-6 pt-2 border-t border-gray-50">
               <div className="flex items-center gap-1.5">
                 <button
@@ -1009,7 +1014,7 @@ function CommentsModal({
                 )}
               </div>
 
-              <button 
+              <button
                 onClick={() => inputRef.current?.focus()}
                 className="flex items-center gap-1.5 group transition-all"
               >
@@ -1018,15 +1023,12 @@ function CommentsModal({
                   strokeWidth={2}
                 />
                 <span className="text-sm font-bold text-gray-900">
-                  {commentsCount && commentsCount > 0
-                    ? `${commentsCount}`
-                    : ""}
+                  {commentsCount && commentsCount > 0 ? `${commentsCount}` : ""}
                 </span>
               </button>
             </div>
           </div>
 
-          {/* COMMENTS LIST */}
           <div ref={commentsTopRef} className="p-4 bg-gray-50/50 min-h-[200px]">
             {loading ? (
               <div className="flex justify-center py-10">
@@ -1075,7 +1077,6 @@ function CommentsModal({
           </div>
         </div>
 
-        {/* INPUT AREA */}
         <div className="p-4 border-t border-gray-100 bg-white md:rounded-b-2xl shrink-0 z-10">
           {activeReplyId && (
             <div className="text-xs text-gray-400 mb-2 ml-4 flex justify-between items-center">
@@ -1138,7 +1139,7 @@ const formatRelativeTime = (dateString: string) => {
   const date = new Date(dateString);
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-  if (diffInSeconds < 0) return "0s"; 
+  if (diffInSeconds < 0) return "0s";
 
   if (diffInSeconds < 2629746) {
     if (diffInSeconds < 60) return `${diffInSeconds}s`;
@@ -1152,8 +1153,6 @@ const formatRelativeTime = (dateString: string) => {
   }
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 };
-
-// --- Individual Comment Item Component ---
 
 interface CommentItemProps {
   event: OutreachEvent;
@@ -1189,6 +1188,7 @@ function CommentItem({
   useEffect(() => {
     fetchCommentLikes();
   }, [comment.id]);
+
 
   const renderContentWithTags = (text: string) => {
     if (!text) return "";
@@ -1297,6 +1297,7 @@ function CommentItem({
                     onChange={(e) => setEditContent(e.target.value)}
                     className="h-8 text-sm"
                     autoFocus
+
                   />
                   <div className="flex gap-2 mt-1">
                     <span

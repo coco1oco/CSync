@@ -20,7 +20,8 @@ import {
   CalendarCheck,
   Search,
   UserCheck,
-  Radio // ✅ Added for Happening Now
+  Radio,
+  Timer // ✅ Added Timer icon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,14 +71,11 @@ export default function OfficialEventDetailsPage() {
   const [registering, setRegistering] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<'going' | 'waitlist'>('going');
-  
-  // ✅ Happening Now State
   const [currentTime, setCurrentTime] = useState(new Date());
 
   const myRegistration = attendees.find((a) => a.user_id === user?.id);
   const isRegistered = !!myRegistration && myRegistration.status !== 'rejected';
   
-  // Counts
   const currentCount = attendees.filter(a => ['approved', 'checked_in'].includes(a.status)).length;
   const waitlistCount = attendees.filter(a => a.status === 'waitlist').length;
 
@@ -85,9 +83,8 @@ export default function OfficialEventDetailsPage() {
     if (id) fetchEventData();
   }, [id]);
 
-  // ✅ Timer for "Happening Now"
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000); // Update every minute
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000); 
     return () => clearInterval(timer);
   }, []);
 
@@ -144,7 +141,7 @@ export default function OfficialEventDetailsPage() {
         throw error;
       }
 
-      const notificationStatus = dbStatus === "waitlist" ? "joined_waitlist" : "approved";
+      const notificationStatus = isWaitlist ? "joined_waitlist" : "approved";
       await notifyRegistrationUpdate(
           user.id, 
           event.id, 
@@ -167,14 +164,26 @@ export default function OfficialEventDetailsPage() {
     if (!confirm("Are you sure you want to leave?")) return;
     setRegistering(true);
     try {
-      const { error } = await supabase.rpc('leave_event', {
+      const { data: promotedUserId, error } = await supabase.rpc('leave_event', {
         p_event_id: event.id,
         p_user_id: user.id
       });
       if (error) throw error;
       toast.success("You have left the event.");
+
+      if (promotedUserId) {
+         await notifyRegistrationUpdate(
+             promotedUserId, 
+             event.id, 
+             event.title, 
+             "approved", 
+             event.admin_id
+         );
+      }
+
       fetchEventData();
     } catch (err) {
+      console.error(err);
       toast.error("Failed to leave event");
     } finally {
       setRegistering(false);
@@ -194,12 +203,31 @@ export default function OfficialEventDetailsPage() {
   if (!event) return <div className="p-8 text-center font-bold text-gray-500">Event not found</div>;
 
   const eventDateObj = new Date(event.event_date);
-  const deadline = event.registration_deadline ? new Date(event.registration_deadline) : null;
-  const isDeadlinePassed = deadline ? isPast(deadline) : false;
-  const isClosed = event.registration_closed_manually || isDeadlinePassed;
+  
+  // ✅ 1. Deadline Logic (Same as Card)
+  const deadlineDate = event.registration_deadline ? new Date(event.registration_deadline) : null;
+  const isDeadlinePassed = deadlineDate ? isPast(deadlineDate) : false;
+  const isClosedManually = event.registration_closed_manually;
+  const isClosed = isClosedManually || isDeadlinePassed;
   const isWaitlistMode = event.max_attendees && currentCount >= event.max_attendees;
 
-  // ✅ Happening Now Logic
+  // Determine Deadline Badge State
+  const getDeadlineBadge = () => {
+    if (isClosedManually) {
+      return { label: "Registration Closed", color: "bg-red-600 text-white shadow-red-500/30", icon: XCircle };
+    }
+    if (isDeadlinePassed) {
+      return { label: "Deadline Passed", color: "bg-gray-600 text-white shadow-gray-500/30", icon: Timer };
+    }
+    if (deadlineDate) {
+      return { label: `Register by ${format(deadlineDate, "MMM d")}`, color: "bg-green-600 text-white shadow-green-500/30", icon: Clock };
+    }
+    return null;
+  };
+
+  const deadlineBadge = getDeadlineBadge();
+  const DeadlineIcon = deadlineBadge?.icon;
+
   const isHappeningNow = (() => {
     const isToday = isSameDay(eventDateObj, new Date());
     if (!isToday || !event.start_time || !event.end_time) return false;
@@ -238,19 +266,28 @@ export default function OfficialEventDetailsPage() {
 
         <div className="absolute bottom-0 left-0 w-full p-6 md:p-12 z-10">
           <div className="max-w-7xl mx-auto">
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              {/* ✅ Happening Now Badge */}
+            <div className="flex flex-wrap items-center gap-3 mb-3">
+              {/* Happening Now Badge */}
               {isHappeningNow && (
-                <div className="bg-red-600 text-white px-3 py-1 rounded shadow-lg flex items-center gap-1.5 text-xs md:text-sm font-bold uppercase tracking-widest animate-pulse">
+                <div className="bg-red-600 text-white px-3 py-1.5 rounded-lg shadow-lg flex items-center gap-1.5 text-xs md:text-sm font-bold uppercase tracking-widest animate-pulse border border-red-500/50">
                   <Radio size={14} className="relative inline-flex" />
                   Happening Now
                 </div>
               )}
               
-              <div className="bg-blue-600 text-white px-3 py-1 rounded shadow-lg flex items-center gap-1.5 text-xs md:text-sm font-bold uppercase tracking-widest">
+              {/* Event Type Badge */}
+              <div className="bg-blue-600 text-white px-3 py-1.5 rounded-lg shadow-lg flex items-center gap-1.5 text-xs md:text-sm font-bold uppercase tracking-widest border border-blue-500/50">
                 {getBadgeIcon(event.event_type)}
                 {event.event_type} Event
               </div>
+
+              {/* ✅ 2. DEADLINE BADGE (Added Here) */}
+              {deadlineBadge && (
+                 <div className={`px-3 py-1.5 rounded-lg shadow-lg flex items-center gap-1.5 text-xs md:text-sm font-bold uppercase tracking-widest border border-white/10 ${deadlineBadge.color}`}>
+                   {DeadlineIcon && <DeadlineIcon size={14} />} 
+                   {deadlineBadge.label}
+                 </div>
+              )}
             </div>
 
             <h1 className="text-4xl md:text-6xl font-black text-white mb-4 drop-shadow-md leading-tight">
@@ -391,7 +428,6 @@ export default function OfficialEventDetailsPage() {
                       <XCircle size={20} /> Registration Closed
                     </div>
                   ) : user?.id === event.admin_id ? (
-                    // Admin View (No text needed here, handled by button)
                     <p className="text-gray-500 font-medium">You are managing this event.</p>
                   ) : (
                     <p className="text-gray-500 font-medium">
@@ -400,9 +436,7 @@ export default function OfficialEventDetailsPage() {
                   )}
                 </div>
 
-                {/* ✅ UPDATED BUTTON LOGIC */}
                 {user?.id === event.admin_id ? (
-                    // 1. ADMIN VIEW
                     <Button 
                       className="w-full h-14 text-lg font-bold rounded-2xl bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200 shadow-none hover:bg-gray-100"
                       disabled
@@ -410,7 +444,6 @@ export default function OfficialEventDetailsPage() {
                       You are the Host
                     </Button>
                 ) : isRegistered ? (
-                    // 2. REGISTERED USER VIEW
                     <Button 
                       variant="outline" 
                       className={cn(
@@ -427,16 +460,17 @@ export default function OfficialEventDetailsPage() {
                       {registering ? <Loader2 className="animate-spin" /> : myRegistration?.status === 'checked_in' ? "Checked In" : myRegistration?.status === 'rejected' ? "Declined" : "Leave Event"}
                     </Button>
                 ) : (
-                    // 3. GUEST VIEW (Register)
                     <Button 
                       className={cn(
                           "w-full h-14 text-lg font-bold rounded-2xl shadow-xl transition-all",
-                          isWaitlistMode ? "bg-amber-500 hover:bg-amber-600 shadow-amber-200" : "bg-blue-600 hover:bg-blue-700 shadow-blue-200"
+                          (isClosed || isClosedManually)
+                             ? "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200 shadow-none hover:bg-gray-100" // Disabled Style
+                             : isWaitlistMode ? "bg-amber-500 hover:bg-amber-600 shadow-amber-200" : "bg-blue-600 hover:bg-blue-700 shadow-blue-200"
                       )}
                       onClick={handleRegister}
                       disabled={isClosed || registering}
                     >
-                      {registering ? <Loader2 className="animate-spin" /> : isWaitlistMode ? "Join Waitlist" : "Register Now"}
+                      {registering ? <Loader2 className="animate-spin" /> : isClosed ? "Registration Ended" : isWaitlistMode ? "Join Waitlist" : "Register Now"}
                     </Button>
                 )}
 

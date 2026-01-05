@@ -1,6 +1,15 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Upload, Trash2, Camera, Info } from "lucide-react";
+import {
+  Upload,
+  Trash2,
+  Camera,
+  Info,
+  Scissors,
+  Activity,
+  AlertTriangle,
+} from "lucide-react"; // Added icons
+import { Switch } from "@/components/ui/switch"; // Ensure you have this or use a checkbox
 
 // Shared Breed Data (Kept the same)
 const BREED_DATA: Record<string, string[]> = {
@@ -36,6 +45,15 @@ const BREED_DATA: Record<string, string[]> = {
   Rabbit: ["Netherland Dwarf", "Holland Lop", "Lionhead", "Mini Rex"],
 };
 
+const CAMPUS_LOCATIONS = [
+  "Main Gate",
+  "CVSU Park",
+  "Engineering",
+  "Hostel",
+  "Old Market",
+  "Roaming",
+];
+
 export interface PetFormData {
   name: string;
   species: string;
@@ -47,6 +65,9 @@ export interface PetFormData {
   microchip_id: string;
   imageFile?: File | null;
   petimage_url?: string;
+  // ✅ Added these for Campus Pets
+  spayed_neutered?: boolean;
+  status?: string;
 }
 
 interface PetFormProps {
@@ -54,6 +75,7 @@ interface PetFormProps {
   onSubmit: (data: PetFormData) => Promise<void>;
   isSubmitting: boolean;
   submitLabel: string;
+  isCampusMode?: boolean; // ✅ Added prop
 }
 
 export default function PetForm({
@@ -61,6 +83,7 @@ export default function PetForm({
   onSubmit,
   isSubmitting,
   submitLabel,
+  isCampusMode = false,
 }: PetFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -74,6 +97,8 @@ export default function PetForm({
     location: "",
     microchip_id: "",
     petimage_url: "",
+    spayed_neutered: false,
+    status: "healthy",
     ...initialData,
   });
 
@@ -303,19 +328,73 @@ export default function PetForm({
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium transition-all"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-                    Microchip ID (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    name="microchip_id"
-                    value={formData.microchip_id}
-                    onChange={handleChange}
-                    placeholder="XXXX-XXXX-XXXX"
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium transition-all"
-                  />
-                </div>
+
+                {/* 🚨 CAMPUS MODE: Show CNVR Toggle instead of Microchip */}
+                {isCampusMode ? (
+                  <div className="md:col-span-2 bg-blue-50 p-4 rounded-xl flex items-center justify-between border border-blue-100">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-white rounded-full text-blue-600 shadow-sm">
+                        <Scissors size={20} />
+                      </div>
+                      <div>
+                        <p className="font-bold text-gray-900 text-sm">
+                          Spayed / Neutered
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Is this dog fixed (Kapon)?
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={formData.spayed_neutered}
+                      onCheckedChange={(c) =>
+                        setFormData((p) => ({ ...p, spayed_neutered: c }))
+                      }
+                      className="data-[state=checked]:bg-blue-600"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                      Microchip ID (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      name="microchip_id"
+                      value={formData.microchip_id}
+                      onChange={handleChange}
+                      placeholder="XXXX-XXXX-XXXX"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium transition-all"
+                    />
+                  </div>
+                )}
+
+                {/* 🚨 CAMPUS MODE: Show Status Dropdown */}
+                {isCampusMode && (
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                      Current Status
+                    </label>
+                    <div className="relative">
+                      <select
+                        name="status"
+                        value={formData.status}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl font-bold focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
+                      >
+                        <option value="healthy">🟢 Healthy</option>
+                        <option value="injured">🔴 Injured</option>
+                        <option value="sick">🟠 Sick</option>
+                        <option value="missing">❓ Missing</option>
+                        <option value="aggressive">⚠️ Aggressive</option>
+                      </select>
+                      <AlertTriangle
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                        size={16}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -324,14 +403,30 @@ export default function PetForm({
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
                 Location / Address
               </label>
-              <input
-                type="text"
-                name="location"
-                value={formData.location}
-                onChange={handleChange}
-                placeholder="e.g. Home, or Campus Sector 4"
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium transition-all"
-              />
+              {isCampusMode ? (
+                <select
+                  name="location"
+                  value={formData.location}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium transition-all appearance-none"
+                >
+                  <option value="">Select Territory...</option>
+                  {CAMPUS_LOCATIONS.map((loc) => (
+                    <option key={loc} value={loc}>
+                      {loc}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  name="location"
+                  value={formData.location}
+                  onChange={handleChange}
+                  placeholder="e.g. Home, or Campus Sector 4"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium transition-all"
+                />
+              )}
             </div>
 
             <div className="pt-6 border-t border-gray-100 flex justify-end">

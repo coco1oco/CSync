@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useNotifications } from "@/context/NotificationContext";
+import { requestNotificationPermission } from "@/lib/NotificationService";
 import {
   Heart,
   MessageCircle,
@@ -9,6 +10,7 @@ import {
   X,
   UserPlus,
   Bell,
+  BellOff,
   Loader2,
   Globe,
   ShieldAlert,
@@ -20,8 +22,9 @@ import {
   XCircle,
   PartyPopper,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-// ✅ Updated Types
+
 type NotificationType =
   | "message"
   | "reaction"
@@ -41,7 +44,9 @@ type NotificationType =
   | "registration_waitlist"
   | "registration_rejected"
   | "registration_removed"
-  | "event_checkin";
+  | "event_checkin"
+  | "vaccination";
+
 
 interface NotificationCenterProps {
   variant?: "page" | "panel";
@@ -57,12 +62,28 @@ export function NotificationCenter({
   const navigate = useNavigate();
   const { notifications, loading, markAsRead } = useNotifications();
 
+  // iOS Permission State
+  const [permission, setPermission] = useState(Notification.permission);
+
+  // iOS Manual Trigger
+  const handleEnableNotifications = async () => {
+    const token = await requestNotificationPermission();
+    setPermission(Notification.permission);
+
+    if (token) {
+      console.log("Push Token:", token);
+    } else if (Notification.permission === "granted") {
+      console.error(
+        "Permission granted, but failed to get Token. Check config."
+      );
+    }
+  };
+
   // --- Click Handler ---
   async function handleClick(n: any) {
     if (n.is_unread) {
       await markAsRead(n.id);
     }
-
     if (n.data?.link) {
       navigate(n.data.link);
       if (variant === "panel") onClose();
@@ -311,6 +332,30 @@ export function NotificationCenter({
 
   const NotificationContent = (
     <div className="flex flex-col pb-24">
+      {/* iOS PERMISSION BUTTON */}
+      {permission === "default" && (
+        <div className="p-4 bg-blue-50 border-b border-blue-100 flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1">
+          <div className="flex items-start gap-3 text-blue-700">
+            <div className="p-2 bg-blue-100 rounded-full mt-0.5">
+              <BellOff size={16} />
+            </div>
+            <div>
+              <p className="text-xs font-bold">Enable Push Notifications</p>
+              <p className="text-[10px] text-blue-600 opacity-90 leading-tight mt-0.5">
+                Don't miss out on likes, comments, and task reminders.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={handleEnableNotifications}
+            className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3 shrink-0 shadow-sm shadow-blue-200"
+          >
+            Enable
+          </Button>
+        </div>
+      )}
+
       {loading ? (
         <div className="p-8 text-center text-gray-500 flex flex-col items-center gap-2">
           <Loader2 className="animate-spin text-gray-300" size={24} />
@@ -328,7 +373,7 @@ export function NotificationCenter({
 
             return (
               <div key={label}>
-                <h3 className="px-5 py-2 text-[15px] font-bold text-gray-900 mt-2">
+                <h3 className="px-5 py-2 text-[13px] font-bold text-gray-500 uppercase tracking-wider bg-gray-50/50 mt-0 sticky top-0 backdrop-blur-sm z-10 border-y border-gray-100">
                   {label}
                 </h3>
 
@@ -336,14 +381,14 @@ export function NotificationCenter({
                   <div
                     key={n.id}
                     onClick={() => handleClick(n)}
-                    className={`flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition-colors cursor-pointer active:bg-gray-100 ${
-                      n.is_unread ? "bg-blue-50/30" : ""
+                    className={`flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition-colors cursor-pointer active:bg-gray-100 border-b border-gray-50 last:border-0 ${
+                      n.is_unread ? "bg-blue-50/20" : ""
                     }`}
                   >
                     <div className="relative flex-shrink-0 mt-1">
                       <img
                         src={n.sender?.avatar_url || "/default-avatar.png"}
-                        className="w-11 h-11 rounded-full object-cover border border-gray-100"
+                        className="w-10 h-10 rounded-full object-cover border border-gray-100"
                         alt="User"
                       />
                       {getIcon(n.type as NotificationType)}
@@ -360,9 +405,12 @@ export function NotificationCenter({
                     {n.data?.post_image && (
                       <img
                         src={n.data.post_image}
-                        className="w-11 h-11 rounded-md object-cover border border-gray-200 flex-shrink-0 ml-1"
+                        className="w-10 h-10 rounded-md object-cover border border-gray-200 flex-shrink-0 ml-1"
                         alt="Post"
                       />
+                    )}
+                    {n.is_unread && (
+                      <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-2 self-center" />
                     )}
                   </div>
                 ))}
@@ -380,34 +428,45 @@ export function NotificationCenter({
     );
 
   return createPortal(
-    <div
-      className={`
-        fixed top-0 bottom-0 z-[50] 
-        w-full sm:w-[397px] 
-        bg-white border-r border-gray-200 shadow-[4px_0_24px_rgba(0,0,0,0.02)]
-        flex flex-col
-        transform transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]
-        left-0 lg:left-[72px]
-        ${isOpen ? "translate-x-0" : "-translate-x-[120%] invisible"}
-      `}
-    >
-      <div className="px-6 py-5 flex justify-between items-center bg-white z-10 sticky top-0">
-        <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
-          Notifications
-        </h2>
-        <button
-          onClick={onClose}
-          className="p-2 -mr-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors active:scale-95 cursor-pointer"
-          aria-label="Close notifications"
-        >
-          <X size={24} />
-        </button>
-      </div>
+    <>
+      {/* Backdrop */}
+      <div
+        className={`fixed inset-0 bg-black/20 backdrop-blur-sm z-[40] transition-opacity duration-300 ${
+          isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+        onClick={onClose}
+      />
 
-      <div className="flex-1 overflow-y-auto overscroll-contain">
-        {NotificationContent}
+      {/* Panel */}
+      <div
+        className={`
+        fixed top-0 bottom-0 z-[50] 
+        w-full sm:w-[400px] 
+        bg-white border-r border-gray-200 shadow-2xl
+        flex flex-col
+        transform transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]
+        left-0 lg:left-[72px] 
+        ${isOpen ? "translate-x-0" : "-translate-x-[120%]"}
+      `}
+      >
+        <div className="px-5 py-4 flex justify-between items-center bg-white z-20 border-b border-gray-100 sticky top-0">
+          <h2 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+            Notifications
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-2 -mr-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors active:scale-95 cursor-pointer"
+            aria-label="Close notifications"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto overscroll-contain">
+          {NotificationContent}
+        </div>
       </div>
-    </div>,
+    </>,
     document.body
   );
 }

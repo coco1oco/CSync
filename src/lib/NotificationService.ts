@@ -233,14 +233,17 @@ export async function requestNotificationPermission(): Promise<string | null> {
   }
 
   try {
+    // Check if permission is already granted
     if (Notification.permission === "granted") {
       return await getFCMToken();
     }
-    if (Notification.permission !== "denied") {
-      const permission = await Notification.requestPermission();
-      if (permission === "granted") {
-        return await getFCMToken();
-      }
+
+    // Request permission (must be triggered by a user click!)
+    const permission = await Notification.requestPermission();
+    if (permission === "granted") {
+      return await getFCMToken();
+    } else {
+      console.warn("Notification permission denied.");
     }
   } catch (err) {
     console.error("Error requesting notification permission:", err);
@@ -250,22 +253,64 @@ export async function requestNotificationPermission(): Promise<string | null> {
 
 async function getFCMToken(): Promise<string | null> {
   try {
-    if (!import.meta.env.VITE_FIREBASE_VAPID_KEY) {
-      console.warn("VITE_FIREBASE_VAPID_KEY is missing in .env file!");
+    // ❌ REMOVED: This check was blocking your hardcoded key below
+    // if (!import.meta.env.VITE_FIREBASE_VAPID_KEY) { ... }
+
+    if ("serviceWorker" in navigator) {
+      const registration = await navigator.serviceWorker.register(
+        "/firebase-messaging-sw.js"
+      );
+
+      await navigator.serviceWorker.ready;
+
+      const token = await getToken(messaging, {
+        // ✅ Your hardcoded key is now guaranteed to run
+        vapidKey:
+          "BHKduEnqHT5hRFJOU8Yz3xG6YBTTfZfNZJilPwj3_7Vif3UVlE5PyWrDui78q1SRE3SwM8BZXFE0R6loBwJuy2o",
+        serviceWorkerRegistration: registration,
+      });
+
+      if (token) {
+        await saveTokenToDatabase(token);
+      }
+
+      return token || null;
+    } else {
+      console.error("Service workers are not supported in this browser.");
       return null;
     }
-    const token = await getToken(messaging, {
-      vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
-    });
-    return token || null;
   } catch (error) {
     console.error("Error retrieving FCM token:", error);
     return null;
   }
 }
 
+// Helper to save token (if you aren't doing this elsewhere)
+async function saveTokenToDatabase(token: string) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) {
+    // Upsert logic for your fcm_tokens table
+    const { error } = await supabase.from("fcm_tokens").upsert(
+      {
+        user_id: user.id,
+        token: token,
+        device_type: /iPhone|iPad|iPod/.test(navigator.userAgent)
+          ? "ios"
+          : "web",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "token" }
+    );
+
+    if (error) console.error("Error saving FCM token:", error);
+  }
+}
+
 export function setupForegroundNotificationHandler() {
   onMessage(messaging, (payload) => {
+    console.log("Foreground Message Received:", payload);
     window.dispatchEvent(
       new CustomEvent("fcm-notification", {
         detail: {
@@ -277,7 +322,6 @@ export function setupForegroundNotificationHandler() {
     );
   });
 }
-
 // --- Database Helpers ---
 
 export async function createNotification(params: {

@@ -17,15 +17,15 @@ const UnifiedDashboard = lazy(() =>
     default: m.UnifiedDashboard,
   }))
 );
-const CreateEvent = lazy(() => import("@/pages/AdminD/CreateEvent"));
-const EditEvent = lazy(() => import("@/pages/AdminD/EditEvent"));
-const ManageTeam = lazy(() => import("@/pages/AdminD/ManageTeam"));
+const CreateEvent = lazy(() => import("@/pages/admin/CreateEvent"));
+const EditEvent = lazy(() => import("@/pages/admin/EditEvent"));
+const ManageTeam = lazy(() => import("@/pages/admin/ManageTeam"));
 const CreateOfficialEvent = lazy(
-  () => import("@/pages/AdminD/CreateOfficialEvent")
+  () => import("@/pages/admin/CreateOfficialEvent")
 );
-const ManageEventsPage = lazy(() => import("@/pages/AdminD/ManageEventsPage"));
+const ManageEventsPage = lazy(() => import("@/pages/admin/ManageEventsPage"));
 const EditOfficialEvent = lazy(
-  () => import("@/pages/AdminD/EditOfficialEvent")
+  () => import("@/pages/admin/EditOfficialEvent")
 );
 const MainPetProfilePage = lazy(
   () => import("@/pages/PetProfile/MainPetProfilePage")
@@ -61,9 +61,11 @@ const NotificationsPage = lazy(() =>
 const EventDetails = lazy(() => import("@/pages/SharedPages/EventDetails"));
 
 const SettingsPage = lazy(() => import("@/pages/MenuPage/SettingsPage"));
+
 const OfficialEventDetails = lazy(() => 
   import("@/pages/SharedPages/OfficialEventDetails") 
 );
+
 
 // Loading Spinner
 const PageLoader = () => (

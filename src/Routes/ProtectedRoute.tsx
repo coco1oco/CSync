@@ -8,7 +8,6 @@ interface ProtectedRouteProps {
   requiredRole?: "admin" | "user";
 }
 
-// ✅ FIX: Changed to named export 'export const ProtectedRoute'
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   requiredRole,
@@ -25,8 +24,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // 2. Check if User is Logged In
+  // ✅ FIX: Redirect to Welcome page instead of SignIn for better UX
   if (!user) {
-    return <Navigate to="/SignIn" replace />;
+    return <Navigate to="/welcome" replace />;
   }
 
   // 3. Security Check: Banned

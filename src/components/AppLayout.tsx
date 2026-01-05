@@ -5,7 +5,7 @@ import { Header } from "./Header";
 import { useAuth } from "@/context/authContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/hooks/utils";
 
 export default function AppLayout() {
   const { user, loading } = useAuth();
@@ -14,11 +14,13 @@ export default function AppLayout() {
   const userRole = (user as any)?.role || "member";
 
   // 🔍 ROUTE DETECTION
-  // ✅ UPDATED: Use startsWith to be safe, matches Sidebar logic
   const isMessagesPage = location.pathname.startsWith("/messages");
 
-  // Detect any PetDashboard route (Dashboard, Add Pet, Edit Pet, etc.)
-  const isPetDashboard = location.pathname.startsWith("/PetDashboard");
+  // Detect any PetDashboard route OR Campus Pets
+  // ✅ FIX: Added "/campus-pets" check so it gets full width and no padding
+  const isPetDashboard =
+    location.pathname.startsWith("/PetDashboard") ||
+    location.pathname.startsWith("/campus-pets");
 
   // Detect Admin pages
   const isAdminPage =
@@ -32,14 +34,17 @@ export default function AppLayout() {
 
   // 2. Wide Page: Uses full width (max-w-full) instead of constrained width
   // 3. Edge-to-Edge: Removes AppLayout padding so the child page can control it
-  const isEdgeToEdge = isPetDashboard;
 
-const isSettingsPage = location.pathname.startsWith("/settings") || location.pathname.startsWith("/Settings"); 
-const isOfficialEventDetails = location.pathname.startsWith("/official-event");
-// 2. UPDATE THIS VARIABLE
-// Add || isSettingsPage to the end
-// ✅ UPDATE THIS:
-const isWidePage = isFixedPage || isAdminPage || isPetDashboard || isSettingsPage || isOfficialEventDetails;
+
+  const isSettingsPage = location.pathname.startsWith("/settings") || location.pathname.startsWith("/Settings"); 
+  const isOfficialEventDetails = location.pathname.startsWith("/official-event");
+  // 2. UPDATE THIS VARIABLE
+  // Add || isSettingsPage to the end
+  // ✅ UPDATE THIS:
+  const isWidePage = isFixedPage || isAdminPage || isPetDashboard || isSettingsPage || isOfficialEventDetails;
+
+  // 3. Edge-to-Edge: Removes AppLayout padding so the child page can control it
+  const isEdgeToEdge = isPetDashboard;
 
   if (loading)
     return (
@@ -67,19 +72,16 @@ const isWidePage = isFixedPage || isAdminPage || isPetDashboard || isSettingsPag
     >
       <Sidebar userRole={userRole} />
 
-      {/* ✅ UPDATE: Dynamic Left Margin 
-          - lg:ml-[72px] when on Messages (matches collapsed sidebar)
-          - lg:ml-64 otherwise (matches full sidebar)
-          - Added transition classes for smooth animation
-      */}
-      <div 
+      <div
         className={cn(
           "flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out",
           isMessagesPage ? "lg:ml-[72px]" : "lg:ml-64"
         )}
       >
-        {/* Mobile Header (Sticky) - HIDDEN ON MESSAGES PAGE */}
-        {!isFixedPage && (
+        {/* Mobile Header (Sticky) 
+            ✅ HIDDEN ON: Messages Page AND Pet Dashboard (to fix double header issue) 
+        */}
+        {!isFixedPage && !isPetDashboard && (
           <div className="lg:hidden sticky top-0 z-40">
             <Header showProfile={true} />
           </div>
