@@ -9,12 +9,12 @@ importScripts(
 );
 
 firebase.initializeApp({
-  apiKey: "AIzaSyACR7SWj9jwsDHBv5823MgiZEcf-_v-CV8",
-  authDomain: "pawpal-227be.firebaseapp.com",
-  projectId: "pawpal-227be",
-  storageBucket: "pawpal-227be.firebasestorage.app",
-  messagingSenderId: "406637646338",
-  appId: "1:406637646338:web:79f8e60a9cc7572b668d1b",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 });
 
 const messaging = firebase.messaging();

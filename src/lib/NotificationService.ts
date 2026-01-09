@@ -265,8 +265,8 @@ async function getFCMToken(): Promise<string | null> {
 
       const token = await getToken(messaging, {
         // ✅ Your hardcoded key is now guaranteed to run
-        vapidKey:
-          "BHKduEnqHT5hRFJOU8Yz3xG6YBTTfZfNZJilPwj3_7Vif3UVlE5PyWrDui78q1SRE3SwM8BZXFE0R6loBwJuy2o",
+        vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
+
         serviceWorkerRegistration: registration,
       });
 
