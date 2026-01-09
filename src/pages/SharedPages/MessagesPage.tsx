@@ -3,9 +3,9 @@ import { useAuth } from "@/context/authContext";
 import { useChat } from "@/context/ChatContext";
 import { supabase } from "@/lib/supabaseClient";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Users,
-  Lock,
   Hash,
   Send,
   Loader2,
@@ -18,30 +18,40 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Message, Conversation, UserProfile } from "@/types";
+import type { Conversation, UserProfile } from "@/types";
 import FailedImageIcon from "@/assets/FailedImage.svg";
 import { toast } from "sonner";
 import { format, isToday, isYesterday, isSameDay } from "date-fns";
 
-// --- TYPES ---
-interface MessageWithSender extends Omit<Message, "sender"> {
-  sender?: {
-    username: string;
-    avatar_url: string | null;
-    first_name: string | null;
-  };
-  image_url?: string | null;
-}
+// ✅ FIX: Use 'type' keyword for MessageWithSender
+import {
+  useChatRooms,
+  useChatMessages,
+  useSendMessage,
+  useMarkRead,
+  type MessageWithSender,
+} from "@/hooks/useChatData";
 
 export default function MessagesPage() {
   const { user } = useAuth();
   const { refreshUnreadCount } = useChat();
+  const queryClient = useQueryClient();
 
-  // Data State
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  // --- 1. DATA WITH HOOKS ---
+  const { data: conversations = [], isLoading: loadingRooms } =
+    useChatRooms(user);
+
+  // Active Room State
   const [activeRoom, setActiveRoom] = useState<Conversation | null>(null);
-  const [messages, setMessages] = useState<MessageWithSender[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  // Messages Hook (Fetches history)
+  const { data: messages = [], isLoading: loadingMessages } = useChatMessages(
+    activeRoom?.id
+  );
+
+  // Mutations
+  const sendMessageMutation = useSendMessage();
+  const markReadMutation = useMarkRead();
 
   // Input State
   const [newMessage, setNewMessage] = useState("");
@@ -59,103 +69,32 @@ export default function MessagesPage() {
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const profileCache = useRef<Record<string, any>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<any>(null);
+  const profileCache = useRef<Record<string, any>>({});
 
+  // Scroll to bottom when messages change
   useEffect(() => {
-    if (!user) return;
-    fetchRooms();
-  }, [user]);
+    scrollToBottom();
+  }, [messages.length, activeRoom?.id]);
 
-  const fetchRooms = async () => {
-    if (!user) return;
-    try {
-      const { data, error } = await supabase
-        .from("conversation_members")
-        .select("conversation:conversations(id, name, is_group)")
-        .eq("user_id", user.id);
-
-      if (error) throw error;
-
-      let rooms = data.map((item: any) => item.conversation);
-
-      // ✅ ENFORCE VISIBILITY RULES (Fully Type-Safe)
-      const filteredRooms = rooms.filter((room) => {
-        if (!room || !room.name) return false;
-
-        // 1. General is visible to everyone
-        if (room.name === "General") return true;
-
-        // 2. Executive Board visibility (using your fix)
-        if (room.name === "Executive Board") {
-          return ["admin", "president", "vice_president"].includes(
-            user.role ?? ""
-          );
-        }
-
-        // 3. Committee Chat visibility
-        if (
-          room.is_group &&
-          !["General", "Executive Board"].includes(room.name)
-        ) {
-          // Presidents and Admins see all committee chats they are in
-          if (["admin", "president"].includes(user.role ?? "")) return true;
-
-          // Apply the same fix here for committee
-          const userCommittee = user.committee ?? "";
-          return userCommittee !== "" && room.name === userCommittee;
-        }
-
-        // 4. Direct Messages are always visible
-        return !room.is_group;
-      });
-
-      // ✅ SORTING
-      filteredRooms.sort((a: Conversation, b: Conversation) => {
-        if (!a.name || !b.name) return 0;
-        if (a.name === "Executive Board") return -1;
-        if (b.name === "Executive Board") return 1;
-        if (a.name === "General") return -1;
-        if (b.name === "General") return 1;
-        return a.name.localeCompare(b.name);
-      });
-
-      setConversations(filteredRooms);
-    } catch (err) {
-      console.error("Room fetch error:", err);
-    } finally {
-      setLoading(false);
-    }
+  const scrollToBottom = () => {
+    setTimeout(
+      () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }),
+      100
+    );
   };
-  // --- ROOM LOGIC (Messages + Realtime) ---
+
+  // --- 2. REALTIME & SUBSCRIPTION LOGIC ---
   useEffect(() => {
     if (!activeRoom || !user) return;
 
-    const markReadAndFetch = async () => {
-      await supabase.rpc("mark_room_as_read", {
-        room_id: activeRoom.id,
-        user_id: user.id,
-      });
-      await refreshUnreadCount();
-    };
-    markReadAndFetch();
+    // Mark as read on entry
+    markReadMutation.mutate({ roomId: activeRoom.id, userId: user.id });
+    refreshUnreadCount();
 
-    const fetchMessages = async () => {
-      const { data } = await supabase
-        .from("messages")
-        .select("*, sender:profiles(username, avatar_url, first_name)")
-        .eq("conversation_id", activeRoom.id)
-        .order("created_at", { ascending: true })
-        .limit(100);
-      if (data) {
-        setMessages(data as any);
-        scrollToBottom();
-      }
-    };
-    fetchMessages();
-
+    // Subscribe
     const channel = supabase.channel(`room-${activeRoom.id}`);
     channelRef.current = channel;
 
@@ -169,10 +108,16 @@ export default function MessagesPage() {
           filter: `conversation_id=eq.${activeRoom.id}`,
         },
         async (payload) => {
-          if (payload.new.sender_id === user.id) return;
+          // If WE sent it, ignore (Mutation handles it or we rely on cache update)
+          // Actually, since we removed optimistic logic from mutation to rely on Realtime,
+          // we SHOULD handle our own messages here OR assume mutation handles it.
+          // For safety with caching, let's process everything but de-dupe in setQueryData.
 
-          markReadAndFetch();
+          // Mark read if we are looking at it
+          markReadMutation.mutate({ roomId: activeRoom.id, userId: user.id });
+          refreshUnreadCount();
 
+          // Fetch Sender Info (Cache it)
           let senderData = profileCache.current[payload.new.sender_id];
           if (!senderData) {
             const { data } = await supabase
@@ -186,12 +131,22 @@ export default function MessagesPage() {
             }
           }
 
-          setMessages((p) => [
-            ...p,
-            { ...payload.new, sender: senderData } as any,
-          ]);
-          scrollToBottom();
+          const incomingMsg: MessageWithSender = {
+            ...payload.new,
+            sender: senderData,
+          } as MessageWithSender;
 
+          // ✅ UPDATE TANSTACK CACHE MANUALLY
+          queryClient.setQueryData(
+            ["chat-messages", activeRoom.id],
+            (oldData: MessageWithSender[] | undefined) => {
+              // Prevent duplicates (Supabase sometimes fires twice or mutation adds it)
+              if (oldData?.find((m) => m.id === incomingMsg.id)) return oldData;
+              return [...(oldData || []), incomingMsg];
+            }
+          );
+
+          // Clear typing indicator
           setTypingUsers((prev) => {
             const next = new Set(prev);
             next.delete(senderData?.first_name || "Someone");
@@ -202,11 +157,7 @@ export default function MessagesPage() {
       .on("broadcast", { event: "typing" }, (payload) => {
         if (payload.payload.userId === user.id) return;
         const username = payload.payload.username;
-        setTypingUsers((prev) => {
-          const next = new Set(prev);
-          next.add(username);
-          return next;
-        });
+        setTypingUsers((prev) => new Set(prev).add(username));
         setTimeout(() => {
           setTypingUsers((prev) => {
             const next = new Set(prev);
@@ -221,14 +172,7 @@ export default function MessagesPage() {
       supabase.removeChannel(channel);
       setTypingUsers(new Set());
     };
-  }, [activeRoom, user?.id]);
-
-  const scrollToBottom = () => {
-    setTimeout(
-      () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }),
-      100
-    );
-  };
+  }, [activeRoom?.id, user?.id]); // Re-run only if room changes
 
   const handleTyping = () => {
     if (!channelRef.current || !user) return;
@@ -286,7 +230,9 @@ export default function MessagesPage() {
         { conversation_id: conv.id, user_id: targetUser.id, role: "member" },
       ]);
 
-      await fetchRooms();
+      // Refetch rooms
+      queryClient.invalidateQueries({ queryKey: ["chat-rooms"] });
+
       setActiveRoom(conv);
       setIsNewChatOpen(false);
     } catch (err) {
@@ -300,37 +246,19 @@ export default function MessagesPage() {
     if ((!newMessage.trim() && !imageUrl) || !activeRoom || !user) return;
 
     const content = newMessage.trim();
-    const tempId = Date.now();
     setNewMessage("");
 
-    const optimisticMsg: any = {
-      id: tempId,
-      conversation_id: activeRoom.id,
-      sender_id: user.id,
-      content: content,
-      image_url: imageUrl || null,
-      created_at: new Date().toISOString(),
-      sender: {
-        username: user.username,
-        avatar_url: user.avatar_url,
-        first_name: user.first_name,
-      },
-    };
+    // Optimistic Logic: We rely on Mutation + Realtime to keep cache coherent.
+    // If you want instant "greyed out" message before server confirms, add logic here.
 
-    setMessages((p) => [...p, optimisticMsg]);
-    scrollToBottom();
-
-    const { error } = await supabase.from("messages").insert([
-      {
-        conversation_id: activeRoom.id,
-        sender_id: user.id,
-        content: content,
-        image_url: imageUrl || null,
-      },
-    ]);
-
-    if (error) {
-      console.error("Send error:", error);
+    try {
+      await sendMessageMutation.mutateAsync({
+        roomId: activeRoom.id,
+        userId: user.id,
+        content,
+        imageUrl,
+      });
+    } catch (err) {
       toast.error("Failed to send message");
     }
   };
@@ -371,11 +299,11 @@ export default function MessagesPage() {
     setRevealedMessageId(revealedMessageId === id ? null : id);
   };
 
-  if (loading) return <MessagesSkeleton />;
+  if (loadingRooms) return <MessagesSkeleton />;
 
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100dvh-64px)] lg:h-full w-full bg-white lg:bg-gray-50 lg:rounded-2xl lg:border lg:border-gray-200 overflow-hidden shadow-sm">
-      {/* SIDEBAR */}
+      {/* ... [SIDEBAR UI] ... */}
       <div
         className={`w-full lg:w-80 bg-white border-r border-gray-200 flex flex-col ${
           activeRoom ? "hidden lg:flex" : "flex"
@@ -440,7 +368,7 @@ export default function MessagesPage() {
         </div>
       </div>
 
-      {/* CHAT AREA */}
+      {/* ... [CHAT AREA UI] ... */}
       <div
         className={`flex-1 flex flex-col bg-white ${
           !activeRoom ? "hidden lg:flex" : "flex"
