@@ -6,6 +6,8 @@ import { FeedPost } from "@/components/FeedPost";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UpcomingEventsWidget } from "@/components/UpcomingEventsWidget";
+// ✅ NEW IMPORT
+import { ChallengeWidget } from "@/components/ChallengeWidget";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,10 +27,11 @@ import {
   PenSquare,
   ChevronDown,
   Settings,
+  Trophy,
 } from "lucide-react";
 import { formatDistanceToNow, isPast, addDays, isBefore } from "date-fns";
 import type { OutreachEvent } from "@/types";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 // --- TYPES ---
 type HealthAlert = {
@@ -88,7 +91,7 @@ export function UnifiedDashboard() {
       const { data: eventsData, error: eventsError } = await query;
       if (eventsError) throw eventsError;
 
-      // ✅ 2. ENHANCE EVENTS: Fetch accurate counts & user status for each event
+      // 2. Enhance Events
       const eventsWithDetails = await Promise.all(
         (eventsData as OutreachEvent[]).map(async (event) => {
           // A. Get "Going" Count (Approved + Checked In only)
@@ -117,9 +120,10 @@ export function UnifiedDashboard() {
 
       setEvents(eventsWithDetails);
 
-      // 3. Parallel Data Fetching (Stats or Alerts)
+      // 3. Parallel Data Fetching
       if (isAdmin) {
-        const [postsCount, myCount, usersCount] = await Promise.all([
+        // Fix for destructuring error
+        const results = await Promise.all([
           supabase
             .from("outreach_events")
             .select("id", { count: "exact", head: true }),
@@ -132,9 +136,9 @@ export function UnifiedDashboard() {
             .select("id", { count: "exact", head: true }),
         ]);
         setStats({
-          totalPosts: postsCount.count || 0,
-          myPosts: myCount.count || 0,
-          totalMembers: usersCount.count || 0,
+          totalPosts: results[0].count || 0,
+          myPosts: results[1].count || 0,
+          totalMembers: results[2].count || 0,
         });
       } else {
         // User Logic: Fetch Pet Alerts
@@ -166,11 +170,11 @@ export function UnifiedDashboard() {
 
   const handleDelete = async () => {
     if (!deleteEventId) return;
-    const { error } = await supabase
+    const response = await supabase
       .from("outreach_events")
       .delete()
       .eq("id", deleteEventId);
-    if (!error) {
+    if (!response.error) {
       setEvents((prev) => prev.filter((e) => e.id !== deleteEventId));
       setDeleteEventId(null);
       if (isAdmin)
@@ -179,10 +183,11 @@ export function UnifiedDashboard() {
           totalPosts: prev.totalPosts - 1,
           myPosts: prev.myPosts - 1,
         }));
+    } else {
+      toast.error("Failed to delete event");
     }
   };
 
-  // ✅ Handle Hide/Unhide Logic
   const handleHide = async (eventId: string, currentStatus: boolean) => {
     // 1. Optimistic Update
     setEvents((prev) =>
@@ -192,13 +197,13 @@ export function UnifiedDashboard() {
     );
 
     // 2. Database Update
-    const { error } = await supabase
+    const response = await supabase
       .from("outreach_events")
       .update({ is_hidden: !currentStatus })
       .eq("id", eventId);
 
-    if (error) {
-      console.error(error);
+    if (response.error) {
+      console.error(response.error);
       toast.error("Failed to update visibility");
       fetchData(); // Revert
     } else {
@@ -376,6 +381,23 @@ export function UnifiedDashboard() {
                     </div>
                   </DropdownMenuItem>
 
+                  <DropdownMenuItem
+                    onClick={() => navigate("/admin/challenges/create")}
+                    className="gap-2 cursor-pointer"
+                  >
+                    <div className="p-1 bg-indigo-100 text-indigo-600 rounded-md">
+                      <Trophy className="w-4 h-4" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-bold text-xs">Challenge</span>
+                      <span className="text-[10px] text-gray-500">
+                        Start new game
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator className="bg-gray-100 my-1" />
+
                   <DropdownMenuSeparator className="bg-gray-100 my-1" />
 
                   <DropdownMenuItem
@@ -486,7 +508,10 @@ export function UnifiedDashboard() {
               </div>
             )}
 
-            {/* WIDGET */}
+            {/* ✅ NEW: Challenge Widget */}
+            <ChallengeWidget />
+
+            {/* Existing Widget */}
             <UpcomingEventsWidget />
           </>
         )}
