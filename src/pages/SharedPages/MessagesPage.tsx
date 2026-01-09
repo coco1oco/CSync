@@ -18,18 +18,19 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Conversation, UserProfile } from "@/types";
+import type { UserProfile } from "@/types";
 import FailedImageIcon from "@/assets/FailedImage.svg";
 import { toast } from "sonner";
 import { format, isToday, isYesterday, isSameDay } from "date-fns";
 
-// ✅ FIX: Use 'type' keyword for MessageWithSender
+// ✅ Import correct types from hook
 import {
   useChatRooms,
   useChatMessages,
   useSendMessage,
   useMarkRead,
   type MessageWithSender,
+  type ChatRoom,
 } from "@/hooks/useChatData";
 
 export default function MessagesPage() {
@@ -37,28 +38,22 @@ export default function MessagesPage() {
   const { refreshUnreadCount } = useChat();
   const queryClient = useQueryClient();
 
-  // --- 1. DATA WITH HOOKS ---
+  // --- 1. DATA ---
   const { data: conversations = [], isLoading: loadingRooms } =
     useChatRooms(user);
 
-  // Active Room State
-  const [activeRoom, setActiveRoom] = useState<Conversation | null>(null);
+  // Use ChatRoom type which has 'hasUnread'
+  const [activeRoom, setActiveRoom] = useState<ChatRoom | null>(null);
 
-  // Messages Hook (Fetches history)
   const { data: messages = [], isLoading: loadingMessages } = useChatMessages(
     activeRoom?.id
   );
-
-  // Mutations
   const sendMessageMutation = useSendMessage();
   const markReadMutation = useMarkRead();
 
-  // Input State
   const [newMessage, setNewMessage] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
-
-  // UI State
   const [revealedMessageId, setRevealedMessageId] = useState<
     number | string | null
   >(null);
@@ -67,14 +62,12 @@ export default function MessagesPage() {
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
   const [searching, setSearching] = useState(false);
 
-  // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<any>(null);
   const profileCache = useRef<Record<string, any>>({});
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     scrollToBottom();
   }, [messages.length, activeRoom?.id]);
@@ -86,15 +79,15 @@ export default function MessagesPage() {
     );
   };
 
-  // --- 2. REALTIME & SUBSCRIPTION LOGIC ---
+  // --- 2. REALTIME & SUBSCRIPTION ---
   useEffect(() => {
     if (!activeRoom || !user) return;
 
-    // Mark as read on entry
+    // Mark as read immediately on entry
     markReadMutation.mutate({ roomId: activeRoom.id, userId: user.id });
+    // Also refresh the global context count
     refreshUnreadCount();
 
-    // Subscribe
     const channel = supabase.channel(`room-${activeRoom.id}`);
     channelRef.current = channel;
 
@@ -108,16 +101,11 @@ export default function MessagesPage() {
           filter: `conversation_id=eq.${activeRoom.id}`,
         },
         async (payload) => {
-          // If WE sent it, ignore (Mutation handles it or we rely on cache update)
-          // Actually, since we removed optimistic logic from mutation to rely on Realtime,
-          // we SHOULD handle our own messages here OR assume mutation handles it.
-          // For safety with caching, let's process everything but de-dupe in setQueryData.
-
-          // Mark read if we are looking at it
+          // If user is currently looking at this room, mark it read again immediately
           markReadMutation.mutate({ roomId: activeRoom.id, userId: user.id });
           refreshUnreadCount();
 
-          // Fetch Sender Info (Cache it)
+          // Fetch Sender
           let senderData = profileCache.current[payload.new.sender_id];
           if (!senderData) {
             const { data } = await supabase
@@ -136,17 +124,14 @@ export default function MessagesPage() {
             sender: senderData,
           } as MessageWithSender;
 
-          // ✅ UPDATE TANSTACK CACHE MANUALLY
           queryClient.setQueryData(
             ["chat-messages", activeRoom.id],
             (oldData: MessageWithSender[] | undefined) => {
-              // Prevent duplicates (Supabase sometimes fires twice or mutation adds it)
               if (oldData?.find((m) => m.id === incomingMsg.id)) return oldData;
               return [...(oldData || []), incomingMsg];
             }
           );
 
-          // Clear typing indicator
           setTypingUsers((prev) => {
             const next = new Set(prev);
             next.delete(senderData?.first_name || "Someone");
@@ -172,7 +157,7 @@ export default function MessagesPage() {
       supabase.removeChannel(channel);
       setTypingUsers(new Set());
     };
-  }, [activeRoom?.id, user?.id]); // Re-run only if room changes
+  }, [activeRoom?.id, user?.id]);
 
   const handleTyping = () => {
     if (!channelRef.current || !user) return;
@@ -222,21 +207,17 @@ export default function MessagesPage() {
         .insert([{ name: targetUser.username, is_group: false }])
         .select()
         .single();
-
       if (error) throw error;
-
       await supabase.from("conversation_members").insert([
         { conversation_id: conv.id, user_id: user.id, role: "owner" },
         { conversation_id: conv.id, user_id: targetUser.id, role: "member" },
       ]);
-
-      // Refetch rooms
       queryClient.invalidateQueries({ queryKey: ["chat-rooms"] });
-
-      setActiveRoom(conv);
+      // We construct a temporary ChatRoom object to switch immediately
+      const newRoom: ChatRoom = { ...conv, hasUnread: false };
+      setActiveRoom(newRoom);
       setIsNewChatOpen(false);
     } catch (err) {
-      console.error(err);
       toast.error("Failed to start conversation");
     }
   };
@@ -244,13 +225,8 @@ export default function MessagesPage() {
   const handleSendMessage = async (e?: React.FormEvent, imageUrl?: string) => {
     if (e) e.preventDefault();
     if ((!newMessage.trim() && !imageUrl) || !activeRoom || !user) return;
-
     const content = newMessage.trim();
     setNewMessage("");
-
-    // Optimistic Logic: We rely on Mutation + Realtime to keep cache coherent.
-    // If you want instant "greyed out" message before server confirms, add logic here.
-
     try {
       await sendMessageMutation.mutateAsync({
         roomId: activeRoom.id,
@@ -266,7 +242,6 @@ export default function MessagesPage() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     try {
       setIsUploading(true);
       const url = await uploadImageToCloudinary(file, "chat");
@@ -279,7 +254,6 @@ export default function MessagesPage() {
     }
   };
 
-  // --- HELPERS ---
   const getDateLabel = (dateStr: string) => {
     const date = new Date(dateStr);
     if (isToday(date)) return "Today";
@@ -287,11 +261,10 @@ export default function MessagesPage() {
     return format(date, "MMM d, yyyy");
   };
 
-  const getRoomIcon = (room: Conversation) => {
+  const getRoomIcon = (room: ChatRoom) => {
     if (room.name === "General") return <Hash size={18} />;
     if (room.name === "Executive Board")
       return <ShieldCheck size={18} className="text-amber-500" />;
-    if (room.is_group) return <Users size={18} />;
     return <Users size={18} />;
   };
 
@@ -303,7 +276,7 @@ export default function MessagesPage() {
 
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100dvh-64px)] lg:h-full w-full bg-white lg:bg-gray-50 lg:rounded-2xl lg:border lg:border-gray-200 overflow-hidden shadow-sm">
-      {/* ... [SIDEBAR UI] ... */}
+      {/* SIDEBAR */}
       <div
         className={`w-full lg:w-80 bg-white border-r border-gray-200 flex flex-col ${
           activeRoom ? "hidden lg:flex" : "flex"
@@ -332,6 +305,9 @@ export default function MessagesPage() {
           ) : (
             conversations.map((room) => {
               const isActive = activeRoom?.id === room.id;
+              // ✅ VISUAL INDICATOR FOR UNREAD
+              const isUnread = room.hasUnread && !isActive;
+
               return (
                 <button
                   key={room.id}
@@ -343,16 +319,33 @@ export default function MessagesPage() {
                   }`}
                 >
                   <div
-                    className={`p-2 rounded-full shrink-0 ${
+                    className={`relative p-2 rounded-full shrink-0 ${
                       isActive ? "bg-blue-100" : "bg-gray-100"
                     }`}
                   >
                     {getRoomIcon(room)}
+                    {/* ✅ UNREAD DOT */}
+                    {isUnread && (
+                      <span className="absolute top-0 right-0 w-3 h-3 bg-blue-600 border-2 border-white rounded-full"></span>
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <span className="truncate block font-semibold">
-                      {room.name}
-                    </span>
+                    <div className="flex justify-between items-center">
+                      <span
+                        className={`truncate block ${
+                          isUnread
+                            ? "font-black text-gray-900"
+                            : "font-semibold"
+                        }`}
+                      >
+                        {room.name}
+                      </span>
+                      {isUnread && (
+                        <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 rounded-full font-bold">
+                          New
+                        </span>
+                      )}
+                    </div>
                     {room.is_group &&
                       room.name !== "General" &&
                       room.name !== "Executive Board" && (
@@ -368,7 +361,7 @@ export default function MessagesPage() {
         </div>
       </div>
 
-      {/* ... [CHAT AREA UI] ... */}
+      {/* CHAT AREA */}
       <div
         className={`flex-1 flex flex-col bg-white ${
           !activeRoom ? "hidden lg:flex" : "flex"
@@ -546,7 +539,6 @@ export default function MessagesPage() {
         )}
       </div>
 
-      {/* NEW CHAT MODAL */}
       {isNewChatOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-xl flex flex-col max-h-[80vh]">
