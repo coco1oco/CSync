@@ -1,3 +1,4 @@
+import Papa from 'papaparse';
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
@@ -241,6 +242,36 @@ export default function ManageEventsPage() {
       console.error(error);
       toast.error("Failed to send notification.");
     }
+  };
+
+  // --- CSV EXPORT ---
+  const exportAttendeesToCSV = async () => {
+    if (!selectedEventId || attendees.length === 0) {
+      toast.error("No attendees to export");
+      return;
+    }
+
+    const csvData = attendees
+      .sort((a, b) => a.user.last_name.localeCompare(b.user.last_name))
+      .map(attendee => ({
+        Name: `${attendee.user.first_name} ${attendee.user.last_name}`,
+        Username: attendee.user.username,
+        Status: attendee.status,
+        'Pet Name': attendee.pet?.name || 'N/A',
+        'Pet Species': attendee.pet?.species || 'N/A',
+        'Registration Date': new Date(attendee.created_at).toLocaleDateString()
+      }));
+
+    const csv = '\uFEFF' + Papa.unparse(csvData);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${selectedEventTitle}-attendees.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // --- GUEST MANAGEMENT HANDLERS ---
@@ -696,7 +727,16 @@ export default function ManageEventsPage() {
                     <div className="p-8 text-center text-gray-400"><p>Analytics features coming soon!</p></div>
                 )}
             </div>
-            <div className="p-4 border-t border-gray-100 bg-white"><Button className="w-full gap-2" variant="outline" disabled={attendees.length === 0}><Download className="w-4 h-4" /> Export Guest List (CSV)</Button></div>
+            <div className="p-4 border-t border-gray-100 bg-white">
+              <Button 
+                onClick={exportAttendeesToCSV}
+                className="w-full gap-2" 
+                variant="outline" 
+                disabled={attendees.length === 0}
+              >
+                <Download className="w-4 h-4" /> Export Guest List (CSV)
+              </Button>
+            </div>
           </div>
         </div>
       )}

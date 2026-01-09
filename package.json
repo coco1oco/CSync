@@ -33,6 +33,7 @@
     "framer-motion": "^12.23.25",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.546.0",
+    "papaparse": "^5.5.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-hook-form": "^7.69.0",
@@ -47,6 +48,7 @@
   "devDependencies": {
     "@eslint/js": "^9.36.0",
     "@types/node": "^24.6.0",
+    "@types/papaparse": "^5.5.2",
     "@types/react": "^19.1.16",
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^5.0.4",

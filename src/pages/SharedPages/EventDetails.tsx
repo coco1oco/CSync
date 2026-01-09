@@ -155,6 +155,7 @@ export default function EventDetails() {
           .eq("id", id)
           .single();
         if (eventError) throw eventError;
+        
         setEvent(eventData);
 
         const officialTypes = ["official", "pet", "member", "campus"];
