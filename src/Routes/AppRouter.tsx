@@ -203,6 +203,14 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: "/challenges/view/:id",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <ChallengeDetailsPage />
+          </Suspense>
+        ),
+      },
+      {
         path: "/official-event/:id",
         element: (
           <Suspense fallback={<PageLoader />}>

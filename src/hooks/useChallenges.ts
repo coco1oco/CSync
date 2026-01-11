@@ -47,7 +47,25 @@ export function useActiveChallenge() {
   });
 }
 
-// ✅ NEW: Fetch All Challenges (For Admins)
+// --- 2. FETCH SPECIFIC CHALLENGE ---
+export function useChallengeById(id: string | undefined) {
+  return useQuery({
+    queryKey: ["challenge", id],
+    enabled: !!id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("challenges")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (error) throw error;
+      return data as Challenge;
+    },
+  });
+}
+
+// --- 3. FETCH ALL CHALLENGES (Admin) ---
 export function useAdminChallenges() {
   return useQuery({
     queryKey: ["admin-challenges"],
@@ -55,7 +73,7 @@ export function useAdminChallenges() {
       const { data, error } = await supabase
         .from("challenges")
         .select("*")
-        .order("start_date", { ascending: true }); // Ordered by schedule
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data as Challenge[];
@@ -63,7 +81,7 @@ export function useAdminChallenges() {
   });
 }
 
-// --- 2. FETCH ENTRIES ---
+// --- 4. FETCH ENTRIES ---
 export function useChallengeEntries(
   challengeId: string | undefined,
   userId: string | undefined
@@ -113,7 +131,7 @@ export function useChallengeEntries(
   });
 }
 
-// --- 3. MUTATIONS ---
+// --- 5. ACTIONS ---
 export function useChallengeActions() {
   const queryClient = useQueryClient();
 
@@ -135,13 +153,51 @@ export function useChallengeActions() {
     },
     onSuccess: () => {
       toast.success("Challenge created successfully!");
-      // Invalidate both active (user view) and admin list (admin view)
       queryClient.invalidateQueries({ queryKey: ["active-challenge"] });
       queryClient.invalidateQueries({ queryKey: ["admin-challenges"] });
     },
     onError: (error) => {
       console.error(error);
       toast.error("Failed to create challenge");
+    },
+  });
+
+  const terminateChallenge = useMutation({
+    mutationFn: async (challengeId: string) => {
+      const { error } = await supabase
+        .from("challenges")
+        .update({ is_active: false })
+        .eq("id", challengeId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Challenge terminated.");
+      queryClient.invalidateQueries({ queryKey: ["active-challenge"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-challenges"] });
+      queryClient.invalidateQueries({ queryKey: ["challenge"] });
+    },
+    onError: () => toast.error("Failed to terminate challenge."),
+  });
+
+  // ✅ NEW: Delete Challenge (Hard Delete)
+  const deleteChallenge = useMutation({
+    mutationFn: async (challengeId: string) => {
+      const { error } = await supabase
+        .from("challenges")
+        .delete()
+        .eq("id", challengeId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Challenge record deleted.");
+      queryClient.invalidateQueries({ queryKey: ["active-challenge"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-challenges"] });
+    },
+    onError: (err) => {
+      console.error(err);
+      toast.error("Failed to delete challenge.");
     },
   });
 
@@ -200,5 +256,11 @@ export function useChallengeActions() {
     },
   });
 
-  return { submitEntry, toggleVote, createChallenge };
+  return {
+    submitEntry,
+    toggleVote,
+    createChallenge,
+    terminateChallenge,
+    deleteChallenge, // ✅ Exported
+  };
 }

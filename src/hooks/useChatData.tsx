@@ -18,7 +18,7 @@ export type ChatRoom = Conversation & {
   lastMessageAt?: string;
 };
 
-// --- 1. FETCH ROOMS HOOK (Fixed Unread Logic) ---
+// --- 1. FETCH ROOMS HOOK ---
 export function useChatRooms(user: any) {
   return useQuery({
     queryKey: ["chat-rooms", user?.id],
@@ -53,7 +53,7 @@ export function useChatRooms(user: any) {
         if (m.last_read_at) lastReadMap.set(m.conversation_id, m.last_read_at);
       });
 
-      // 3. Get All Official Groups (Metadata only)
+      // 3. Get All Official Groups
       const { data: officialGroups, error: groupError } = await supabase
         .from("conversations")
         .select("id, name, is_group")
@@ -61,7 +61,7 @@ export function useChatRooms(user: any) {
 
       if (groupError) throw groupError;
 
-      // 4. Determine "Visible" Official Groups based on Role
+      // 4. Determine "Visible" Official Groups
       const visibleOfficialGroups = (officialGroups || []).filter(
         (room: any) => {
           if (room.name === "General") return true;
@@ -73,8 +73,7 @@ export function useChatRooms(user: any) {
         }
       );
 
-      // 5. Collect ALL IDs to fetch details for
-      // (Visible Groups + All DMs I'm part of)
+      // 5. Collect IDs
       const visibleGroupIds = visibleOfficialGroups.map((r: any) => r.id);
       const allTargetIds = Array.from(
         new Set([...visibleGroupIds, ...Array.from(myMemberIds)])
@@ -82,8 +81,7 @@ export function useChatRooms(user: any) {
 
       if (allTargetIds.length === 0) return [];
 
-      // 6. Fetch Details (Messages) for these IDs efficiently
-      // We fetch sender_id to check if "I" sent the last message
+      // 6. Fetch Messages efficiently
       const { data: detailedRooms, error: detailsError } = await supabase
         .from("conversations")
         .select(
@@ -102,7 +100,6 @@ export function useChatRooms(user: any) {
       const processedRooms: ChatRoom[] = [];
 
       detailedRooms?.forEach((room: any) => {
-        // Filter out groups I shouldn't see (e.g. if I was demoted but still in membership)
         if (room.is_group) {
           const isOfficialVisible = visibleGroupIds.includes(room.id);
           if (!isOfficialVisible) return;
@@ -116,14 +113,13 @@ export function useChatRooms(user: any) {
         let hasUnread = false;
 
         if (lastMsgAt) {
-          // ✅ LOGIC FIX: If *I* sent the last message, it is NOT unread
           const isMyMessage = lastSenderId === user.id;
 
           if (!isMyMessage) {
             if (!lastReadAt) {
-              hasUnread = true; // Never read
+              hasUnread = true;
             } else if (new Date(lastMsgAt) > new Date(lastReadAt)) {
-              hasUnread = true; // New message since last read
+              hasUnread = true;
             }
           }
         }
@@ -210,7 +206,8 @@ export function useMarkRead() {
       roomId: string;
       userId: string;
     }) => {
-      // ✅ FIX: Use 'update' to avoid RLS policy violations on insert
+      // ✅ FIX: Reverted to 'update' to avoid RLS error.
+      // We only update if a record already exists.
       const { error } = await supabase
         .from("conversation_members")
         .update({ last_read_at: new Date().toISOString() })
@@ -218,12 +215,13 @@ export function useMarkRead() {
         .eq("user_id", userId);
 
       if (error) {
-        console.error("Failed to mark read:", error);
+        console.warn(
+          "Failed to mark read (likely permission issue):",
+          error.message
+        );
       }
     },
     onSuccess: () => {
-      // Invalidating this query re-runs the useChatRooms logic,
-      // which will now see the updated last_read_at and clear the blue dot.
       queryClient.invalidateQueries({ queryKey: ["chat-rooms"] });
     },
   });

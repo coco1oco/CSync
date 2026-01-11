@@ -1,16 +1,51 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Camera, Trophy, ArrowRight, Loader2 } from "lucide-react";
+import { Camera, Trophy, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useActiveChallenge } from "@/hooks/useChallenges";
+import {
+  differenceInDays,
+  differenceInHours,
+  differenceInMinutes,
+} from "date-fns";
 
 export function ChallengeWidget() {
   const navigate = useNavigate();
   const { data: challenge, isLoading } = useActiveChallenge();
+  const [timeLeft, setTimeLeft] = useState("");
+
+  // Countdown Logic
+  useEffect(() => {
+    if (!challenge) return;
+
+    const updateTimer = () => {
+      const now = new Date();
+      const end = new Date(challenge.end_date);
+
+      if (now > end) {
+        setTimeLeft("Ended");
+        return;
+      }
+
+      const days = differenceInDays(end, now);
+      const hours = differenceInHours(end, now) % 24;
+      const minutes = differenceInMinutes(end, now) % 60;
+
+      if (days > 0) {
+        setTimeLeft(`${days}d ${hours}h left`);
+      } else {
+        setTimeLeft(`${hours}h ${minutes}m left`);
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 60000); // Update every minute
+    return () => clearInterval(interval);
+  }, [challenge]);
 
   if (isLoading)
     return <div className="h-32 bg-gray-100 rounded-3xl animate-pulse" />;
 
-  // If no active challenge, show nothing (or a "Coming Soon" placeholder if you prefer)
   if (!challenge) return null;
 
   return (
@@ -21,10 +56,18 @@ export function ChallengeWidget() {
 
       <div className="relative z-10 flex items-start justify-between gap-4">
         <div className="flex-1">
-          <div className="flex items-center gap-2 text-indigo-100 text-xs font-bold uppercase tracking-wider mb-1">
-            <Trophy className="w-3.5 h-3.5 text-yellow-400" />
-            Weekly Challenge
+          <div className="flex items-center gap-3 mb-1">
+            <div className="flex items-center gap-2 text-indigo-100 text-xs font-bold uppercase tracking-wider">
+              <Trophy className="w-3.5 h-3.5 text-yellow-400" />
+              Weekly Challenge
+            </div>
+            {timeLeft && (
+              <div className="flex items-center gap-1 bg-white/20 px-2 py-0.5 rounded text-[10px] font-bold text-white animate-pulse">
+                <Clock className="w-3 h-3" /> {timeLeft}
+              </div>
+            )}
           </div>
+
           <h3 className="text-2xl font-black text-white leading-tight mb-2">
             "{challenge.theme}"
           </h3>
