@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   Paperclip,
   ShieldCheck,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +24,6 @@ import FailedImageIcon from "@/assets/FailedImage.svg";
 import { toast } from "sonner";
 import { format, isToday, isYesterday, isSameDay } from "date-fns";
 
-// ✅ Import correct types from hook
 import {
   useChatRooms,
   useChatMessages,
@@ -38,39 +38,81 @@ export default function MessagesPage() {
   const { refreshUnreadCount } = useChat();
   const queryClient = useQueryClient();
 
-  // --- 1. DATA ---
+  // --- DATA ---
   const { data: conversations = [], isLoading: loadingRooms } =
     useChatRooms(user);
 
-  // Use ChatRoom type which has 'hasUnread'
   const [activeRoom, setActiveRoom] = useState<ChatRoom | null>(null);
+  const { data: messages = [] } = useChatMessages(activeRoom?.id);
 
-  const { data: messages = [], isLoading: loadingMessages } = useChatMessages(
-    activeRoom?.id
-  );
   const sendMessageMutation = useSendMessage();
   const markReadMutation = useMarkRead();
 
+  // --- LOCAL STATE ---
   const [newMessage, setNewMessage] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
   const [revealedMessageId, setRevealedMessageId] = useState<
     number | string | null
   >(null);
+
+  // Image Preview
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
+
+  // Search / New Chat
   const [isNewChatOpen, setIsNewChatOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
   const [searching, setSearching] = useState(false);
 
+  // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<any>(null);
   const profileCache = useRef<Record<string, any>>({});
 
+  // --- HISTORY & BACK BUTTON ---
+  useEffect(() => {
+    const handlePopState = () => {
+      if (activeRoom) setActiveRoom(null);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [activeRoom]);
+
+  const openRoom = (room: ChatRoom) => {
+    window.history.pushState({ panel: "chat" }, "", "");
+
+    // ⚡ OPTIMISTIC UPDATE: Mark as read INSTANTLY in the UI list
+    queryClient.setQueryData(
+      ["chat-rooms", user?.id],
+      (old: ChatRoom[] | undefined) => {
+        if (!old) return [];
+        return old.map((c) =>
+          c.id === room.id ? { ...c, hasUnread: false } : c
+        );
+      }
+    );
+
+    setActiveRoom(room);
+  };
+
+  const closeRoom = () => {
+    if (window.history.state?.panel === "chat") {
+      window.history.back();
+    } else {
+      setActiveRoom(null);
+    }
+  };
+
+  // --- SCROLLING ---
   useEffect(() => {
     scrollToBottom();
-  }, [messages.length, activeRoom?.id]);
+  }, [messages.length, activeRoom?.id, previewUrl]);
 
   const scrollToBottom = () => {
     setTimeout(
@@ -79,14 +121,38 @@ export default function MessagesPage() {
     );
   };
 
-  // --- 2. REALTIME & SUBSCRIPTION ---
+  // --- ⚡ LOGIC FIX: AUTO-JOIN OFFICIAL GROUPS ---
+  useEffect(() => {
+    const autoJoinOfficialGroups = async () => {
+      if (!user || !conversations) return;
+
+      const officialGroups = conversations.filter((c) => c.is_group);
+
+      for (const group of officialGroups) {
+        await supabase.from("conversation_members").upsert(
+          {
+            conversation_id: group.id,
+            user_id: user.id,
+            role: "member",
+          },
+          { onConflict: "conversation_id,user_id", ignoreDuplicates: true }
+        );
+      }
+    };
+
+    autoJoinOfficialGroups();
+  }, [user, conversations.length]);
+
+  // --- REALTIME & MARK READ ---
   useEffect(() => {
     if (!activeRoom || !user) return;
 
-    // Mark as read immediately on entry
-    markReadMutation.mutate({ roomId: activeRoom.id, userId: user.id });
-    // Also refresh the global context count
-    refreshUnreadCount();
+    markReadMutation
+      .mutateAsync({ roomId: activeRoom.id, userId: user.id })
+      .then(() => {
+        refreshUnreadCount();
+        queryClient.invalidateQueries({ queryKey: ["chat-rooms"] });
+      });
 
     const channel = supabase.channel(`room-${activeRoom.id}`);
     channelRef.current = channel;
@@ -101,11 +167,12 @@ export default function MessagesPage() {
           filter: `conversation_id=eq.${activeRoom.id}`,
         },
         async (payload) => {
-          // If user is currently looking at this room, mark it read again immediately
-          markReadMutation.mutate({ roomId: activeRoom.id, userId: user.id });
+          await markReadMutation.mutateAsync({
+            roomId: activeRoom.id,
+            userId: user.id,
+          });
           refreshUnreadCount();
 
-          // Fetch Sender
           let senderData = profileCache.current[payload.new.sender_id];
           if (!senderData) {
             const { data } = await supabase
@@ -159,6 +226,7 @@ export default function MessagesPage() {
     };
   }, [activeRoom?.id, user?.id]);
 
+  // --- HANDLERS ---
   const handleTyping = () => {
     if (!channelRef.current || !user) return;
     if (!typingTimeoutRef.current) {
@@ -175,19 +243,24 @@ export default function MessagesPage() {
 
   const handleSearchUsers = async (query: string) => {
     setSearchQuery(query);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+
     if (query.length < 2) {
       setSearchResults([]);
       return;
     }
     setSearching(true);
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .neq("id", user?.id)
-      .or(`username.ilike.%${query}%,first_name.ilike.%${query}%`)
-      .limit(5);
-    setSearchResults((data as UserProfile[]) || []);
-    setSearching(false);
+
+    searchTimeoutRef.current = setTimeout(async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .neq("id", user?.id)
+        .or(`username.ilike.%${query}%,first_name.ilike.%${query}%`)
+        .limit(5);
+      setSearchResults((data as UserProfile[]) || []);
+      setSearching(false);
+    }, 500);
   };
 
   const startDM = async (targetUser: UserProfile) => {
@@ -196,7 +269,7 @@ export default function MessagesPage() {
       (c) => !c.is_group && c.name === targetUser.username
     );
     if (existing) {
-      setActiveRoom(existing);
+      openRoom(existing);
       setIsNewChatOpen(false);
       return;
     }
@@ -213,44 +286,73 @@ export default function MessagesPage() {
         { conversation_id: conv.id, user_id: targetUser.id, role: "member" },
       ]);
       queryClient.invalidateQueries({ queryKey: ["chat-rooms"] });
-      // We construct a temporary ChatRoom object to switch immediately
       const newRoom: ChatRoom = { ...conv, hasUnread: false };
-      setActiveRoom(newRoom);
+      openRoom(newRoom);
       setIsNewChatOpen(false);
     } catch (err) {
       toast.error("Failed to start conversation");
     }
   };
 
-  const handleSendMessage = async (e?: React.FormEvent, imageUrl?: string) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      const objectUrl = URL.createObjectURL(file);
+      setPreviewUrl(objectUrl);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const clearPreview = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setSelectedFile(null);
+    setPreviewUrl(null);
+  };
+
+  const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if ((!newMessage.trim() && !imageUrl) || !activeRoom || !user) return;
+    if (
+      (!newMessage.trim() && !selectedFile) ||
+      !activeRoom ||
+      !user ||
+      isSending
+    )
+      return;
+
+    setIsSending(true);
     const content = newMessage.trim();
-    setNewMessage("");
+
     try {
+      let finalImageUrl = null;
+      if (selectedFile) {
+        finalImageUrl = await uploadImageToCloudinary(selectedFile, "chat");
+      }
+
       await sendMessageMutation.mutateAsync({
         roomId: activeRoom.id,
         userId: user.id,
         content,
-        imageUrl,
+        imageUrl: finalImageUrl || undefined,
       });
+
+      if (activeRoom.hasUnread) {
+        queryClient.setQueryData(
+          ["chat-rooms", user.id],
+          (old: ChatRoom[] | undefined) => {
+            return old?.map((c) =>
+              c.id === activeRoom.id ? { ...c, hasUnread: false } : c
+            );
+          }
+        );
+      }
+
+      setNewMessage("");
+      clearPreview();
     } catch (err) {
       toast.error("Failed to send message");
-    }
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      setIsUploading(true);
-      const url = await uploadImageToCloudinary(file, "chat");
-      await handleSendMessage(undefined, url);
-    } catch (err) {
-      toast.error("Failed to upload image");
     } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      setIsSending(false);
     }
   };
 
@@ -275,7 +377,9 @@ export default function MessagesPage() {
   if (loadingRooms) return <MessagesSkeleton />;
 
   return (
-    <div className="flex flex-col lg:flex-row h-[calc(100dvh-64px)] lg:h-full w-full bg-white lg:bg-gray-50 lg:rounded-2xl lg:border lg:border-gray-200 overflow-hidden shadow-sm">
+    // ✅ CHANGED: lg:h-full (Forces full height on Desktop/Laptop)
+    // Mobile keeps h-[calc(100dvh-4rem)] to account for bottom nav
+    <div className="flex flex-col lg:flex-row h-[calc(100dvh-4rem)] lg:h-full w-full bg-white lg:bg-gray-50 lg:rounded-2xl lg:border lg:border-gray-200 overflow-hidden shadow-sm">
       {/* SIDEBAR */}
       <div
         className={`w-full lg:w-80 bg-white border-r border-gray-200 flex flex-col ${
@@ -284,95 +388,91 @@ export default function MessagesPage() {
       >
         <div className="h-16 px-4 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10 shrink-0">
           <h1 className="text-xl font-bold text-gray-900">Messages</h1>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => setIsNewChatOpen(true)}
-            className="rounded-full text-blue-600 hover:bg-blue-50"
-          >
-            <Plus size={24} />
-          </Button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
           {conversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-gray-400 text-sm text-center">
               <p>No conversations yet.</p>
-              <Button variant="link" onClick={() => setIsNewChatOpen(true)}>
-                Start a chat
-              </Button>
             </div>
           ) : (
-            conversations.map((room) => {
-              const isActive = activeRoom?.id === room.id;
-              // ✅ VISUAL INDICATOR FOR UNREAD
-              const isUnread = room.hasUnread && !isActive;
+            conversations
+              .filter((room) => room.is_group)
+              .map((room) => {
+                const isActive = activeRoom?.id === room.id;
+                const isUnread = room.hasUnread && !isActive;
 
-              return (
-                <button
-                  key={room.id}
-                  onClick={() => setActiveRoom(room)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all ${
-                    isActive
-                      ? "bg-blue-50 text-blue-700 font-medium"
-                      : "text-gray-600 hover:bg-gray-50"
-                  }`}
-                >
-                  <div
-                    className={`relative p-2 rounded-full shrink-0 ${
-                      isActive ? "bg-blue-100" : "bg-gray-100"
+                return (
+                  <button
+                    key={room.id}
+                    onClick={() => openRoom(room)}
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all ${
+                      isActive
+                        ? "bg-blue-50 text-blue-700 font-medium"
+                        : "text-gray-600 hover:bg-gray-50"
                     }`}
                   >
-                    {getRoomIcon(room)}
-                    {/* ✅ UNREAD DOT */}
-                    {isUnread && (
-                      <span className="absolute top-0 right-0 w-3 h-3 bg-blue-600 border-2 border-white rounded-full"></span>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex justify-between items-center">
-                      <span
-                        className={`truncate block ${
-                          isUnread
-                            ? "font-black text-gray-900"
-                            : "font-semibold"
-                        }`}
-                      >
-                        {room.name}
-                      </span>
+                    <div
+                      className={`relative p-2 rounded-full shrink-0 ${
+                        isActive ? "bg-blue-100" : "bg-gray-100"
+                      }`}
+                    >
+                      {getRoomIcon(room)}
                       {isUnread && (
-                        <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 rounded-full font-bold">
-                          New
-                        </span>
+                        <span className="absolute top-0 right-0 w-3 h-3 bg-blue-600 border-2 border-white rounded-full"></span>
                       )}
                     </div>
-                    {room.is_group &&
-                      room.name !== "General" &&
-                      room.name !== "Executive Board" && (
-                        <span className="text-[10px] text-blue-500 font-bold uppercase tracking-wider">
-                          Committee
+                    <div className="min-w-0 flex-1">
+                      <div className="flex justify-between items-center">
+                        <span
+                          className={`truncate block ${
+                            isUnread
+                              ? "font-black text-gray-900"
+                              : "font-semibold"
+                          }`}
+                        >
+                          {room.name}
                         </span>
-                      )}
-                  </div>
-                </button>
-              );
-            })
+                        {isUnread && (
+                          <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 rounded-full font-bold">
+                            New
+                          </span>
+                        )}
+                      </div>
+                      {room.is_group &&
+                        room.name !== "General" &&
+                        room.name !== "Executive Board" && (
+                          <span className="text-[10px] text-blue-500 font-bold uppercase tracking-wider">
+                            Committee
+                          </span>
+                        )}
+                    </div>
+                  </button>
+                );
+              })
           )}
         </div>
       </div>
 
       {/* CHAT AREA */}
       <div
-        className={`flex-1 flex flex-col bg-white ${
-          !activeRoom ? "hidden lg:flex" : "flex"
-        } h-full min-h-0 relative`}
+        className={`
+            flex flex-col bg-white
+            ${!activeRoom ? "hidden lg:flex" : "flex"}
+            fixed inset-0 z-[100]
+            lg:static lg:z-auto lg:flex-1 lg:h-full
+        `}
+        style={{
+          paddingTop: "env(safe-area-inset-top)",
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
       >
         {activeRoom ? (
           <>
             <div className="h-16 px-4 border-b border-gray-100 flex items-center justify-between bg-white shadow-sm z-20 shrink-0">
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => setActiveRoom(null)}
+                  onClick={closeRoom}
                   className="lg:hidden p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-full"
                 >
                   <ArrowLeft size={20} />
@@ -416,7 +516,7 @@ export default function MessagesPage() {
                       }`}
                     >
                       <div
-                        className={`flex gap-2 max-w-[85%] ${
+                        className={`flex gap-2 max-w-[85%] sm:max-w-[75%] ${
                           isMe ? "flex-row-reverse" : "flex-row"
                         }`}
                       >
@@ -429,21 +529,26 @@ export default function MessagesPage() {
                         )}
                         <div
                           onClick={() => toggleMessageTime(msg.id)}
-                          className={`cursor-pointer active:scale-[0.98] transition-transform shadow-sm overflow-hidden ${
-                            isMe
-                              ? "bg-blue-600 text-white rounded-2xl rounded-br-sm"
-                              : "bg-white border border-gray-100 text-gray-800 rounded-2xl rounded-bl-sm"
-                          }`}
+                          className="flex flex-col gap-1 min-w-0"
                         >
                           {msg.image_url && (
                             <img
                               src={msg.image_url}
                               alt="Attachment"
-                              className="w-full h-auto max-w-[240px] object-cover block border-b border-black/10"
+                              className="rounded-xl w-auto max-h-[320px] max-w-full object-cover border border-gray-100 shadow-sm cursor-pointer block"
                             />
                           )}
                           {msg.content && (
-                            <div className="px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words">
+                            <div
+                              className={`
+                                px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words
+                                ${
+                                  isMe
+                                    ? "bg-blue-600 text-white rounded-2xl rounded-tr-sm"
+                                    : "bg-white border border-gray-100 text-gray-800 rounded-2xl rounded-tl-sm shadow-sm"
+                                }
+                            `}
+                            >
                               {msg.content}
                             </div>
                           )}
@@ -483,50 +588,88 @@ export default function MessagesPage() {
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="p-3 bg-white border-t border-gray-100 shrink-0 lg:pb-3 pb-7">
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                accept="image/*"
-                onChange={handleFileUpload}
-              />
-              <form
-                onSubmit={handleSendMessage}
-                className="flex gap-2 items-center"
-              >
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  className="rounded-full text-gray-400 hover:text-blue-600 shrink-0"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
-                >
-                  {isUploading ? (
-                    <Loader2 className="animate-spin" size={20} />
-                  ) : (
-                    <Paperclip size={20} />
-                  )}
-                </Button>
-                <Input
-                  value={newMessage}
-                  onChange={(e) => {
-                    setNewMessage(e.target.value);
-                    handleTyping();
-                  }}
-                  placeholder="Type a message..."
-                  className="flex-1 rounded-full bg-gray-100 border-none h-10 px-4"
+            <div className="bg-white border-t border-gray-100 shrink-0 safe-area-bottom">
+              {previewUrl && (
+                <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-start justify-between animate-in slide-in-from-bottom-2">
+                  <div className="relative group">
+                    <img
+                      src={previewUrl}
+                      className="h-20 w-auto rounded-lg object-cover border border-gray-200 shadow-sm"
+                    />
+                    {isSending && (
+                      <div className="absolute inset-0 bg-black/30 rounded-lg flex items-center justify-center">
+                        <Loader2 className="w-6 h-6 text-white animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={clearPreview}
+                    disabled={isSending}
+                    className="p-1.5 bg-gray-200 hover:bg-gray-300 rounded-full text-gray-600 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              <div className="p-3">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleFileSelect}
                 />
-                <Button
-                  type="submit"
-                  size="icon"
-                  disabled={!newMessage.trim() && !isUploading}
-                  className="h-10 w-10 rounded-full bg-blue-600 hover:bg-blue-700 shadow-md shrink-0"
+                <form
+                  onSubmit={handleSendMessage}
+                  className="flex gap-2 items-center"
                 >
-                  <Send size={16} className="ml-0.5" />
-                </Button>
-              </form>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className={`rounded-full shrink-0 ${
+                      previewUrl
+                        ? "bg-blue-100 text-blue-600"
+                        : "text-gray-400 hover:text-blue-600"
+                    }`}
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isSending}
+                  >
+                    {previewUrl ? (
+                      <ImageIcon size={20} />
+                    ) : (
+                      <Paperclip size={20} />
+                    )}
+                  </Button>
+
+                  <Input
+                    value={newMessage}
+                    onChange={(e) => {
+                      setNewMessage(e.target.value);
+                      handleTyping();
+                    }}
+                    placeholder={
+                      previewUrl ? "Add a caption..." : "Type a message..."
+                    }
+                    className="flex-1 rounded-full bg-gray-100 border-none h-10 px-4"
+                    disabled={isSending}
+                  />
+
+                  <Button
+                    type="submit"
+                    size="icon"
+                    disabled={(!newMessage.trim() && !previewUrl) || isSending}
+                    className="h-10 w-10 rounded-full bg-blue-600 hover:bg-blue-700 shadow-md shrink-0"
+                  >
+                    {isSending ? (
+                      <Loader2 className="animate-spin" size={16} />
+                    ) : (
+                      <Send size={16} className="ml-0.5" />
+                    )}
+                  </Button>
+                </form>
+              </div>
             </div>
           </>
         ) : (
@@ -540,7 +683,7 @@ export default function MessagesPage() {
       </div>
 
       {isNewChatOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-xl flex flex-col max-h-[80vh]">
             <div className="p-4 border-b flex justify-between items-center">
               <h2 className="font-bold">New Direct Message</h2>
@@ -592,7 +735,8 @@ export default function MessagesPage() {
 
 function MessagesSkeleton() {
   return (
-    <div className="flex flex-col lg:flex-row h-full w-full bg-white lg:bg-gray-50 lg:rounded-2xl lg:border lg:border-gray-200 overflow-hidden shadow-sm">
+    // ✅ CHANGED: lg:h-full on skeleton too
+    <div className="flex flex-col lg:flex-row h-[calc(100dvh-4rem)] lg:h-full w-full bg-white lg:bg-gray-50 lg:rounded-2xl lg:border lg:border-gray-200 overflow-hidden shadow-sm">
       <div className="w-full lg:w-80 bg-white border-r border-gray-200 flex flex-col h-full">
         <div className="h-16 px-4 border-b border-gray-100 flex justify-between items-center">
           <Skeleton className="h-6 w-24 rounded-md" />

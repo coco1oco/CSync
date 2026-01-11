@@ -26,6 +26,7 @@ export interface ChallengeEntry {
 }
 
 // --- 1. FETCH ACTIVE CHALLENGE ---
+// --- 1. FETCH ACTIVE CHALLENGE ---
 export function useActiveChallenge() {
   return useQuery({
     queryKey: ["active-challenge"],
@@ -39,14 +40,16 @@ export function useActiveChallenge() {
         .gte("end_date", now)
         .order("end_date", { ascending: true })
         .limit(1)
-        .single();
+        .maybeSingle(); // <--- CHANGE THIS (was .single())
 
-      if (error && error.code !== "PGRST116") throw error;
+      // You can remove the specific error check if you want,
+      // as maybeSingle() doesn't throw on 0 rows.
+      if (error) throw error;
+
       return data as Challenge | null;
     },
   });
 }
-
 // --- 2. FETCH SPECIFIC CHALLENGE ---
 export function useChallengeById(id: string | undefined) {
   return useQuery({

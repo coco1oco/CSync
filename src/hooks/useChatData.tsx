@@ -206,22 +206,25 @@ export function useMarkRead() {
       roomId: string;
       userId: string;
     }) => {
-      // ✅ FIX: Reverted to 'update' to avoid RLS error.
-      // We only update if a record already exists.
-      const { error } = await supabase
-        .from("conversation_members")
-        .update({ last_read_at: new Date().toISOString() })
-        .eq("conversation_id", roomId)
-        .eq("user_id", userId);
+      // ✅ FIX: Use 'upsert' instead of 'update'.
+      // This ensures that if the user is viewing an Official Group (like General)
+      // for the first time, a membership row is created for them.
+      const { error } = await supabase.from("conversation_members").upsert(
+        {
+          conversation_id: roomId,
+          user_id: userId,
+          last_read_at: new Date().toISOString(),
+          role: "member", // Default role
+        },
+        { onConflict: "conversation_id,user_id" }
+      );
 
       if (error) {
-        console.warn(
-          "Failed to mark read (likely permission issue):",
-          error.message
-        );
+        console.warn("Failed to mark read:", error.message);
       }
     },
     onSuccess: () => {
+      // Refresh the room list to remove the bold text
       queryClient.invalidateQueries({ queryKey: ["chat-rooms"] });
     },
   });
