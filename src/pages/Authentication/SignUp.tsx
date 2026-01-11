@@ -89,10 +89,11 @@ export default function SignUp() {
         password: data.password,
         options: {
           data: {
-            username: data.username, // Passed to metadata for the SQL Trigger
+            username: data.username,
           },
-          // ✅ IMPORTANT: Redirect users back to your site after they click the link
-          emailRedirectTo: `${window.location.origin}/welcome`,
+          // ✅ UPDATE THIS LINE:
+          emailRedirectTo:
+            "https://stiffledly-bimaculate-candida.ngrok-free.dev/welcome",
         },
       });
 
