@@ -47,8 +47,7 @@ export default function SignIn() {
 
   const onSubmit = async (data: SignInFormValues) => {
     try {
-      // ✅ 1. SET PREFERENCE
-      // This tells our custom storage adapter where to save the NEW token
+      // 1. Set Preference
       setPersistencePreference(!!data.rememberMe);
 
       // 2. Attempt Login
@@ -61,30 +60,33 @@ export default function SignIn() {
       if (signInError) throw signInError;
 
       if (authData.user) {
-        // 3. Silent Status Check
+        // 3. Check for Ban/Delete Status
         const { data: profile } = await supabase
           .from("profiles")
           .select("banned_at, deleted_at")
           .eq("id", authData.user.id)
           .maybeSingle();
 
-        // 4. Update Audit Log
+        // 🛑 SECURITY CHECK: Kick them out if banned/deleted
+        // Your current code is missing this block!
+        if (profile?.banned_at || profile?.deleted_at) {
+          await supabase.auth.signOut(); // Force logout immediately
+          throw new Error("This account has been suspended or deleted.");
+        }
+
+        // 4. Update Audit Log (Only if allowed)
         await supabase
           .from("profiles")
           .update({ last_sign_in_at: new Date().toISOString() })
           .eq("id", authData.user.id);
 
-        // 5. Conditional Toast
-        if (!profile?.banned_at && !profile?.deleted_at) {
-          toast.success("Welcome back! 🐾");
-        }
+        toast.success("Welcome back! 🐾");
       }
     } catch (err: any) {
       console.error("Login error:", err);
       toast.error(err.message || "Invalid login credentials.");
     }
   };
-
   return (
     <div className="flex h-[100dvh] w-full bg-white overflow-hidden">
       {/* LEFT SIDE: Hero Image */}

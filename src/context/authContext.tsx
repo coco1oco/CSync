@@ -49,13 +49,15 @@ const getUserFromSession = (sessionUser: any): UserProfile => {
     email: sessionUser.email,
     avatar_url: meta.avatar_url || null,
     username: meta.username || sessionUser.email?.split("@")[0],
-    first_name: meta.full_name?.split(" ")[0] || meta.first_name,
-    last_name: meta.full_name?.split(" ")[1] || meta.last_name,
+    // ✅ FIX 1: Prioritize explicit fields over split logic
+    first_name: meta.first_name || meta.full_name?.split(" ")[0] || null,
+    last_name: meta.last_name || meta.full_name?.split(" ")[1] || null,
     pronouns: meta.pronouns,
     role: meta.role || "user",
+    bio: meta.bio || null,
+    contact_number: meta.contact_number || null,
   };
 };
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -171,7 +173,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       if (event === "SIGNED_IN" && session?.user) {
         const instantUser = getUserFromSession(session.user);
-        setUser(instantUser);
+
+        // ✅ FIX 2: PREVENT FLICKER / DOWNGRADE
+        // If we already have the full profile for this user, keep it!
+        // Don't overwrite it with the partial 'instantUser' while we wait for the DB.
+        setUser((prev) => {
+          if (prev && prev.id === instantUser.id) {
+            return prev;
+          }
+          return instantUser;
+        });
 
         const dbProfile = await fetchProfileSafe(session.user.id, session.user);
         if (mounted && dbProfile) {
@@ -183,7 +194,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setLoading(false);
       }
     });
-
     return () => {
       mounted = false;
       subscription?.unsubscribe();
