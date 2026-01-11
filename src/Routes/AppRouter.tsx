@@ -1,10 +1,9 @@
-import { lazy, Suspense, useMemo } from "react";
+import { lazy, Suspense } from "react";
 import {
   createBrowserRouter,
   RouterProvider,
   Navigate,
 } from "react-router-dom";
-// ❌ REMOVED: AuthProvider, ChatProvider, Toaster (Already in App.tsx)
 import { ProtectedRoute } from "./ProtectedRoute";
 import { PublicRoute } from "./PublicRoute";
 import AppLayout from "@/components/AppLayout";
@@ -24,9 +23,7 @@ const CreateOfficialEvent = lazy(
   () => import("@/pages/admin/CreateOfficialEvent")
 );
 const ManageEventsPage = lazy(() => import("@/pages/admin/ManageEventsPage"));
-const EditOfficialEvent = lazy(
-  () => import("@/pages/admin/EditOfficialEvent")
-);
+const EditOfficialEvent = lazy(() => import("@/pages/admin/EditOfficialEvent"));
 const MainPetProfilePage = lazy(
   () => import("@/pages/PetProfile/MainPetProfilePage")
 );
@@ -59,13 +56,15 @@ const NotificationsPage = lazy(() =>
   }))
 );
 const EventDetails = lazy(() => import("@/pages/SharedPages/EventDetails"));
-
 const SettingsPage = lazy(() => import("@/pages/MenuPage/SettingsPage"));
-
-const OfficialEventDetails = lazy(() => 
-  import("@/pages/SharedPages/OfficialEventDetails") 
+const OfficialEventDetails = lazy(
+  () => import("@/pages/SharedPages/OfficialEventDetails")
 );
 
+// ✅ NEW: Import Challenge Page
+const ChallengeDetailsPage = lazy(
+  () => import("@/pages/SharedPages/ChallengeDetailsPage")
+);
 
 // Loading Spinner
 const PageLoader = () => (
@@ -73,6 +72,8 @@ const PageLoader = () => (
     <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
   </div>
 );
+
+const CreateChallenge = lazy(() => import("@/pages/admin/CreateChallenge"));
 
 const router = createBrowserRouter([
   // 1. PUBLIC (QR CODES)
@@ -84,7 +85,6 @@ const router = createBrowserRouter([
       </Suspense>
     ),
   },
-  // ✅ FIX: Move Unauthorized OUT of PublicRoute
   {
     path: "/unauthorized",
     element: (
@@ -170,6 +170,16 @@ const router = createBrowserRouter([
         ),
       },
 
+      // ✅ NEW: Challenge Route
+      {
+        path: "/challenges/current",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <ChallengeDetailsPage />
+          </Suspense>
+        ),
+      },
+
       // Admin Events
       {
         path: "/admin/events/new-official",
@@ -181,8 +191,27 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
+      // ✅ NEW: Challenge Creation Route
       {
-        path: "/official-event/:id", 
+        path: "/admin/challenges/create",
+        element: (
+          <ProtectedRoute requiredRole="admin">
+            <Suspense fallback={<PageLoader />}>
+              <CreateChallenge />
+            </Suspense>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/challenges/view/:id",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <ChallengeDetailsPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/official-event/:id",
         element: (
           <Suspense fallback={<PageLoader />}>
             <OfficialEventDetails />
@@ -341,7 +370,6 @@ const router = createBrowserRouter([
           </Suspense>
         ),
       },
-      // 2. ADD THIS ROUTE BLOCK
       {
         path: "/settings",
         element: (
@@ -357,6 +385,5 @@ const router = createBrowserRouter([
 ]);
 
 export default function AppRouter() {
-  // ✅ CLEAN: No providers here. They are in App.tsx
   return <RouterProvider router={router} />;
 }
