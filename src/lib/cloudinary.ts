@@ -1,8 +1,13 @@
-// src/lib/cloudinary.ts
-
+// FIX: Added "challenges" to the allowed types
 export async function uploadImageToCloudinary(
   file: File,
-  presetType: "avatar" | "pet" | "chat" | "report" | "document" = "chat" // Added "document"
+  presetType:
+    | "avatar"
+    | "pet"
+    | "chat"
+    | "report"
+    | "document"
+    | "challenges" = "chat"
 ): Promise<string> {
   // 1. Validate file type
   if (!file.type.startsWith("image/")) {
@@ -22,7 +27,12 @@ export async function uploadImageToCloudinary(
   // We'll reuse the PETIMAGEURL for documents since they belong to the pet profile.
   let uploadPreset = import.meta.env.VITE_CLOUDINARY_AVATARURL;
 
-  if (presetType === "pet" || presetType === "document") {
+  // ✅ FIX: Map "challenges" to use the Pet Image Preset
+  if (
+    presetType === "pet" ||
+    presetType === "document" ||
+    presetType === "challenges"
+  ) {
     uploadPreset = import.meta.env.VITE_CLOUDINARY_PETIMAGEURL;
   } else if (presetType === "avatar") {
     uploadPreset = import.meta.env.VITE_CLOUDINARY_AVATARURL;

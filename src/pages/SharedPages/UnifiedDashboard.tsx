@@ -6,6 +6,7 @@ import { FeedPost } from "@/components/FeedPost";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UpcomingEventsWidget } from "@/components/UpcomingEventsWidget";
+import { ChallengeWidget } from "@/components/ChallengeWidget";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,17 +19,22 @@ import {
   Plus,
   Calendar,
   Stethoscope,
-  BarChart3,
-  Users,
-  FileText,
   X,
   PenSquare,
   ChevronDown,
   Settings,
+  Trophy,
 } from "lucide-react";
-import { formatDistanceToNow, isPast, addDays, isBefore } from "date-fns";
+import {
+  formatDistanceToNow,
+  isPast,
+  addDays,
+  isBefore,
+  format,
+} from "date-fns";
 import type { OutreachEvent } from "@/types";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
+import { useAdminChallenges } from "@/hooks/useChallenges";
 
 // --- TYPES ---
 type HealthAlert = {
@@ -37,12 +43,6 @@ type HealthAlert = {
   next_due_date: string;
   pet_id: string;
   pets: { name: string; petimage_url: string | null };
-};
-
-type AdminStats = {
-  totalPosts: number;
-  myPosts: number;
-  totalMembers: number;
 };
 
 export function UnifiedDashboard() {
@@ -54,13 +54,11 @@ export function UnifiedDashboard() {
   const [events, setEvents] = useState<OutreachEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Admin Data: Fetch all challenges (Past, Present, Future)
+  const { data: adminChallenges } = useAdminChallenges();
+
   // Feature Specific State
   const [alerts, setAlerts] = useState<HealthAlert[]>([]);
-  const [stats, setStats] = useState<AdminStats>({
-    totalPosts: 0,
-    myPosts: 0,
-    totalMembers: 0,
-  });
 
   // Filters
   const [filterMode, setFilterMode] = useState<"all" | "mine">("all");
@@ -88,10 +86,10 @@ export function UnifiedDashboard() {
       const { data: eventsData, error: eventsError } = await query;
       if (eventsError) throw eventsError;
 
-      // ✅ 2. ENHANCE EVENTS: Fetch accurate counts & user status for each event
+      // 2. Enhance Events
       const eventsWithDetails = await Promise.all(
         (eventsData as OutreachEvent[]).map(async (event) => {
-          // A. Get "Going" Count (Approved + Checked In only)
+          // A. Get "Going" Count
           const { count } = await supabase
             .from("event_registrations")
             .select("id", { count: "exact", head: true })
@@ -108,7 +106,7 @@ export function UnifiedDashboard() {
 
           return {
             ...event,
-            current_attendees: count || 0, // Pass accurate count to card
+            current_attendees: count || 0,
             is_registered: !!myReg,
             registration_status: myReg?.status,
           };
@@ -117,27 +115,8 @@ export function UnifiedDashboard() {
 
       setEvents(eventsWithDetails);
 
-      // 3. Parallel Data Fetching (Stats or Alerts)
-      if (isAdmin) {
-        const [postsCount, myCount, usersCount] = await Promise.all([
-          supabase
-            .from("outreach_events")
-            .select("id", { count: "exact", head: true }),
-          supabase
-            .from("outreach_events")
-            .select("id", { count: "exact", head: true })
-            .eq("admin_id", user?.id),
-          supabase
-            .from("profiles")
-            .select("id", { count: "exact", head: true }),
-        ]);
-        setStats({
-          totalPosts: postsCount.count || 0,
-          myPosts: myCount.count || 0,
-          totalMembers: usersCount.count || 0,
-        });
-      } else {
-        // User Logic: Fetch Pet Alerts
+      // 3. User Logic: Fetch Pet Alerts
+      if (!isAdmin) {
         const { data: vaxData } = await supabase
           .from("vaccinations")
           .select(
@@ -166,23 +145,18 @@ export function UnifiedDashboard() {
 
   const handleDelete = async () => {
     if (!deleteEventId) return;
-    const { error } = await supabase
+    const response = await supabase
       .from("outreach_events")
       .delete()
       .eq("id", deleteEventId);
-    if (!error) {
+    if (!response.error) {
       setEvents((prev) => prev.filter((e) => e.id !== deleteEventId));
       setDeleteEventId(null);
-      if (isAdmin)
-        setStats((prev) => ({
-          ...prev,
-          totalPosts: prev.totalPosts - 1,
-          myPosts: prev.myPosts - 1,
-        }));
+    } else {
+      toast.error("Failed to delete event");
     }
   };
 
-  // ✅ Handle Hide/Unhide Logic
   const handleHide = async (eventId: string, currentStatus: boolean) => {
     // 1. Optimistic Update
     setEvents((prev) =>
@@ -192,13 +166,13 @@ export function UnifiedDashboard() {
     );
 
     // 2. Database Update
-    const { error } = await supabase
+    const response = await supabase
       .from("outreach_events")
       .update({ is_hidden: !currentStatus })
       .eq("id", eventId);
 
-    if (error) {
-      console.error(error);
+    if (response.error) {
+      console.error(response.error);
       toast.error("Failed to update visibility");
       fetchData(); // Revert
     } else {
@@ -220,21 +194,6 @@ export function UnifiedDashboard() {
         <Skeleton className="h-3 w-24 rounded" />
       </div>
       <Skeleton className="h-8 w-24 rounded-full" />
-    </div>
-  );
-
-  const renderStatsSkeleton = () => (
-    <div className="grid grid-cols-3 gap-3">
-      {[1, 2, 3].map((i) => (
-        <div
-          key={i}
-          className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex flex-col items-center"
-        >
-          <Skeleton className="w-8 h-8 rounded-full mb-2" />
-          <Skeleton className="w-8 h-5 mb-1" />
-          <Skeleton className="w-12 h-3" />
-        </div>
-      ))}
     </div>
   );
 
@@ -376,6 +335,21 @@ export function UnifiedDashboard() {
                     </div>
                   </DropdownMenuItem>
 
+                  <DropdownMenuItem
+                    onClick={() => navigate("/admin/challenges/create")}
+                    className="gap-2 cursor-pointer"
+                  >
+                    <div className="p-1 bg-indigo-100 text-indigo-600 rounded-md">
+                      <Trophy className="w-4 h-4" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-bold text-xs">Challenge</span>
+                      <span className="text-[10px] text-gray-500">
+                        Start new game
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+
                   <DropdownMenuSeparator className="bg-gray-100 my-1" />
 
                   <DropdownMenuItem
@@ -394,52 +368,75 @@ export function UnifiedDashboard() {
         )}
       </div>
 
-      {/* --- WIDGET AREA (Stats & Alerts) --- */}
+      {/* --- WIDGET AREA --- */}
       <div className="px-4 mt-4 space-y-4">
         {loading ? (
           <>
-            {isAdmin ? renderStatsSkeleton() : renderAlertsSkeleton()}
+            {!isAdmin && renderAlertsSkeleton()}
             {renderUpcomingEventsSkeleton()}
           </>
         ) : (
           <>
+            {/* 👑 ADMIN WIDGETS */}
             {isAdmin ? (
-              /* 👑 ADMIN STATS GRID */
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex flex-col items-center text-center">
-                  <div className="p-2 bg-blue-50 text-blue-600 rounded-full mb-1">
-                    <FileText size={18} />
+              <>
+                {/* CHALLENGE HISTORY WIDGET */}
+                {adminChallenges && adminChallenges.length > 0 && (
+                  <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Trophy className="w-4 h-4 text-indigo-600" />
+                      <h3 className="font-bold text-gray-900 text-sm">
+                        Challenge History
+                      </h3>
+                    </div>
+
+                    {/* Scrollable list to prevent clutter */}
+                    <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+                      {adminChallenges.map((c) => {
+                        const isUpcoming = new Date(c.start_date) > new Date();
+                        const isEnded =
+                          !c.is_active || new Date() > new Date(c.end_date);
+                        const isActive = !isUpcoming && !isEnded;
+
+                        return (
+                          <div
+                            key={c.id}
+                            onClick={() => navigate(`/challenges/view/${c.id}`)}
+                            className="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 cursor-pointer rounded-xl transition-colors group"
+                          >
+                            <div className="min-w-0">
+                              <span className="font-bold text-gray-900 text-sm block group-hover:text-indigo-600 transition-colors truncate">
+                                {c.theme}
+                              </span>
+                              <span className="text-gray-500 text-xs">
+                                {format(new Date(c.end_date), "MMM d")}
+                              </span>
+                            </div>
+
+                            <div className="shrink-0 ml-2">
+                              {isActive && (
+                                <span className="px-2 py-1 bg-green-100 text-green-700 text-[10px] font-bold rounded-lg whitespace-nowrap">
+                                  Active
+                                </span>
+                              )}
+                              {isUpcoming && (
+                                <span className="px-2 py-1 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-lg whitespace-nowrap">
+                                  Upcoming
+                                </span>
+                              )}
+                              {isEnded && (
+                                <span className="px-2 py-1 bg-gray-200 text-gray-600 text-[10px] font-bold rounded-lg whitespace-nowrap">
+                                  Ended
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <span className="text-xl font-bold text-gray-900">
-                    {stats.totalPosts}
-                  </span>
-                  <span className="text-[10px] text-gray-400 uppercase font-bold">
-                    Total Posts
-                  </span>
-                </div>
-                <div className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex flex-col items-center text-center">
-                  <div className="p-2 bg-purple-50 text-purple-600 rounded-full mb-1">
-                    <BarChart3 size={18} />
-                  </div>
-                  <span className="text-xl font-bold text-gray-900">
-                    {stats.myPosts}
-                  </span>
-                  <span className="text-[10px] text-gray-400 uppercase font-bold">
-                    My Posts
-                  </span>
-                </div>
-                <div className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex flex-col items-center text-center">
-                  <div className="p-2 bg-green-50 text-green-600 rounded-full mb-1">
-                    <Users size={18} />
-                  </div>
-                  <span className="text-xl font-bold text-gray-900">
-                    {stats.totalMembers}
-                  </span>
-                  <span className="text-[10px] text-gray-400 uppercase font-bold">
-                    Members
-                  </span>
-                </div>
-              </div>
+                )}
+              </>
             ) : /* 🐾 USER ALERTS */
             alerts.length > 0 ? (
               <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide snap-x">
@@ -486,7 +483,10 @@ export function UnifiedDashboard() {
               </div>
             )}
 
-            {/* WIDGET */}
+            {/* ✅ Challenge Widget (Everyone sees the active one) */}
+            <ChallengeWidget />
+
+            {/* Existing Widget */}
             <UpcomingEventsWidget />
           </>
         )}
@@ -576,7 +576,7 @@ export function UnifiedDashboard() {
 
       {/* Delete Modal */}
       {deleteEventId && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+        <div className="fixed inset-0 z-100 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl">
             <h2 className="text-lg font-bold text-gray-900 mb-2">
               Delete Post?
