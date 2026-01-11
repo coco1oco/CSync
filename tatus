@@ -1,0 +1,80 @@
+[33m83a9d50[m[33m ([m[1;36mHEAD[m[33m, [m[1;31morigin/PawPal[m[33m, [m[1;32mPawPal[m[33m)[m idk
+[33m5c916a2[m auth refinement and tanstack wrap dashboard
+[33m31653f3[m temporary messaging
+[33m78ee5ca[m Full  feature weekly challenge, awaiting polish
+[33m38cd8bb[m Feature unpolished
+[33m78061a2[m Commit before Weekly Challenge integration
+[33madc10c0[m[33m ([m[1;31morigin/prototype[m[33m, [m[1;32mprototype[m[33m)[m Merge origin/PawPal into feature/pawpal_before2ndmerge
+[33m538a3b3[m Final features of Pet Dashboard
+[33m5f6cddb[m[33m ([m[1;31morigin/feature/pawpal_before2ndmerge[m[33m)[m Official Event Logic- UI not final
+[33m5610800[m Removed the sign out button for mobile in profile page, redesign the manage team for mobile, added a logo to the install pwa pop up
+[33mcf27742[m[33m ([m[1;32mbackup-detached[m[33m)[m Polished Pet Dashboard
+[33m7ba7483[m Commit test
+[33mb4459f3[m Merge Check
+[33m668236a[m Merge remote-tracking branch 'origin/feature/pawpal_before2ndmerge' into HEAD
+[33m9d23a3d[m[33m ([m[1;31morigin/PawPal_merge[m[33m, [m[1;32mPawPal_merge[m[33m)[m Rebuild Pet Dashboard
+[33mb2f6eb7[m All of my changes before merging
+[33m152c2a8[m All of my changes before merging
+[33m2075825[m Manage Team Done
+[33m0757679[m Manage Team fix
+[33mb257de1[m Work on FeedPost and EventCard  on PawPal_merge
+[33mcf7f5d9[m ngrok temporary
+[33mc9c8bdb[m saving FeedPost changes
+[33m58cefd3[m fix merge conflict
+[33m56781f4[m Merge
+[33mf2d02dc[m[33m ([m[1;31morigin/PawPal-v0.2[m[33m)[m Feed post, comments, likes comments, notifications, and event detail
+[33me5d2b1a[m Create Events Progress
+[33ma19b517[m Improving message, added picture sending
+[33ma468fc4[m Feed post, comments, likes comments and edit delete of comment
+[33m0a98630[m Notification working no grouping
+[33m8a267d9[m Notification configurtion
+[33md75a583[m[33m ([m[1;31morigin/PawPal-v0.1[m[33m)[m Build fixes
+[33m858142a[m pet not found fix
+[33m41f9599[m UI improvements and messaging
+[33m040f13e[m try state
+[33md2a2287[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m Chat updates
+[33m55ebad9[m latest
+[33m559e3d6[m Add typing feat
+[33mef0741e[m Working Chat
+[33m4dd7cf8[m Messages
+[33m325d5d5[m Manage Team feature
+[33mcb01685[m Optimization
+[33me531d1a[m Dummy Pages
+[33m14b7fc6[m Added UI transitions
+[33m3c4e495[m Polishing of home page
+[33m5facd8b[m commit before breaking things
+[33mbde8b82[m Added profile picture beside the comment message
+[33mfa20ea5[m Added like and comment functionality
+[33m4f09306[m resize ui fix
+[33m59f91b8[m start
+[33m1b88fe6[m[33m ([m[1;31morigin/LOGIN80%[m[33m)[m latest pet profile, profile page and newsfeed
+[33m24c8acd[m latest
+[33ma50ba15[m[33m ([m[1;32mLOGIN80%[m[33m)[m Pet Profile Page
+[33m5fa3cfa[m[33m ([m[1;31morigin/merge-attempt[m[33m, [m[1;32mmirafelix[m[33m, [m[1;32mmerge-attempt[m[33m)[m News feed
+[33med13191[m Edit Profile Page bug fixes
+[33m756690b[m Fixed Mobile header added profile functionality
+[33m2371bfe[m Merge mirafelix into LOGIN80%
+[33m12a4d55[m Latest
+[33mc9cdc02[m Fix bug on unauthorized access & Desktop UI
+[33m8b2a186[m Merge branch 'mirafelix' into LOGIN80%
+[33mc885a78[m lastest index, InstallPWA, and Bottom Navigation
+[33md19ff78[m Polishing desktop and mobile UI
+[33mecae37f[m Pushing to main
+[33m39ee203[m Normalize filename casing for InstallPWA
+[33me7ff4af[m Normalize casing: InstallPWA.tsx
+[33m5cd8a18[m Fix App.tsx and InstallPWA.tsx
+[33mb85a462[m merge log in
+[33m0636712[m AuthenticationMerge
+[33m8c6f012[m Latest dec 1 5 p.m
+[33m7b0385b[m Newsfeed profile page and petprofile progress
+[33m88bb432[m Will proceed on DAshboards
+[33mded3701[m second commint
+[33m144f39b[m first commit
+[33m71d2bbc[m Initial commit
+[33md54d779[m First Commit
+[33m23d346a[m First Commit for pawpals
+[33mab80612[m Initial commit
+[33m9269a24[m Update README.md
+[33m74b8814[m Update README.md
+[33m68802e2[m Update README.md
+[33mfac87ca[m Initial commit
