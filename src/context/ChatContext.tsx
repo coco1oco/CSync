@@ -23,10 +23,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   const refreshUnreadCount = async () => {
     if (!user) return;
 
-    // ✅ LOGIC FIX: Only count messages where YOU are a member,
-    // it is NOT read, and you are NOT the sender.
-
-    // 1. Get all conversations you are part of
+    // 1. Get all conversations you are explicitly part of
     const { data: myConvs } = await supabase
       .from("conversation_members")
       .select("conversation_id, last_read_at")
@@ -41,13 +38,19 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
     let totalUnread = 0;
 
     for (const conv of myConvs) {
-      const { count } = await supabase
+      // Build query: Count messages in this room...
+      let query = supabase
         .from("messages")
         .select("*", { count: "exact", head: true })
         .eq("conversation_id", conv.conversation_id)
-        .gt("created_at", conv.last_read_at) // Newer than last read
-        .neq("sender_id", user.id); // ✅ IGNORE YOUR OWN MESSAGES
+        .neq("sender_id", user.id); // ...that YOU didn't send
 
+      // ...and are newer than your last read time (if it exists)
+      if (conv.last_read_at) {
+        query = query.gt("created_at", conv.last_read_at);
+      }
+
+      const { count } = await query;
       totalUnread += count || 0;
     }
 
@@ -57,9 +60,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     if (!user) return;
 
+    // Initial fetch
     refreshUnreadCount();
 
-    // ✅ REALTIME FIX: Don't increment if YOU sent the message
+    // ✅ REALTIME FIX: Recalculate instead of incrementing to avoid ghost numbers
     const channel = supabase
       .channel("global-chat-count")
       .on(
@@ -73,7 +77,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
           // If WE sent it, ignore.
           if (payload.new.sender_id === user.id) return;
 
-          // Check if this message belongs to one of our conversations
+          // Only refresh if this message belongs to a conversation we are in
           const { data: isMember } = await supabase
             .from("conversation_members")
             .select("conversation_id")
@@ -82,7 +86,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
             .maybeSingle();
 
           if (isMember) {
-            setUnreadCount((prev) => prev + 1);
+            refreshUnreadCount();
           }
         }
       )
