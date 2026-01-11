@@ -35,6 +35,8 @@ import {
 import type { OutreachEvent } from "@/types";
 import { toast } from "sonner";
 import { useAdminChallenges } from "@/hooks/useChallenges";
+// ✅ NEW: Import Hook
+import { useFeedEvents, useEventMutations } from "@/hooks/useFeedEvents";
 
 // --- TYPES ---
 type HealthAlert = {
@@ -51,78 +53,41 @@ export function UnifiedDashboard() {
   const isAdmin = (user as any)?.role === "admin";
 
   // State
-  const [events, setEvents] = useState<OutreachEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Admin Data: Fetch all challenges (Past, Present, Future)
-  const { data: adminChallenges } = useAdminChallenges();
-
-  // Feature Specific State
-  const [alerts, setAlerts] = useState<HealthAlert[]>([]);
-
-  // Filters
   const [filterMode, setFilterMode] = useState<"all" | "mine">("all");
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
 
+  // ✅ 1. FETCH FEED (Replaced manual fetch with Hook)
+  // This handles caching, loading states, and filtering automatically
+  const {
+    data: events = [],
+    isLoading: isFeedLoading,
+    refetch,
+  } = useFeedEvents(user?.id, filterMode, isAdmin);
+
+  // ✅ 2. MUTATIONS (Replaced manual delete/hide)
+  const { deleteEvent, toggleVisibility } = useEventMutations();
+
+  // Admin Data: Challenges
+  const { data: adminChallenges } = useAdminChallenges();
+
+  // Feature Specific State: Alerts (Manual fetch for non-admins)
+  const [alerts, setAlerts] = useState<HealthAlert[]>([]);
+  const [isAlertsLoading, setIsAlertsLoading] = useState(false);
+
+  // 3. FETCH ALERTS (Only for regular users)
   useEffect(() => {
-    if (user) fetchData();
-  }, [user?.id, filterMode]);
+    if (!user || isAdmin) return;
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      // 1. Base Query: Fetch Events (Feed)
-      let query = supabase
-        .from("outreach_events")
-        .select("*, admin:profiles(id, username, avatar_url)")
-        .eq("is_hidden", false) // Hides events marked as hidden
-        .order("created_at", { ascending: false });
-
-      if (isAdmin && filterMode === "mine") {
-        query = query.eq("admin_id", user?.id);
-      }
-
-      const { data: eventsData, error: eventsError } = await query;
-      if (eventsError) throw eventsError;
-
-      // 2. Enhance Events
-      const eventsWithDetails = await Promise.all(
-        (eventsData as OutreachEvent[]).map(async (event) => {
-          // A. Get "Going" Count
-          const { count } = await supabase
-            .from("event_registrations")
-            .select("id", { count: "exact", head: true })
-            .eq("event_id", event.id)
-            .in("status", ["approved", "checked_in"]);
-
-          // B. Get Current User's Status
-          const { data: myReg } = await supabase
-            .from("event_registrations")
-            .select("status")
-            .eq("event_id", event.id)
-            .eq("user_id", user?.id)
-            .maybeSingle();
-
-          return {
-            ...event,
-            current_attendees: count || 0,
-            is_registered: !!myReg,
-            registration_status: myReg?.status,
-          };
-        })
-      );
-
-      setEvents(eventsWithDetails);
-
-      // 3. User Logic: Fetch Pet Alerts
-      if (!isAdmin) {
+    const fetchAlerts = async () => {
+      setIsAlertsLoading(true);
+      try {
         const { data: vaxData } = await supabase
           .from("vaccinations")
           .select(
             `id, vaccine_name, next_due_date, pet_id, pets (name, petimage_url)`
           )
-          .eq("owner_id", user?.id)
+          .eq("owner_id", user.id)
           .neq("status", "completed")
           .order("next_due_date", { ascending: true });
 
@@ -134,49 +99,41 @@ export function UnifiedDashboard() {
             isBefore(new Date(a.next_due_date), cutoff)
         );
         setAlerts(urgent);
+      } catch (err) {
+        console.error("Failed to load alerts", err);
+      } finally {
+        setIsAlertsLoading(false);
       }
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to load dashboard data");
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    fetchAlerts();
+  }, [user?.id, isAdmin]);
+
+  // Combined Loading State
+  const loading = isFeedLoading || (isAdmin ? false : isAlertsLoading);
+
+  // --- ACTIONS ---
 
   const handleDelete = async () => {
     if (!deleteEventId) return;
-    const response = await supabase
-      .from("outreach_events")
-      .delete()
-      .eq("id", deleteEventId);
-    if (!response.error) {
-      setEvents((prev) => prev.filter((e) => e.id !== deleteEventId));
+    try {
+      await deleteEvent.mutateAsync(deleteEventId);
+      toast.success("Post deleted");
       setDeleteEventId(null);
-    } else {
-      toast.error("Failed to delete event");
+    } catch (err) {
+      toast.error("Failed to delete post");
     }
   };
 
   const handleHide = async (eventId: string, currentStatus: boolean) => {
-    // 1. Optimistic Update
-    setEvents((prev) =>
-      prev.map((e) =>
-        e.id === eventId ? { ...e, is_hidden: !currentStatus } : e
-      )
-    );
-
-    // 2. Database Update
-    const response = await supabase
-      .from("outreach_events")
-      .update({ is_hidden: !currentStatus })
-      .eq("id", eventId);
-
-    if (response.error) {
-      console.error(response.error);
-      toast.error("Failed to update visibility");
-      fetchData(); // Revert
-    } else {
+    try {
+      await toggleVisibility.mutateAsync({
+        id: eventId,
+        isHidden: currentStatus,
+      });
       toast.success(currentStatus ? "Event is now visible" : "Event hidden");
+    } catch (err) {
+      toast.error("Failed to update visibility");
     }
   };
 
@@ -552,7 +509,7 @@ export function UnifiedDashboard() {
           filteredEvents.map((event) => (
             <FeedPost
               key={event.id}
-              event={event}
+              event={event as any} // ✅ Cast to avoid strict TS type mismatch with Hook type
               isAdmin={isAdmin}
               onHide={() => handleHide(event.id, event.is_hidden || false)}
               isHidden={event.is_hidden}
@@ -569,6 +526,8 @@ export function UnifiedDashboard() {
                 setActiveTag(tag);
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }}
+              // ✅ NEW: Refresh feed after internal changes (like unregistering)
+              onRefresh={refetch}
             />
           ))
         )}
