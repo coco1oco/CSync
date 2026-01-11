@@ -36,7 +36,7 @@ const AuthContext = createContext<AuthContextProps>({
   refreshProfile: async () => {},
   updatePassword: async (currentPassword: string, newPassword: string) => {},
 
-// ...existing code...
+  // ...existing code...
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -97,9 +97,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           db.username !== meta.username ||
           db.first_name !== meta.first_name ||
           db.contact_number !== meta.contact_number ||
+          // ✅ ADD THIS LINE:
+          db.bio !== meta.bio ||
           db.banned_at !== meta.banned_at ||
           db.deleted_at !== meta.deleted_at;
-
         if (needsSync) {
           console.log("♻️ Syncing full profile to session cache...");
           await supabase.auth.updateUser({
@@ -227,7 +228,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       throw new Error(error.message || "Failed to change password");
     }
   };
-
 
   const refreshProfile = async () => {
     const {
