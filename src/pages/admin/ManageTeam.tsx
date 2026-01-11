@@ -1,10 +1,9 @@
 import { useEffect, useState, useMemo } from "react";
-import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAuth } from "@/context/authContext"; // ✅ Added Import
+import { useAuth } from "@/context/authContext";
 import {
   Search,
   UserCog,
@@ -18,16 +17,14 @@ import {
   AlertTriangle,
   CheckCircle2,
   MoreHorizontal,
-  Info, // ✅ Added Info Icon
-  MessageCircle, // ✅ Added Message Icon
+  MessageCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useTeamMembers, useAdminMutations } from "@/hooks/useAdminData";
 
-
-// ✅ SYSTEM ROLE (Strict DB Enum)
+// ✅ TYPES & CONSTANTS
 type SystemRole = "user" | "admin" | "member";
 
-// ✅ POSITIONS
 const OFFICIAL_POSITIONS = ["President", "Vice President", "Member"];
 
 const OFFICIAL_COMMITTEES = [
@@ -61,15 +58,16 @@ type FormData = {
 };
 
 export default function ManageTeam() {
-  const { user: currentUser } = useAuth(); // ✅ Get Current Admin
-  const [members, setMembers] = useState<Profile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+  const { user: currentUser } = useAuth();
 
+  // ✅ Hook Data
+  const { data: members = [], isLoading: loading } = useTeamMembers();
+  const { updateProfile } = useAdminMutations();
+
+  // State
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedMember, setSelectedMember] = useState<Profile | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [updating, setUpdating] = useState(false);
-
   const [confirmAction, setConfirmAction] = useState<"ban" | "delete" | null>(
     null
   );
@@ -81,49 +79,7 @@ export default function ManageTeam() {
     committee: "",
   });
 
-  useEffect(() => {
-    fetchMembers();
-  }, []);
-
-  const fetchMembers = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .is("deleted_at", null)
-        .order("first_name", { ascending: true });
-
-      if (error) throw error;
-      if (data) setMembers(data as Profile[]);
-    } catch (err) {
-      toast.error("Failed to load team members");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ✅ HELPER: Send Notification
-  const sendSystemNotification = async (
-    targetUserId: string,
-    title: string,
-    body: string
-  ) => {
-    if (!currentUser) return;
-
-    // We use 'message' type for system alerts based on your DB constraints
-    const { error } = await supabase.from("notifications").insert({
-      user_id: targetUserId,
-      from_user_id: currentUser.id,
-      type: "system",
-      title: title,
-      body: body,
-      is_unread: true,
-    });
-
-    if (error) console.error("Failed to send notification:", error);
-  };
-
+  // --- ACTIONS ---
   const handleEditClick = (member: Profile) => {
     setSelectedMember(member);
     setFormData({
@@ -147,83 +103,16 @@ export default function ManageTeam() {
 
   const handleUpdate = async () => {
     if (!selectedMember || !currentUser) return;
-    setUpdating(true);
+    setIsProcessingAction(true);
     try {
-      // 1. Update Database
-      const { error } = await supabase
-        .from("profiles")
-        .update({
+      await updateProfile.mutateAsync({
+        id: selectedMember.id,
+        updates: {
           role: formData.role,
           position: formData.position,
           committee: formData.committee || null,
-        })
-        .eq("id", selectedMember.id);
-
-      if (error) throw error;
-      // 2. ✅ Check & Send Notifications
-      const notificationsToSend = [];
-
-      // A. Admin Status Changed
-      if (selectedMember.role !== formData.role) {
-        if (formData.role === "admin") {
-          notificationsToSend.push(
-            sendSystemNotification(
-              selectedMember.id,
-              "Role Updated",
-              "You have been promoted to Admin."
-            )
-          );
-        } else if (selectedMember.role === "admin") {
-          notificationsToSend.push(
-            sendSystemNotification(
-              selectedMember.id,
-              "Role Updated",
-              "Your Admin privileges have been revoked."
-            )
-          );
-        }
-      }
-
-      // B. Position Changed
-      if (selectedMember.position !== formData.position && formData.position) {
-        notificationsToSend.push(
-          sendSystemNotification(
-            selectedMember.id,
-            "New Position",
-            `Your position is now: ${formData.position}.`
-          )
-        );
-      }
-
-      // C. Committee Changed
-      if (selectedMember.committee !== formData.committee) {
-        if (formData.committee) {
-          notificationsToSend.push(
-            sendSystemNotification(
-              selectedMember.id,
-              "Committee Assignment",
-              `You have been added to the ${formData.committee}.`
-            )
-          );
-        } else if (selectedMember.committee) {
-           notificationsToSend.push(
-            sendSystemNotification(
-              selectedMember.id,
-              "Committee Update",
-              `You have been removed from the ${selectedMember.committee}.`
-            )
-          );
-        }
-      }
-
-      await Promise.all(notificationsToSend);
-
-      // 3. Update Local State
-      setMembers((prev) =>
-        prev.map((m) =>
-          m.id === selectedMember.id ? { ...m, ...formData } : m
-        )
-      );
+        },
+      });
 
       toast.success(`Updated ${selectedMember.first_name}`);
       setIsDialogOpen(false);
@@ -231,7 +120,7 @@ export default function ManageTeam() {
       console.error(err);
       toast.error("Failed to update profile.");
     } finally {
-      setUpdating(false);
+      setIsProcessingAction(false);
     }
   };
 
@@ -240,47 +129,26 @@ export default function ManageTeam() {
     setIsProcessingAction(true);
 
     try {
-      if (confirmAction === "ban") {
-        const isBanned = !!selectedMember.banned_at;
-        const updates = {
-          banned_at: isBanned ? null : new Date().toISOString(),
-        };
+      const updates =
+        confirmAction === "ban"
+          ? {
+              banned_at: selectedMember.banned_at
+                ? null
+                : new Date().toISOString(),
+            }
+          : {
+              deleted_at: new Date().toISOString(),
+              banned_at: new Date().toISOString(),
+            };
 
-        const { error } = await supabase
-          .from("profiles")
-          .update(updates)
-          .eq("id", selectedMember.id);
+      await updateProfile.mutateAsync({
+        id: selectedMember.id,
+        updates,
+      });
 
-        if (error) throw error;
-
-        setMembers((prev) =>
-          prev.map((m) =>
-            m.id === selectedMember.id ? { ...m, ...updates } : m
-          )
-        );
-
-        toast.success(
-          isBanned
-            ? `${selectedMember.first_name} has been unbanned.`
-            : `${selectedMember.first_name} has been banned.`
-        );
-      } else if (confirmAction === "delete") {
-        const updates = {
-          deleted_at: new Date().toISOString(),
-          banned_at: new Date().toISOString(),
-        };
-
-        const { error } = await supabase
-          .from("profiles")
-          .update(updates)
-          .eq("id", selectedMember.id);
-
-        if (error) throw error;
-
-        setMembers((prev) => prev.filter((m) => m.id !== selectedMember.id));
-        toast.success("User account deleted successfully.");
-      }
-
+      toast.success(
+        confirmAction === "delete" ? "Account deleted" : "Status updated"
+      );
       setIsDialogOpen(false);
       setConfirmAction(null);
     } catch (err: any) {
@@ -291,6 +159,7 @@ export default function ManageTeam() {
     }
   };
 
+  // --- HELPERS ---
   const getBadgeStyles = (
     isBanned: boolean,
     role: string,
@@ -307,23 +176,28 @@ export default function ManageTeam() {
   };
 
   const stats = useMemo(() => {
-    const total = members.length;
-    const admins = members.filter((m) => m.role === "admin").length;
-    const banned = members.filter((m) => m.banned_at).length;
+    const safeMembers = Array.isArray(members) ? members : [];
+    const total = safeMembers.length;
+    const admins = safeMembers.filter((m: any) => m.role === "admin").length;
+    const banned = safeMembers.filter((m: any) => m.banned_at).length;
     const lastWeek = new Date();
     lastWeek.setDate(lastWeek.getDate() - 7);
-    const active = members.filter(
-      (m) => m.last_sign_in_at && new Date(m.last_sign_in_at) > lastWeek
+    const active = safeMembers.filter(
+      (m: any) => m.last_sign_in_at && new Date(m.last_sign_in_at) > lastWeek
     ).length;
     return { total, admins, active, banned };
   }, [members]);
 
-  const filteredMembers = members.filter((m) => {
-    const term = searchTerm.toLowerCase();
-    const fullName = `${m.first_name || ""} ${m.last_name || ""}`.toLowerCase();
-    const email = m.email?.toLowerCase() || "";
-    return fullName.includes(term) || email.includes(term);
-  });
+  const filteredMembers = (Array.isArray(members) ? members : []).filter(
+    (m: any) => {
+      const term = searchTerm.toLowerCase();
+      const fullName = `${m.first_name || ""} ${
+        m.last_name || ""
+      }`.toLowerCase();
+      const email = m.email?.toLowerCase() || "";
+      return fullName.includes(term) || email.includes(term);
+    }
+  );
 
   const getInitials = (first: string | null, last: string | null) => {
     const f = first ? first[0] : "";
@@ -396,74 +270,85 @@ export default function ManageTeam() {
 
       {/* === MOBILE LIST VIEW (Visible on small screens) === */}
       <div className="md:hidden space-y-3">
-        {filteredMembers.map((member) => {
-          const isBanned = !!member.banned_at;
-          const initials = getInitials(member.first_name, member.last_name);
-          const name = getDisplayName(
-            member.first_name,
-            member.last_name,
-            member.email
-          );
+        {filteredMembers.length === 0 ? (
+          // ✅ EMPTY STATE FOR MOBILE
+          <div className="flex flex-col items-center justify-center p-8 bg-white rounded-xl border border-dashed border-gray-300 text-center">
+            <User className="w-8 h-8 text-gray-300 mb-2" />
+            <p className="text-sm font-bold text-gray-500">No members found</p>
+            <p className="text-xs text-gray-400">Try adjusting your search</p>
+          </div>
+        ) : (
+          filteredMembers.map((member: any) => {
+            const isBanned = !!member.banned_at;
+            const initials = getInitials(member.first_name, member.last_name);
+            const name = getDisplayName(
+              member.first_name,
+              member.last_name,
+              member.email
+            );
 
-          return (
-            <div
-              key={member.id}
-              onClick={() => handleEditClick(member)}
-              className={`bg-white p-4 rounded-xl border border-gray-200 shadow-sm active:scale-[0.98] transition-transform flex items-center justify-between ${
-                isBanned ? "bg-red-50/50 border-red-100" : ""
-              }`}
-            >
-              <div className="flex items-center gap-3 overflow-hidden">
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
-                    isBanned
-                      ? "bg-red-100 text-red-600"
-                      : "bg-blue-100 text-blue-600"
-                  }`}
-                >
-                  {member.avatar_url ? (
-                    <img
-                      src={member.avatar_url}
-                      alt={initials}
-                      className="w-full h-full rounded-full object-cover"
-                    />
-                  ) : (
-                    initials
-                  )}
+            return (
+              <div
+                key={member.id}
+                onClick={() => handleEditClick(member)}
+                className={`bg-white p-4 rounded-xl border border-gray-200 shadow-sm active:scale-[0.98] transition-transform flex items-center justify-between ${
+                  isBanned ? "bg-red-50/50 border-red-100" : ""
+                }`}
+              >
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
+                      isBanned
+                        ? "bg-red-100 text-red-600"
+                        : "bg-blue-100 text-blue-600"
+                    }`}
+                  >
+                    {member.avatar_url ? (
+                      <img
+                        src={member.avatar_url}
+                        alt={initials}
+                        className="w-full h-full rounded-full object-cover"
+                      />
+                    ) : (
+                      initials
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h4
+                        className={`font-bold text-sm truncate ${
+                          isBanned
+                            ? "text-red-700 line-through"
+                            : "text-gray-900"
+                        }`}
+                      >
+                        {name}
+                      </h4>
+                      {isBanned && <Ban size={12} className="text-red-500" />}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-gray-500 truncate block max-w-[120px]">
+                        {member.email}
+                      </span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded border font-bold uppercase ${getBadgeStyles(
+                          isBanned,
+                          member.role,
+                          member.position || ""
+                        )}`}
+                      >
+                        {member.role === "admin" ? "Admin" : "Member"}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h4
-                      className={`font-bold text-sm truncate ${
-                        isBanned ? "text-red-700 line-through" : "text-gray-900"
-                      }`}
-                    >
-                      {name}
-                    </h4>
-                    {isBanned && <Ban size={12} className="text-red-500" />}
-                  </div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-gray-500 truncate block max-w-[120px]">
-                      {member.email}
-                    </span>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded border font-bold uppercase ${getBadgeStyles(
-                        isBanned,
-                        member.role,
-                        member.position || ""
-                      )}`}
-                    >
-                      {member.role === "admin" ? "Admin" : "Member"}
-                    </span>
-                  </div>
+                <div className="text-gray-300">
+                  <MoreHorizontal size={20} />
                 </div>
               </div>
-              <div className="text-gray-300">
-                <MoreHorizontal size={20} />
-              </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
 
       {/* === DESKTOP TABLE VIEW (Visible on medium+ screens) === */}
@@ -479,91 +364,106 @@ export default function ManageTeam() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredMembers.map((member) => {
-                const isBanned = !!member.banned_at;
-                return (
-                  <tr
-                    key={member.id}
-                    className={`hover:bg-gray-50/50 transition group ${
-                      isBanned ? "bg-red-50/30" : ""
-                    }`}
+              {filteredMembers.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="px-6 py-10 text-center text-gray-500"
                   >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden ${
-                      isBanned ? "bg-red-100 text-red-600" : "bg-blue-100 text-blue-600"
-                    }`}>
-                    {member.avatar_url ? (
-                      <img 
-                        src={member.avatar_url} 
-                        alt={member.username} 
-                        className="w-full h-full object-cover" 
-                      />
-                    ) : (
-                      getInitials(member.first_name, member.last_name)
-                    )}
-                  </div>
-                        <div>
+                    No team members found.
+                  </td>
+                </tr>
+              ) : (
+                filteredMembers.map((member: any) => {
+                  const isBanned = !!member.banned_at;
+                  return (
+                    <tr
+                      key={member.id}
+                      className={`hover:bg-gray-50/50 transition group ${
+                        isBanned ? "bg-red-50/30" : ""
+                      }`}
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
                           <div
-                            className={`font-bold ${
+                            className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden ${
                               isBanned
-                                ? "text-red-600 line-through"
-                                : "text-gray-900"
+                                ? "bg-red-100 text-red-600"
+                                : "bg-blue-100 text-blue-600"
                             }`}
-                          > 
-                            {getDisplayName(
-                              member.first_name,
-                              member.last_name,
-                              member.email
+                          >
+                            {member.avatar_url ? (
+                              <img
+                                src={member.avatar_url}
+                                alt={member.username}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              getInitials(member.first_name, member.last_name)
                             )}
                           </div>
-                          <div className="text-xs text-gray-500">
-                            {member.email}
+                          <div>
+                            <div
+                              className={`font-bold ${
+                                isBanned
+                                  ? "text-red-600 line-through"
+                                  : "text-gray-900"
+                              }`}
+                            >
+                              {getDisplayName(
+                                member.first_name,
+                                member.last_name,
+                                member.email
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {member.email}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${getBadgeStyles(
-                          isBanned,
-                          member.role,
-                          member.position || ""
-                        )}`}
-                      >
-                        {isBanned
-                          ? "Banned"
-                          : member.position || member.role.toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {isBanned ? (
-                        <div className="flex items-center gap-1.5 text-red-600 font-medium">
-                          <Ban className="w-4 h-4" /> Suspended
-                        </div>
-                      ) : member.role === "admin" ? (
-                        <div className="flex items-center gap-1.5 text-purple-600 font-medium">
-                          <ShieldCheck className="w-4 h-4" /> Admin
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 text-green-600 font-medium">
-                          <CheckCircle2 className="w-4 h-4" /> Active
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditClick(member)}
-                        className="hover:bg-gray-100 rounded-full"
-                      >
-                        <UserCog className="w-4 h-4 text-gray-400" />
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${getBadgeStyles(
+                            isBanned,
+                            member.role,
+                            member.position || ""
+                          )}`}
+                        >
+                          {isBanned
+                            ? "Banned"
+                            : member.position || member.role.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {isBanned ? (
+                          <div className="flex items-center gap-1.5 text-red-600 font-medium">
+                            <Ban className="w-4 h-4" /> Suspended
+                          </div>
+                        ) : member.role === "admin" ? (
+                          <div className="flex items-center gap-1.5 text-purple-600 font-medium">
+                            <ShieldCheck className="w-4 h-4" /> Admin
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 text-green-600 font-medium">
+                            <CheckCircle2 className="w-4 h-4" /> Active
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditClick(member)}
+                          className="hover:bg-gray-100 rounded-full"
+                        >
+                          <UserCog className="w-4 h-4 text-gray-400" />
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -593,15 +493,7 @@ export default function ManageTeam() {
                     : "Suspend User Account?"}
                 </h3>
 
-                <p className="text-sm text-gray-500 mb-6">
-                  {confirmAction === "delete"
-                    ? `Are you sure you want to delete ${selectedMember.first_name}? This action cannot be undone.`
-                    : !!selectedMember.banned_at
-                    ? `This will restore ${selectedMember.first_name}'s ability to log in.`
-                    : `This will immediately block ${selectedMember.first_name} from logging in.`}
-                </p>
-
-                <div className="flex gap-3 justify-center">
+                <div className="flex gap-3 justify-center mt-6">
                   <Button
                     variant="outline"
                     onClick={() => setConfirmAction(null)}
@@ -627,11 +519,7 @@ export default function ManageTeam() {
                     {isProcessingAction && (
                       <Loader2 className="w-4 h-4 animate-spin mr-2" />
                     )}
-                    {confirmAction === "delete"
-                      ? "Yes, Delete"
-                      : !!selectedMember.banned_at
-                      ? "Yes, Restore"
-                      : "Yes, Suspend"}
+                    Confirm
                   </Button>
                 </div>
               </div>
@@ -727,7 +615,6 @@ export default function ManageTeam() {
                         ))}
                       </select>
 
-                      {/* ✅ ADDED: UI Message about Group Chat */}
                       {formData.committee && (
                         <div className="flex items-start gap-2 p-3 bg-blue-50 text-blue-700 rounded-xl text-xs font-medium animate-in fade-in slide-in-from-top-1">
                           <MessageCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -766,11 +653,6 @@ export default function ManageTeam() {
                               ? "Restore Access"
                               : "Suspend Account"}
                           </span>
-                          <span className="text-[10px] opacity-80">
-                            {selectedMember.banned_at
-                              ? "User can log in again"
-                              : "User cannot log in"}
-                          </span>
                         </div>
                         <Ban className="w-5 h-5" />
                       </button>
@@ -782,9 +664,6 @@ export default function ManageTeam() {
                         <div className="text-left">
                           <span className="block font-bold text-sm">
                             Delete Account
-                          </span>
-                          <span className="text-[10px] opacity-80">
-                            Permanently remove data
                           </span>
                         </div>
                         <Trash2 className="w-5 h-5" />
@@ -803,10 +682,10 @@ export default function ManageTeam() {
                   </Button>
                   <Button
                     onClick={handleUpdate}
-                    disabled={updating}
+                    disabled={isProcessingAction}
                     className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-11"
                   >
-                    {updating ? (
+                    {isProcessingAction ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
                       "Save Changes"
@@ -832,8 +711,14 @@ function StatsCard({ icon, label, value, color }: any) {
   };
 
   return (
-    <div className={`bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4`}>
-      <div className={`w-12 h-12 rounded-full flex items-center justify-center ${colors[color as keyof typeof colors] || colors.blue}`}>
+    <div
+      className={`bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4`}
+    >
+      <div
+        className={`w-12 h-12 rounded-full flex items-center justify-center ${
+          colors[color as keyof typeof colors] || colors.blue
+        }`}
+      >
         {icon}
       </div>
       <div>
@@ -847,44 +732,40 @@ function StatsCard({ icon, label, value, color }: any) {
 function ManageTeamSkeleton() {
   return (
     <div className="space-y-6 pb-24 animate-in fade-in duration-500">
-      
-      {/* 1. Header Skeleton (Title + Search) */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div className="space-y-2">
-          <Skeleton className="h-8 w-48" /> {/* Title */}
-          <Skeleton className="h-4 w-64" /> {/* Subtitle */}
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-64" />
         </div>
-        <Skeleton className="h-11 w-full md:w-64 rounded-xl" /> {/* Search Input */}
+        <Skeleton className="h-11 w-full md:w-64 rounded-xl" />
       </div>
-
-      {/* 2. Stats Grid Skeleton (4 Cards) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-            <Skeleton className="w-12 h-12 rounded-full shrink-0" /> {/* Icon */}
+          <div
+            key={i}
+            className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4"
+          >
+            <Skeleton className="w-12 h-12 rounded-full shrink-0" />
             <div className="space-y-2 w-full">
-              <Skeleton className="h-3 w-20" /> {/* Label */}
-              <Skeleton className="h-6 w-12" /> {/* Number */}
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-6 w-12" />
             </div>
           </div>
         ))}
       </div>
-
-      {/* 3. Table Skeleton */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        {/* Table Header */}
         <div className="border-b border-gray-200 bg-gray-50 px-6 py-4 flex justify-between">
-           <Skeleton className="h-4 w-32" />
-           <Skeleton className="h-4 w-24 hidden md:block" />
-           <Skeleton className="h-4 w-32 hidden md:block" />
-           <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-4 w-24 hidden md:block" />
+          <Skeleton className="h-4 w-32 hidden md:block" />
+          <Skeleton className="h-4 w-16" />
         </div>
-        
-        {/* Table Rows */}
         <div className="divide-y divide-gray-100">
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="px-6 py-4 flex items-center justify-between">
-              {/* Name Column */}
+            <div
+              key={i}
+              className="px-6 py-4 flex items-center justify-between"
+            >
               <div className="flex items-center gap-3 w-full md:w-auto">
                 <Skeleton className="w-10 h-10 rounded-full shrink-0" />
                 <div className="space-y-2">
@@ -892,13 +773,9 @@ function ManageTeamSkeleton() {
                   <Skeleton className="h-3 w-40" />
                 </div>
               </div>
-
-              {/* Other Columns (Hidden on small screens for realism) */}
-              <Skeleton className="h-6 w-24 rounded-full hidden md:block" /> {/* Role Badge */}
-              <Skeleton className="h-4 w-24 hidden md:block" /> {/* Status */}
-              
-              {/* Action Button */}
-              <Skeleton className="w-8 h-8 rounded-full shrink-0" /> 
+              <Skeleton className="h-6 w-24 rounded-full hidden md:block" />
+              <Skeleton className="h-4 w-24 hidden md:block" />
+              <Skeleton className="w-8 h-8 rounded-full shrink-0" />
             </div>
           ))}
         </div>
@@ -906,4 +783,3 @@ function ManageTeamSkeleton() {
     </div>
   );
 }
-
