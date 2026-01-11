@@ -7,6 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UpcomingEventsWidget } from "@/components/UpcomingEventsWidget";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
   LayoutGrid,
   Plus,
   Calendar,
@@ -16,6 +23,8 @@ import {
   FileText,
   X,
   PenSquare,
+  ChevronDown,
+  Settings,
 } from "lucide-react";
 import { formatDistanceToNow, isPast, addDays, isBefore } from "date-fns";
 import type { OutreachEvent } from "@/types";
@@ -62,7 +71,7 @@ export function UnifiedDashboard() {
     if (user) fetchData();
   }, [user?.id, filterMode]);
 
- const fetchData = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
       // 1. Base Query: Fetch Events (Feed)
@@ -87,7 +96,7 @@ export function UnifiedDashboard() {
             .from("event_registrations")
             .select("id", { count: "exact", head: true })
             .eq("event_id", event.id)
-            .in("status", ["approved", "checked_in"]); // <--- THE FIX
+            .in("status", ["approved", "checked_in"]);
 
           // B. Get Current User's Status
           const { data: myReg } = await supabase
@@ -154,7 +163,7 @@ export function UnifiedDashboard() {
       setLoading(false);
     }
   };
-  
+
   const handleDelete = async () => {
     if (!deleteEventId) return;
     const { error } = await supabase
@@ -172,27 +181,30 @@ export function UnifiedDashboard() {
         }));
     }
   };
- // ✅ NEW: Handle Hide/Unhide Logic
-const handleHide = async (eventId: string, currentStatus: boolean) => {
-  // 1. Optimistic Update
-  setEvents((prev) => 
-    prev.map((e) => e.id === eventId ? { ...e, is_hidden: !currentStatus } : e)
-  );
 
-  // 2. Database Update
-  const { error } = await supabase
-    .from("outreach_events")
-    .update({ is_hidden: !currentStatus })
-    .eq("id", eventId);
+  // ✅ Handle Hide/Unhide Logic
+  const handleHide = async (eventId: string, currentStatus: boolean) => {
+    // 1. Optimistic Update
+    setEvents((prev) =>
+      prev.map((e) =>
+        e.id === eventId ? { ...e, is_hidden: !currentStatus } : e
+      )
+    );
 
-  if (error) {
-    console.error(error);
-    toast.error("Failed to update visibility");
-    fetchData(); // Revert
-  } else {
-    toast.success(currentStatus ? "Event is now visible" : "Event hidden");
-  }
-};
+    // 2. Database Update
+    const { error } = await supabase
+      .from("outreach_events")
+      .update({ is_hidden: !currentStatus })
+      .eq("id", eventId);
+
+    if (error) {
+      console.error(error);
+      toast.error("Failed to update visibility");
+      fetchData(); // Revert
+    } else {
+      toast.success(currentStatus ? "Event is now visible" : "Event hidden");
+    }
+  };
 
   const filteredEvents = activeTag
     ? events.filter((e) =>
@@ -246,35 +258,25 @@ const handleHide = async (eventId: string, currentStatus: boolean) => {
     </div>
   );
 
-  // ✅ NEW: Upcoming Events Skeleton (Reduced to 2 items)
   const renderUpcomingEventsSkeleton = () => (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden h-full">
-      {/* Header Skeleton */}
       <div className="p-4 border-b border-gray-50 flex items-center justify-between">
         <div className="h-5 w-28 bg-gray-100 rounded animate-pulse" />
       </div>
-      {/* List Items Skeleton */}
       <div className="divide-y divide-gray-50">
-        {[1, 2].map(
-          (
-            i // <--- CHANGED FROM [1,2,3] TO [1,2]
-          ) => (
-            <div key={i} className="p-3 flex gap-3 items-center">
-              {/* Date Box */}
-              <div className="shrink-0 w-12 h-12 bg-gray-100 rounded-lg animate-pulse" />
-              {/* Text Content */}
-              <div className="flex-1 flex flex-col justify-center gap-2">
-                <div className="h-3.5 w-3/4 bg-gray-100 rounded animate-pulse" />
-                <div className="flex gap-2">
-                  <div className="h-2.5 w-1/3 bg-gray-100 rounded animate-pulse" />
-                  <div className="h-2.5 w-10 bg-gray-100 rounded animate-pulse" />
-                </div>
+        {[1, 2].map((i) => (
+          <div key={i} className="p-3 flex gap-3 items-center">
+            <div className="shrink-0 w-12 h-12 bg-gray-100 rounded-lg animate-pulse" />
+            <div className="flex-1 flex flex-col justify-center gap-2">
+              <div className="h-3.5 w-3/4 bg-gray-100 rounded animate-pulse" />
+              <div className="flex gap-2">
+                <div className="h-2.5 w-1/3 bg-gray-100 rounded animate-pulse" />
+                <div className="h-2.5 w-10 bg-gray-100 rounded animate-pulse" />
               </div>
-              {/* Chevron */}
-              <div className="w-4 h-4 bg-gray-100 rounded animate-pulse shrink-0" />
             </div>
-          )
-        )}
+            <div className="w-4 h-4 bg-gray-100 rounded animate-pulse shrink-0" />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -332,30 +334,61 @@ const handleHide = async (eventId: string, currentStatus: boolean) => {
             )}
 
             {isAdmin && (
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  className="rounded-full h-8 text-xs gap-1 bg-purple-600 hover:bg-purple-700 text-white shadow-sm border border-purple-500/20"
-                  onClick={() => navigate("/admin/events/new-official")}
-                >
-                  <Calendar className="w-3 h-3" /> Event
-                </Button>
-                <Button
-                  size="sm"
-                  className="rounded-full h-8 text-xs gap-1 bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-                  onClick={() => navigate("/admin/events/create")}
-                >
-                  <PenSquare className="w-3 h-3" /> Post
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="rounded-full h-8 text-xs gap-1 border-gray-300 text-gray-700 hover:bg-gray-100"
-                  onClick={() => navigate("/admin/events/manage")}
-                >
-                  <Users className="w-3 h-3" /> Manage
-                </Button>
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    className="rounded-full h-8 text-xs gap-1.5 bg-gray-900 text-white hover:bg-gray-800 shadow-sm pr-3"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span className="font-bold">Create</span>
+                    <ChevronDown className="w-3 h-3 text-gray-400 ml-0.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48 p-1">
+                  <DropdownMenuItem
+                    onClick={() => navigate("/admin/events/new-official")}
+                    className="gap-2 cursor-pointer"
+                  >
+                    <div className="p-1 bg-purple-100 text-purple-600 rounded-md">
+                      <Calendar className="w-4 h-4" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-bold text-xs">Official Event</span>
+                      <span className="text-[10px] text-gray-500">
+                        Calendar & Signups
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem
+                    onClick={() => navigate("/admin/events/create")}
+                    className="gap-2 cursor-pointer"
+                  >
+                    <div className="p-1 bg-blue-100 text-blue-600 rounded-md">
+                      <PenSquare className="w-4 h-4" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-bold text-xs">Community Post</span>
+                      <span className="text-[10px] text-gray-500">
+                        Feed Update
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator className="bg-gray-100 my-1" />
+
+                  <DropdownMenuItem
+                    onClick={() => navigate("/admin/events/manage")}
+                    className="gap-2 cursor-pointer"
+                  >
+                    <div className="p-1 bg-gray-100 text-gray-600 rounded-md">
+                      <Settings className="w-4 h-4" />
+                    </div>
+                    <span className="font-bold text-xs">Manage Guests</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </>
         )}
@@ -521,9 +554,8 @@ const handleHide = async (eventId: string, currentStatus: boolean) => {
               key={event.id}
               event={event}
               isAdmin={isAdmin}
-              // ✅ ADD THESE TWO LINES:
-                onHide={() => handleHide(event.id, event.is_hidden || false)}
-                isHidden={event.is_hidden}
+              onHide={() => handleHide(event.id, event.is_hidden || false)}
+              isHidden={event.is_hidden}
               onEdit={() => {
                 const officialTypes = ["official", "pet", "member", "campus"];
                 if (officialTypes.includes(event.event_type || "")) {
