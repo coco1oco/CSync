@@ -23,38 +23,16 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   const refreshUnreadCount = async () => {
     if (!user) return;
 
-    // 1. Get all conversations you are explicitly part of
-    const { data: myConvs } = await supabase
-      .from("conversation_members")
-      .select("conversation_id, last_read_at")
-      .eq("user_id", user.id);
+    // ✅ NEW: Call the optimized SQL function instead of looping in JS
+    const { data, error } = await supabase.rpc("get_total_unread_count", {
+      target_user_id: user.id,
+    });
 
-    if (!myConvs || myConvs.length === 0) {
-      setUnreadCount(0);
-      return;
+    if (error) {
+      console.error("Error fetching unread count:", error);
+    } else {
+      setUnreadCount(data || 0);
     }
-
-    // 2. Count unread messages in those conversations
-    let totalUnread = 0;
-
-    for (const conv of myConvs) {
-      // Build query: Count messages in this room...
-      let query = supabase
-        .from("messages")
-        .select("*", { count: "exact", head: true })
-        .eq("conversation_id", conv.conversation_id)
-        .neq("sender_id", user.id); // ...that YOU didn't send
-
-      // ...and are newer than your last read time (if it exists)
-      if (conv.last_read_at) {
-        query = query.gt("created_at", conv.last_read_at);
-      }
-
-      const { count } = await query;
-      totalUnread += count || 0;
-    }
-
-    setUnreadCount(totalUnread);
   };
 
   useEffect(() => {
@@ -63,7 +41,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
     // Initial fetch
     refreshUnreadCount();
 
-    // ✅ REALTIME FIX: Recalculate instead of incrementing to avoid ghost numbers
+    // ✅ REALTIME LISTENER (Global)
+    // We listen for ANY new message. If it's for a group we are in, we refresh.
     const channel = supabase
       .channel("global-chat-count")
       .on(
@@ -74,24 +53,25 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
           table: "messages",
         },
         async (payload) => {
-          // If WE sent it, ignore.
+          // If WE sent it, ignore
           if (payload.new.sender_id === user.id) return;
 
-          // Only refresh if this message belongs to a conversation we are in
-          const { data: isMember } = await supabase
-            .from("conversation_members")
-            .select("conversation_id")
-            .eq("conversation_id", payload.new.conversation_id)
-            .eq("user_id", user.id)
-            .maybeSingle();
+          // ✅ FIX: Simplify the check.
+          // Instead of checking the DB every time (which fails for implicit groups),
+          // we can just refresh the count. The RPC 'get_total_unread_count' is
+          // fast enough to call on every message insertion.
 
-          if (isMember) {
-            refreshUnreadCount();
-          }
+          // However, if you want to be safe, just refresh:
+          refreshUnreadCount();
+
+          /* NOTE: If you really want to filter, you would need to know the IDs 
+             of the official groups here. But for a student project, simply 
+             calling refreshUnreadCount() on ANY new message is acceptable 
+             and fixes the "banner not updating" bug immediately.
+          */
         }
       )
       .subscribe();
-
     return () => {
       supabase.removeChannel(channel);
     };
