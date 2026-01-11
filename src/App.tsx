@@ -2,6 +2,7 @@ import { AuthProvider, useAuth } from "@/context/authContext";
 import { ChatProvider } from "@/context/ChatContext";
 import { DialogProvider } from "@/context/DialogContext";
 import { NotificationProvider } from "@/context/NotificationContext";
+import InstallPWA from "./components/InstallPWA";
 import AppRouter from "@/Routes/AppRouter";
 import { Toaster } from "sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -48,6 +49,7 @@ function AppContent() {
     <NotificationProvider>
       <ChatProvider>
         <DialogProvider>
+          <InstallPWA />
           <AppRouter />
           <Toaster position="top-center" richColors closeButton />
         </DialogProvider>
