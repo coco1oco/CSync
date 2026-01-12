@@ -163,9 +163,9 @@ export function About() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
               {[
-                "Kurt Micheal Mirafelix",
-                "Alexander Mikael Jove Simpelo",
-                "Charlize Ellaine Dezor",
+                "Kurt Michael Mirafelix",
+                "Alexander Jove Mikael Simpelo",
+                "Charlize Ellaine Dizor",
                 "Kurt Cadorna",
               ].map((name) => (
                 <div key={name} className="flex items-center gap-3 group">
