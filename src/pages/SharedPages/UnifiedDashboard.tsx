@@ -4,7 +4,6 @@ import { useAuth } from "@/context/authContext";
 import { FeedPost } from "@/components/FeedPost";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-// ❌ REMOVED: UpcomingEventsWidget import
 import { ChallengeWidget } from "@/components/ChallengeWidget";
 import {
   DropdownMenu,
@@ -23,9 +22,8 @@ import {
   Settings,
   Trophy,
 } from "lucide-react";
-import { format } from "date-fns";
 import { toast } from "sonner";
-import { useAdminChallenges } from "@/hooks/useChallenges";
+// ❌ REMOVED: useAdminChallenges import
 import { useFeedEvents, useEventMutations } from "@/hooks/useFeedEvents";
 
 export function UnifiedDashboard() {
@@ -48,8 +46,7 @@ export function UnifiedDashboard() {
   // MUTATIONS
   const { deleteEvent, toggleVisibility } = useEventMutations();
 
-  // Admin Data: Challenges
-  const { data: adminChallenges } = useAdminChallenges();
+  // ❌ REMOVED: Admin Challenges Data Hook
 
   const loading = isFeedLoading;
 
@@ -93,8 +90,6 @@ export function UnifiedDashboard() {
       <Skeleton className="h-8 w-24 rounded-full" />
     </div>
   );
-
-  // ❌ REMOVED: renderUpcomingEventsSkeleton
 
   const renderFeedSkeleton = () => (
     <div className="space-y-6">
@@ -226,71 +221,12 @@ export function UnifiedDashboard() {
 
       {/* --- WIDGET AREA --- */}
       <div className="px-4 mt-4 space-y-4">
-        {loading ? (
-          // ❌ Removed Upcoming Events Skeleton
-          null
-        ) : (
+        {!loading && (
           <>
-            {/* 👑 ADMIN WIDGETS */}
-            {isAdmin && adminChallenges && adminChallenges.length > 0 && (
-              <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
-                <div className="flex items-center gap-2 mb-3">
-                  <Trophy className="w-4 h-4 text-indigo-600" />
-                  <h3 className="font-bold text-gray-900 text-sm">
-                    Challenge History
-                  </h3>
-                </div>
+            {/* ❌ REMOVED: Challenge History List Widget */}
 
-                <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
-                  {adminChallenges.map((c) => {
-                    const isUpcoming = new Date(c.start_date) > new Date();
-                    const isEnded =
-                      !c.is_active || new Date() > new Date(c.end_date);
-                    const isActive = !isUpcoming && !isEnded;
-
-                    return (
-                      <div
-                        key={c.id}
-                        onClick={() => navigate(`/challenges/view/${c.id}`)}
-                        className="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 cursor-pointer rounded-xl transition-colors group"
-                      >
-                        <div className="min-w-0">
-                          <span className="font-bold text-gray-900 text-sm block group-hover:text-indigo-600 transition-colors truncate">
-                            {c.theme}
-                          </span>
-                          <span className="text-gray-500 text-xs">
-                            {format(new Date(c.end_date), "MMM d")}
-                          </span>
-                        </div>
-
-                        <div className="shrink-0 ml-2">
-                          {isActive && (
-                            <span className="px-2 py-1 bg-green-100 text-green-700 text-[10px] font-bold rounded-lg whitespace-nowrap">
-                              Active
-                            </span>
-                          )}
-                          {isUpcoming && (
-                            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-lg whitespace-nowrap">
-                              Upcoming
-                            </span>
-                          )}
-                          {isEnded && (
-                            <span className="px-2 py-1 bg-gray-200 text-gray-600 text-[10px] font-bold rounded-lg whitespace-nowrap">
-                              Ended
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* ✅ Challenge Widget (Everyone sees the active one) */}
+            {/* ✅ Challenge Widget (Active Game) */}
             <ChallengeWidget />
-
-            {/* ❌ REMOVED: UpcomingEventsWidget from body */}
           </>
         )}
       </div>
