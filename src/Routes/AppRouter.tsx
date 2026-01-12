@@ -65,7 +65,7 @@ const OfficialEventDetails = lazy(
 const ChallengeDetailsPage = lazy(
   () => import("@/pages/SharedPages/ChallengeDetailsPage")
 );
-
+const MyTicketsPage = lazy(() => import("@/pages/SharedPages/MyTicketsPage"));
 // Loading Spinner
 const PageLoader = () => (
   <div className="flex h-screen w-full items-center justify-center bg-gray-50">
@@ -309,6 +309,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoader />}>
             <ProfilePage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/my-tickets",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <MyTicketsPage />
           </Suspense>
         ),
       },

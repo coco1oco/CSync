@@ -8,13 +8,11 @@ import {
   MessageCircle,
   AtSign,
   X,
-  UserPlus,
   Bell,
   BellOff,
   Loader2,
   Globe,
   ShieldAlert,
-  // ✅ New Icons
   CalendarCheck,
   BellRing,
   CheckCircle2,
@@ -23,7 +21,6 @@ import {
   PartyPopper,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
 
 type NotificationType =
   | "message"
@@ -37,16 +34,13 @@ type NotificationType =
   | "vaccination"
   | "new_post"
   | "system"
-  // New Types
   | "official_event"
   | "event_reminder"
   | "registration_approved"
   | "registration_waitlist"
   | "registration_rejected"
   | "registration_removed"
-  | "event_checkin"
-  | "vaccination";
-
+  | "event_checkin";
 
 interface NotificationCenterProps {
   variant?: "page" | "panel";
@@ -62,12 +56,20 @@ export function NotificationCenter({
   const navigate = useNavigate();
   const { notifications, loading, markAsRead } = useNotifications();
 
-  // iOS Permission State
-  const [permission, setPermission] = useState(Notification.permission);
+  // ✅ FIX 1: Safe Initialization for iOS
+  // If 'Notification' doesn't exist, default to "default" (or "denied") to prevent crash
+  const [permission, setPermission] = useState(
+    "Notification" in window ? Notification.permission : "default"
+  );
 
-  // iOS Manual Trigger
+  // ✅ FIX 2: Safe Handler
   const handleEnableNotifications = async () => {
+    // Guard clause: stop if browser doesn't support it
+    if (!("Notification" in window)) return;
+
     const token = await requestNotificationPermission();
+
+    // Now safe to access global Notification object
     setPermission(Notification.permission);
 
     if (token) {
@@ -84,6 +86,35 @@ export function NotificationCenter({
     if (n.is_unread) {
       await markAsRead(n.id);
     }
+
+    // 1. SMART INTERCEPT: Check for Official Event types
+    if (
+      n.type === "official_event" ||
+      n.type === "event_reminder" ||
+      n.type === "registration_approved" ||
+      n.type === "registration_waitlist" ||
+      n.type === "registration_rejected" ||
+      n.type === "registration_removed" ||
+      n.type === "event_checkin" ||
+      (n.type === "new_post" && n.title?.includes("Event"))
+    ) {
+      let eventId = n.data?.event_id;
+
+      if (!eventId && n.data?.link) {
+        const uuidMatch = n.data.link.match(
+          /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/
+        );
+        if (uuidMatch) eventId = uuidMatch[0];
+      }
+
+      if (eventId) {
+        navigate(`/official-event/${eventId}`, { replace: true });
+        if (variant === "panel") onClose();
+        return;
+      }
+    }
+
+    // Default Behavior
     if (n.data?.link) {
       navigate(n.data.link);
       if (variant === "panel") onClose();
@@ -114,39 +145,106 @@ export function NotificationCenter({
     return "Earlier";
   }
 
-  // ✅ Updated Icon Logic
+  // --- Icon Logic ---
   const getIcon = (type: NotificationType) => {
-    const base = "absolute -bottom-0.5 -right-0.5 rounded-full p-0.5 border-2 border-white flex items-center justify-center";
-    switch(type) {
-      // Social
-      case 'reaction': return <div className={`${base} bg-red-500`}><Heart size={10} className="text-white fill-white"/></div>;
-      case 'comment': return <div className={`${base} bg-blue-500`}><MessageCircle size={10} className="text-white fill-white"/></div>;
-      case 'reply': return <div className={`${base} bg-green-500`}><MessageCircle size={10} className="text-white fill-white"/></div>;
-      case 'mention': return <div className={`${base} bg-orange-500`}><AtSign size={10} className="text-white"/></div>;
-      case 'comment_like': return <div className={`${base} bg-red-500`}><Heart size={10} className="text-white fill-white"/></div>;
-      case 'new_post': return <div className={`${base} bg-purple-500`}><Globe size={10} className="text-white"/></div>;
-      case 'system': return <div className={`${base} bg-blue-600`}><ShieldAlert size={10} className="text-white"/></div>;
-      
-      // ✅ Official Events & Registration
-      case 'official_event': return <div className={`${base} bg-purple-600`}><CalendarCheck size={10} className="text-white"/></div>;
-      case 'event_reminder': return <div className={`${base} bg-amber-500`}><BellRing size={10} className="text-white"/></div>;
-      case 'registration_approved': return <div className={`${base} bg-green-500`}><CheckCircle2 size={10} className="text-white"/></div>;
-      case 'registration_waitlist': return <div className={`${base} bg-amber-500`}><Clock size={10} className="text-white"/></div>;
-      case 'registration_rejected': 
-      case 'registration_removed': return <div className={`${base} bg-red-500`}><XCircle size={10} className="text-white"/></div>;
-      case 'event_checkin': return <div className={`${base} bg-teal-500`}><PartyPopper size={10} className="text-white"/></div>;
-
-      default: return <div className={`${base} bg-gray-500`}><Bell size={10} className="text-white"/></div>;
+    const base =
+      "absolute -bottom-0.5 -right-0.5 rounded-full p-0.5 border-2 border-white flex items-center justify-center";
+    switch (type) {
+      case "reaction":
+        return (
+          <div className={`${base} bg-red-500`}>
+            <Heart size={10} className="text-white fill-white" />
+          </div>
+        );
+      case "comment":
+        return (
+          <div className={`${base} bg-blue-500`}>
+            <MessageCircle size={10} className="text-white fill-white" />
+          </div>
+        );
+      case "reply":
+        return (
+          <div className={`${base} bg-green-500`}>
+            <MessageCircle size={10} className="text-white fill-white" />
+          </div>
+        );
+      case "mention":
+        return (
+          <div className={`${base} bg-orange-500`}>
+            <AtSign size={10} className="text-white" />
+          </div>
+        );
+      case "comment_like":
+        return (
+          <div className={`${base} bg-red-500`}>
+            <Heart size={10} className="text-white fill-white" />
+          </div>
+        );
+      case "new_post":
+        return (
+          <div className={`${base} bg-purple-500`}>
+            <Globe size={10} className="text-white" />
+          </div>
+        );
+      case "system":
+        return (
+          <div className={`${base} bg-blue-600`}>
+            <ShieldAlert size={10} className="text-white" />
+          </div>
+        );
+      case "official_event":
+        return (
+          <div className={`${base} bg-purple-600`}>
+            <CalendarCheck size={10} className="text-white" />
+          </div>
+        );
+      case "event_reminder":
+        return (
+          <div className={`${base} bg-amber-500`}>
+            <BellRing size={10} className="text-white" />
+          </div>
+        );
+      case "registration_approved":
+        return (
+          <div className={`${base} bg-green-500`}>
+            <CheckCircle2 size={10} className="text-white" />
+          </div>
+        );
+      case "registration_waitlist":
+        return (
+          <div className={`${base} bg-amber-500`}>
+            <Clock size={10} className="text-white" />
+          </div>
+        );
+      case "registration_rejected":
+      case "registration_removed":
+        return (
+          <div className={`${base} bg-red-500`}>
+            <XCircle size={10} className="text-white" />
+          </div>
+        );
+      case "event_checkin":
+        return (
+          <div className={`${base} bg-teal-500`}>
+            <PartyPopper size={10} className="text-white" />
+          </div>
+        );
+      default:
+        return (
+          <div className={`${base} bg-gray-500`}>
+            <Bell size={10} className="text-white" />
+          </div>
+        );
     }
   };
 
-  // ✅ Updated Content Logic
+  // --- Content Logic ---
   const renderNotificationContent = (n: any) => {
     const actors = n.data?.actors;
     const username = n.sender?.username || "System";
 
     const getSuffix = (type: string) => {
-      if (type === "reaction") return "liked your post"; 
+      if (type === "reaction") return "liked your post";
       if (type === "comment") return "commented on your post";
       if (type === "mention") return "mentioned you";
       if (type === "reply") return "replied to your comment";
@@ -154,11 +252,9 @@ export function NotificationCenter({
       return "acted on your post";
     };
 
-    // 1. Grouped Actors Logic
     if (Array.isArray(actors) && actors.length > 1) {
       const count = actors.length;
       const suffix = getSuffix(n.type);
-
       if (count === 2) {
         return (
           <>
@@ -169,7 +265,6 @@ export function NotificationCenter({
           </>
         );
       }
-
       return (
         <>
           <span className="font-bold text-gray-700">{actors[0]}</span>
@@ -181,117 +276,52 @@ export function NotificationCenter({
       );
     }
 
-    // 2. Single User Social Scenarios
-    if (n.type === "reaction") {
+    if (n.type === "reaction")
       return (
         <>
           <span className="font-bold text-gray-700 mr-1">{username}</span>
           <span className="text-gray-600">liked your post</span>
         </>
       );
-    }
-
-    if (n.type === 'new_post') {
+    if (n.type === "new_post")
       return (
         <>
           <span className="font-bold text-gray-900 mr-1">{username}</span>
           <span className="text-gray-600">posted a new update</span>
         </>
       );
-    }
-
-    if (n.type === "comment") {
+    if (n.type === "comment")
       return (
         <>
           <span className="font-bold text-gray-700 mr-1">{username}</span>
           <span className="text-gray-600">commented: {n.body}</span>
         </>
       );
-    }
-
-    // 3. ✅ Official Events
-    if (n.type === 'official_event') {
+    if (n.type === "official_event")
       return (
         <>
           <span className="font-bold text-purple-700 mr-1">New Event:</span>
           <span className="text-gray-900">{n.body}</span>
         </>
       );
-    }
-
-    // 4. ✅ Reminders
-    if (n.type === 'event_reminder') {
+    if (n.type === "event_reminder")
       return (
         <>
           <span className="font-bold text-amber-600 mr-1">{n.title}</span>
           <span className="text-gray-700">{n.body}</span>
         </>
       );
-    }
-    
-    // 5. System
-    if (n.type === 'system') {
+    if (n.type === "system")
       return (
         <>
           <span className="font-bold text-gray-900 mr-1">{n.title}</span>
           <span className="text-gray-600">{n.body}</span>
         </>
       );
-    }
 
-// --- Click Handler ---
-  // --- Click Handler ---
-  // --- Click Handler ---
-  async function handleClick(n: any) {
-    if (n.is_unread) {
-      await markAsRead(n.id);
-    }
-
-    // 1. SMART INTERCEPT: Check for Official Event types
-    if (
-        n.type === 'official_event' || 
-        n.type === 'event_reminder' ||
-        n.type === 'registration_approved' ||
-        n.type === 'registration_waitlist' ||
-        n.type === 'registration_rejected' ||
-        n.type === 'registration_removed' ||
-        n.type === 'event_checkin' ||
-        // ✅ SAFETY: Check 'new_post' too, just in case old events were created with this type
-        (n.type === 'new_post' && n.title?.includes("Event")) 
-    ) {
-        let eventId = n.data?.event_id;
-        
-        // 2. ROBUST EXTRACTION: If ID is missing, hunt for it in the link
-        if (!eventId && n.data?.link) {
-            // This Regex finds a UUID (8-4-4-4-12 chars) anywhere in the string
-            // It ignores slashes, query params, and text around it.
-            const uuidMatch = n.data.link.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/);
-            
-            if (uuidMatch) {
-                eventId = uuidMatch[0];
-            }
-        }
-
-        // 3. EXECUTE: If we found an ID, force the correct page
-        if (eventId) {
-            // 'replace: true' ensures the user doesn't get stuck if they hit Back
-            navigate(`/official-event/${eventId}`, { replace: true });
-            if (variant === "panel") onClose();
-            return; // 🛑 STOP HERE. Do not run default behavior.
-        }
-    }
-
-    // 4. DEFAULT BEHAVIOR (Social Posts, Messages)
-    if (n.data?.link) {
-      navigate(n.data.link);
-      if (variant === "panel") onClose();
-    }
-  }
-    // 7. Default Fallback
     const cleanBody = n.body.startsWith(username)
       ? n.body.replace(username, "").trim()
       : n.body;
-
     return (
       <>
         <span className="font-bold text-gray-900 mr-1">{username}</span>
@@ -314,7 +344,6 @@ export function NotificationCenter({
     return `${Math.floor(days / 7)}w`;
   }
 
-  // --- Render Logic ---
   const groupedNotifications = notifications.reduce((acc, n) => {
     const label = getGroupLabel(n.created_at);
     if (!acc[label]) acc[label] = [];
@@ -333,7 +362,8 @@ export function NotificationCenter({
   const NotificationContent = (
     <div className="flex flex-col pb-24">
       {/* iOS PERMISSION BUTTON */}
-      {permission === "default" && (
+      {/* Only show if we can actually use notifications (permission is 'default' AND it exists) */}
+      {"Notification" in window && permission === "default" && (
         <div className="p-4 bg-blue-50 border-b border-blue-100 flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1">
           <div className="flex items-start gap-3 text-blue-700">
             <div className="p-2 bg-blue-100 rounded-full mt-0.5">
@@ -396,7 +426,6 @@ export function NotificationCenter({
 
                     <div className="flex-1 min-w-0 text-sm leading-snug">
                       {renderNotificationContent(n)}
-
                       <span className="text-gray-400 text-xs ml-1.5 whitespace-nowrap">
                         {getRelativeTime(n.created_at)}
                       </span>
@@ -429,15 +458,12 @@ export function NotificationCenter({
 
   return createPortal(
     <>
-      {/* Backdrop */}
       <div
         className={`fixed inset-0 bg-black/20 backdrop-blur-sm z-[40] transition-opacity duration-300 ${
           isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
         onClick={onClose}
       />
-
-      {/* Panel */}
       <div
         className={`
         fixed top-0 bottom-0 z-[50] 
@@ -461,7 +487,6 @@ export function NotificationCenter({
             <X size={20} />
           </button>
         </div>
-
         <div className="flex-1 overflow-y-auto overscroll-contain">
           {NotificationContent}
         </div>

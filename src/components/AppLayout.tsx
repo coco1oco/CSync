@@ -33,20 +33,21 @@ const isHomePage = location.pathname === "/" || location.pathname === "/dashboar
   const isChallengeDetailsPage = location.pathname.startsWith("/challenges/");
   // 1. Fixed Page: Locks window scroll (used for Chat/Messages only)
   const isFixedPage = isMessagesPage;
-  
+  const isMyticketsPage = location.pathname.startsWith("/my-tickets");
+
   const isEventDetails = location.pathname.startsWith("/event/");
   // 2. Wide Page: Uses full width (max-w-full) instead of constrained width
   // 3. Edge-to-Edge: Removes AppLayout padding so the child page can control it
+  const isManageEventsPage = location.pathname.startsWith("/admin/events/manage");
 
   const isSettingsPage = location.pathname.startsWith("/settings") || location.pathname.startsWith("/Settings"); 
   const isOfficialEventDetails = location.pathname.startsWith("/official-event");
   // 2. UPDATE THIS VARIABLE
   // Add || isSettingsPage to the end
   // ✅ UPDATE THIS:
-  const isWidePage = isFixedPage || isAdminPage || isPetDashboard || isSettingsPage || isOfficialEventDetails;
-
+  const isWidePage = isFixedPage || isAdminPage || isPetDashboard || isSettingsPage || isOfficialEventDetails || isMyticketsPage;
   // 3. Edge-to-Edge: Removes AppLayout padding so the child page can control it
-  const isEdgeToEdge = isPetDashboard || isAdminPage || isHomePage|| isOfficialEventDetails || isChallengeDetailsPage;
+  const isEdgeToEdge = isPetDashboard || isAdminPage || isHomePage|| isOfficialEventDetails || isChallengeDetailsPage || isMyticketsPage || isManageEventsPage;
 
   if (loading)
     return (
@@ -59,6 +60,7 @@ const isHomePage = location.pathname === "/" || location.pathname === "/dashboar
 
   const isProfileIncomplete = !user.first_name || !user.last_name;
   const isOnEditPage = location.pathname === "/ProfilePage/Edit";
+  
 
   if (isProfileIncomplete && !isOnEditPage) {
     return <Navigate to="/ProfilePage/Edit" replace />;
@@ -83,7 +85,7 @@ const isHomePage = location.pathname === "/" || location.pathname === "/dashboar
         {/* Mobile Header (Sticky) 
             ✅ HIDDEN ON: Messages Page AND Pet Dashboard (to fix double header issue) 
         */}
-        {!isFixedPage && !isPetDashboard && !isChallengeDetailsPage && !isChallengeDetailsPage&& !isEventDetails&&(
+        {!isFixedPage && !isPetDashboard && !isChallengeDetailsPage && !isChallengeDetailsPage&& !isEventDetails&& !isOfficialEventDetails&& !isMyticketsPage&& !isManageEventsPage && (
           <div className="lg:hidden sticky top-0 z-50">
             <Header showProfile={true} />
           </div>

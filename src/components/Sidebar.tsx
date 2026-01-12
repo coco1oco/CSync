@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, MessageCircle, Bell, PawPrint, User, Users } from "lucide-react";
+import { Home, MessageCircle, Bell, PawPrint, User, Users, Ticket } from "lucide-react";
 import { useAuth } from "@/context/authContext";
 import { useChat } from "@/context/ChatContext";
 import { useNotifications } from "@/context/NotificationContext"; // ✅ 1. Import Hook
@@ -56,6 +56,8 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
             isButton: true,
             hasBadge: hasUnreadNotifications, // <--- Dynamic Badge
           },
+          { path: "/PetDashboard", icon: PawPrint, label: "Pet Dashboard" },
+          { path: "/ProfilePage", icon: User, label: "Profile" },
         ]
       : [
           {
@@ -65,9 +67,11 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
             isButton: true,
             hasBadge: hasUnreadNotifications, // <--- Dynamic Badge
           },
+            { path: "/PetDashboard", icon: PawPrint, label: "Pet Dashboard" },
+            { path: "/my-tickets", icon: Ticket, label: "Tickets" },
+            { path: "/ProfilePage", icon: User, label: "Profile" },
+
         ]),
-    { path: "/PetDashboard", icon: PawPrint, label: "Pet Dashboard" },
-    { path: "/ProfilePage", icon: User, label: "Profile" },
   ];
 
   return (

@@ -1,11 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/authContext";
 import { FeedPost } from "@/components/FeedPost";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UpcomingEventsWidget } from "@/components/UpcomingEventsWidget";
+// ❌ REMOVED: UpcomingEventsWidget import
 import { ChallengeWidget } from "@/components/ChallengeWidget";
 import {
   DropdownMenu,
@@ -18,34 +17,16 @@ import {
   LayoutGrid,
   Plus,
   Calendar,
-  Stethoscope,
   X,
   PenSquare,
   ChevronDown,
   Settings,
   Trophy,
 } from "lucide-react";
-import {
-  formatDistanceToNow,
-  isPast,
-  addDays,
-  isBefore,
-  format,
-} from "date-fns";
-import type { OutreachEvent } from "@/types";
+import { format } from "date-fns";
 import { toast } from "sonner";
 import { useAdminChallenges } from "@/hooks/useChallenges";
-// ✅ NEW: Import Hook
 import { useFeedEvents, useEventMutations } from "@/hooks/useFeedEvents";
-
-// --- TYPES ---
-type HealthAlert = {
-  id: string;
-  vaccine_name: string;
-  next_due_date: string;
-  pet_id: string;
-  pets: { name: string; petimage_url: string | null };
-};
 
 export function UnifiedDashboard() {
   const { user } = useAuth();
@@ -57,63 +38,22 @@ export function UnifiedDashboard() {
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
 
-  // ✅ 1. FETCH FEED (Replaced manual fetch with Hook)
-  // This handles caching, loading states, and filtering automatically
+  // FETCH FEED
   const {
     data: events = [],
     isLoading: isFeedLoading,
     refetch,
   } = useFeedEvents(user?.id, filterMode, isAdmin);
 
-  // ✅ 2. MUTATIONS (Replaced manual delete/hide)
+  // MUTATIONS
   const { deleteEvent, toggleVisibility } = useEventMutations();
 
   // Admin Data: Challenges
   const { data: adminChallenges } = useAdminChallenges();
 
-  // Feature Specific State: Alerts (Manual fetch for non-admins)
-  const [alerts, setAlerts] = useState<HealthAlert[]>([]);
-  const [isAlertsLoading, setIsAlertsLoading] = useState(false);
-
-  // 3. FETCH ALERTS (Only for regular users)
-  useEffect(() => {
-    if (!user || isAdmin) return;
-
-    const fetchAlerts = async () => {
-      setIsAlertsLoading(true);
-      try {
-        const { data: vaxData } = await supabase
-          .from("vaccinations")
-          .select(
-            `id, vaccine_name, next_due_date, pet_id, pets (name, petimage_url)`
-          )
-          .eq("owner_id", user.id)
-          .neq("status", "completed")
-          .order("next_due_date", { ascending: true });
-
-        const rawAlerts = (vaxData as any[]) || [];
-        const cutoff = addDays(new Date(), 30);
-        const urgent = rawAlerts.filter(
-          (a) =>
-            isPast(new Date(a.next_due_date)) ||
-            isBefore(new Date(a.next_due_date), cutoff)
-        );
-        setAlerts(urgent);
-      } catch (err) {
-        console.error("Failed to load alerts", err);
-      } finally {
-        setIsAlertsLoading(false);
-      }
-    };
-
-    fetchAlerts();
-  }, [user?.id, isAdmin]);
-
-  // Combined Loading State
-  const loading = isFeedLoading || (isAdmin ? false : isAlertsLoading);
+  const loading = isFeedLoading;
 
   // --- ACTIONS ---
-
   const handleDelete = async () => {
     if (!deleteEventId) return;
     try {
@@ -154,48 +94,7 @@ export function UnifiedDashboard() {
     </div>
   );
 
-  const renderAlertsSkeleton = () => (
-    <div className="flex gap-3 overflow-x-hidden pb-2 -mx-4 px-4">
-      {[1, 2].map((i) => (
-        <div
-          key={i}
-          className="shrink-0 w-64 p-3 rounded-2xl border bg-white border-gray-200 shadow-sm flex flex-col gap-3"
-        >
-          <div className="flex items-center gap-3">
-            <Skeleton className="w-10 h-10 rounded-full" />
-            <div className="space-y-1.5 flex-1">
-              <Skeleton className="w-20 h-4" />
-              <Skeleton className="w-16 h-3" />
-            </div>
-          </div>
-          <Skeleton className="w-24 h-6 rounded-lg" />
-        </div>
-      ))}
-    </div>
-  );
-
-  const renderUpcomingEventsSkeleton = () => (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden h-full">
-      <div className="p-4 border-b border-gray-50 flex items-center justify-between">
-        <div className="h-5 w-28 bg-gray-100 rounded animate-pulse" />
-      </div>
-      <div className="divide-y divide-gray-50">
-        {[1, 2].map((i) => (
-          <div key={i} className="p-3 flex gap-3 items-center">
-            <div className="shrink-0 w-12 h-12 bg-gray-100 rounded-lg animate-pulse" />
-            <div className="flex-1 flex flex-col justify-center gap-2">
-              <div className="h-3.5 w-3/4 bg-gray-100 rounded animate-pulse" />
-              <div className="flex gap-2">
-                <div className="h-2.5 w-1/3 bg-gray-100 rounded animate-pulse" />
-                <div className="h-2.5 w-10 bg-gray-100 rounded animate-pulse" />
-              </div>
-            </div>
-            <div className="w-4 h-4 bg-gray-100 rounded animate-pulse shrink-0" />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  // ❌ REMOVED: renderUpcomingEventsSkeleton
 
   const renderFeedSkeleton = () => (
     <div className="space-y-6">
@@ -327,116 +226,63 @@ export function UnifiedDashboard() {
 
       {/* --- WIDGET AREA --- */}
       <div className="px-4 mt-4 space-y-4">
-          {loading ? (
-              <>
-                {!isAdmin && renderAlertsSkeleton()}
-                {/* ✅ Only show if NOT admin */}
-                {!isAdmin && renderUpcomingEventsSkeleton()}
-              </>
-            ) : (
+        {loading ? (
+          // ❌ Removed Upcoming Events Skeleton
+          null
+        ) : (
           <>
             {/* 👑 ADMIN WIDGETS */}
-            {isAdmin ? (
-              <>
-                {/* CHALLENGE HISTORY WIDGET */}
-                {adminChallenges && adminChallenges.length > 0 && (
-                  <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Trophy className="w-4 h-4 text-indigo-600" />
-                      <h3 className="font-bold text-gray-900 text-sm">
-                        Challenge History
-                      </h3>
-                    </div>
-
-                    {/* Scrollable list to prevent clutter */}
-                    <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
-                      {adminChallenges.map((c) => {
-                        const isUpcoming = new Date(c.start_date) > new Date();
-                        const isEnded =
-                          !c.is_active || new Date() > new Date(c.end_date);
-                        const isActive = !isUpcoming && !isEnded;
-
-                        return (
-                          <div
-                            key={c.id}
-                            onClick={() => navigate(`/challenges/view/${c.id}`)}
-                            className="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 cursor-pointer rounded-xl transition-colors group"
-                          >
-                            <div className="min-w-0">
-                              <span className="font-bold text-gray-900 text-sm block group-hover:text-indigo-600 transition-colors truncate">
-                                {c.theme}
-                              </span>
-                              <span className="text-gray-500 text-xs">
-                                {format(new Date(c.end_date), "MMM d")}
-                              </span>
-                            </div>
-
-                            <div className="shrink-0 ml-2">
-                              {isActive && (
-                                <span className="px-2 py-1 bg-green-100 text-green-700 text-[10px] font-bold rounded-lg whitespace-nowrap">
-                                  Active
-                                </span>
-                              )}
-                              {isUpcoming && (
-                                <span className="px-2 py-1 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-lg whitespace-nowrap">
-                                  Upcoming
-                                </span>
-                              )}
-                              {isEnded && (
-                                <span className="px-2 py-1 bg-gray-200 text-gray-600 text-[10px] font-bold rounded-lg whitespace-nowrap">
-                                  Ended
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : /* 🐾 USER ALERTS */
-            alerts.length > 0 ? (
-              <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide snap-x">
-                {alerts.map((alert) => (
-                  <div
-                    key={alert.id}
-                    onClick={() => navigate(`/PetDashboard/${alert.pet_id}`)}
-                    className="snap-center shrink-0 w-64 p-3 rounded-2xl border bg-white border-gray-200 shadow-sm"
-                  >
-                    <div className="flex items-center gap-3 mb-2">
-                      <img
-                        src={alert.pets.petimage_url || "/default-pet.png"}
-                        className="w-10 h-10 rounded-full bg-gray-200 object-cover"
-                      />
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold truncate">
-                          {alert.pets.name}
-                        </p>
-                        <p className="text-xs text-gray-500 truncate">
-                          {alert.vaccine_name}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-xs font-semibold px-2 py-1 bg-orange-50 text-orange-700 rounded-lg inline-flex items-center gap-1">
-                      <Calendar className="w-3 h-3" /> Due{" "}
-                      {formatDistanceToNow(new Date(alert.next_due_date), {
-                        addSuffix: true,
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-full text-blue-600">
-                  <Stethoscope className="w-5 h-5" />
+            {isAdmin && adminChallenges && adminChallenges.length > 0 && (
+              <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <Trophy className="w-4 h-4 text-indigo-600" />
+                  <h3 className="font-bold text-gray-900 text-sm">
+                    Challenge History
+                  </h3>
                 </div>
-                <div>
-                  <p className="text-sm font-bold text-blue-900">
-                    All caught up!
-                  </p>
-                  <p className="text-xs text-blue-700">No pending vaccines.</p>
+
+                <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+                  {adminChallenges.map((c) => {
+                    const isUpcoming = new Date(c.start_date) > new Date();
+                    const isEnded =
+                      !c.is_active || new Date() > new Date(c.end_date);
+                    const isActive = !isUpcoming && !isEnded;
+
+                    return (
+                      <div
+                        key={c.id}
+                        onClick={() => navigate(`/challenges/view/${c.id}`)}
+                        className="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 cursor-pointer rounded-xl transition-colors group"
+                      >
+                        <div className="min-w-0">
+                          <span className="font-bold text-gray-900 text-sm block group-hover:text-indigo-600 transition-colors truncate">
+                            {c.theme}
+                          </span>
+                          <span className="text-gray-500 text-xs">
+                            {format(new Date(c.end_date), "MMM d")}
+                          </span>
+                        </div>
+
+                        <div className="shrink-0 ml-2">
+                          {isActive && (
+                            <span className="px-2 py-1 bg-green-100 text-green-700 text-[10px] font-bold rounded-lg whitespace-nowrap">
+                              Active
+                            </span>
+                          )}
+                          {isUpcoming && (
+                            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-lg whitespace-nowrap">
+                              Upcoming
+                            </span>
+                          )}
+                          {isEnded && (
+                            <span className="px-2 py-1 bg-gray-200 text-gray-600 text-[10px] font-bold rounded-lg whitespace-nowrap">
+                              Ended
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -444,8 +290,7 @@ export function UnifiedDashboard() {
             {/* ✅ Challenge Widget (Everyone sees the active one) */}
             <ChallengeWidget />
 
-            {/* Existing Widget */}
-           {!isAdmin && <UpcomingEventsWidget />}
+            {/* ❌ REMOVED: UpcomingEventsWidget from body */}
           </>
         )}
       </div>
@@ -510,7 +355,7 @@ export function UnifiedDashboard() {
           filteredEvents.map((event) => (
             <FeedPost
               key={event.id}
-              event={event as any} // ✅ Cast to avoid strict TS type mismatch with Hook type
+              event={event as any}
               isAdmin={isAdmin}
               onHide={() => handleHide(event.id, event.is_hidden || false)}
               isHidden={event.is_hidden}
@@ -527,7 +372,6 @@ export function UnifiedDashboard() {
                 setActiveTag(tag);
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }}
-              // ✅ NEW: Refresh feed after internal changes (like unregistering)
               onRefresh={refetch}
             />
           ))
