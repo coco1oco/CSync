@@ -18,7 +18,7 @@ export type NotificationType =
   | "new_post"
   | "system"
   // ✅ NEW TYPES
-  | "official_event" 
+  | "official_event"
   | "event_reminder";
 
 /** Simple shapes so we don't depend heavily on your types file */
@@ -29,12 +29,17 @@ type SimpleEvent = {
 };
 type SimpleActor = { id: string; username?: string | null };
 
-
 export async function notifyRegistrationUpdate(
   userId: string,
   eventId: string,
   eventTitle: string,
-  status: "approved" | "waitlist" | "joined_waitlist" | "rejected" | "checked_in" | "removed",
+  status:
+    | "approved"
+    | "waitlist"
+    | "joined_waitlist"
+    | "rejected"
+    | "checked_in"
+    | "removed",
   adminId: string
 ) {
   let type = "";
@@ -56,7 +61,7 @@ export async function notifyRegistrationUpdate(
 
     case "waitlist": // Admin manually moved user to waitlist
       type = "registration_waitlist";
-      title = "Waitlist Update"; 
+      title = "Waitlist Update";
       body = `You have been moved to the waitlist for "${eventTitle}".`;
       break;
 
@@ -97,7 +102,7 @@ export async function notifyRegistrationUpdate(
   } catch (err) {
     console.error("Failed to notify registration status:", err);
   }
-  
+
   // Supabase insert logic follows...
 }
 // --- Permission & Token Management ---
@@ -105,9 +110,11 @@ export async function notifyRegistrationUpdate(
 // ... existing code ...
 
 // ✅ NEW: Notify for Regular Posts (Replaces the deleted trigger)
-export async function notifyNewPost(
-  post: { id: string; admin_id: string; username: string }
-) {
+export async function notifyNewPost(post: {
+  id: string;
+  admin_id: string;
+  username: string;
+}) {
   try {
     // 1. Get recipients (All users except author)
     // Note: If you have a "Followers" system, you would fetch followers here instead.
@@ -125,10 +132,10 @@ export async function notifyNewPost(
       from_user_id: post.admin_id,
       type: "new_post", // <--- This triggers the Blue Globe Icon
       title: "New Post",
-      body: "posted a new update", 
-      data: { 
+      body: "posted a new update",
+      data: {
         link: `/event/${post.id}`,
-        event_id: post.id 
+        event_id: post.id,
       },
       is_unread: true,
     }));
@@ -141,10 +148,11 @@ export async function notifyNewPost(
   }
 }
 
-
-export async function notifyAllUsers(
-  event: { id: string; title: string; admin_id: string },
-) {
+export async function notifyAllUsers(event: {
+  id: string;
+  title: string;
+  admin_id: string;
+}) {
   try {
     // 1. Get ALL user IDs except the admin
     const { data: users, error } = await supabase
@@ -163,9 +171,9 @@ export async function notifyAllUsers(
       type: "official_event",
       title: "New Official Event",
       body: event.title,
-      data: { 
+      data: {
         link: `/official-event/${event.id}`,
-        event_id: event.id 
+        event_id: event.id,
       },
       is_unread: true,
     }));
@@ -176,12 +184,13 @@ export async function notifyAllUsers(
       .insert(notifications);
 
     if (insertError) throw insertError;
-    console.log(`Sent official event notification to ${notifications.length} users.`);
+    console.log(
+      `Sent official event notification to ${notifications.length} users.`
+    );
   } catch (err) {
     console.error("Failed to notify all users:", err);
   }
 }
-
 
 export async function notifyAttendees(
   eventId: string,
@@ -200,7 +209,7 @@ export async function notifyAttendees(
     if (error || !attendees) throw error;
 
     // Filter out the admin if they registered for testing
-    const validAttendees = attendees.filter(a => a.user_id !== adminId);
+    const validAttendees = attendees.filter((a) => a.user_id !== adminId);
 
     if (validAttendees.length === 0) return;
 
@@ -211,9 +220,9 @@ export async function notifyAttendees(
       type: "event_reminder",
       title: `Reminder: ${eventTitle}`,
       body: message,
-      data: { 
+      data: {
         link: `/official-event/${eventId}`,
-        event_id: eventId 
+        event_id: eventId,
       },
       is_unread: true,
     }));
@@ -227,6 +236,7 @@ export async function notifyAttendees(
 }
 
 export async function requestNotificationPermission(): Promise<string | null> {
+  // ✅ FIX: This check MUST be at the very top to prevent crashes on iOS Safari
   if (!("Notification" in window)) {
     console.log("This browser does not support desktop notification");
     return null;
@@ -234,11 +244,12 @@ export async function requestNotificationPermission(): Promise<string | null> {
 
   try {
     // Check if permission is already granted
+    // Now safe to access 'Notification' because we passed the check above
     if (Notification.permission === "granted") {
       return await getFCMToken();
     }
 
-    // Request permission (must be triggered by a user click!)
+    // Request permission
     const permission = await Notification.requestPermission();
     if (permission === "granted") {
       return await getFCMToken();
@@ -361,7 +372,7 @@ export async function notifyLike(event: SimpleEvent, actor: SimpleActor) {
     p_event_id: event.id,
     p_actor_name: actorName,
     // 👇 CHANGE THIS: This becomes the "New like" text in your screenshot
-    p_preview_text: "New like", 
+    p_preview_text: "New like",
     p_link: `/event/${event.id}?action=like`,
     p_title: "Post Activity", // Keep title generic or internal
   });
@@ -388,7 +399,7 @@ export async function notifyComment(
     p_event_id: event.id,
     p_actor_name: actorName,
     // 👇 CHANGE THIS: This passes the actual comment content (e.g., "hey")
-    p_preview_text: shortPreview, 
+    p_preview_text: shortPreview,
     p_link: `/event/${event.id}?comment_id=${commentId}`,
     p_title: "New Comment",
   });
@@ -465,15 +476,19 @@ export async function notifyMentions(
   // ✅ FIX 1: Robust Regex
   // Matches @user, @user.name, @user-name (allows dots and dashes)
   const mentionRegex = /@([\w.-]+)/g;
-  
+
   // 1. Extract matches
-  const rawMatches = [...commentContent.matchAll(mentionRegex)].map((m) => m[1]);
+  const rawMatches = [...commentContent.matchAll(mentionRegex)].map(
+    (m) => m[1]
+  );
 
   if (rawMatches.length === 0) return;
 
   // ✅ FIX 2: Normalize to Lowercase
   // This ensures that if I type "@Mihhg", it still finds "mihhg" in the database
-  const uniqueUsernames = [...new Set(rawMatches.map(name => name.toLowerCase()))];
+  const uniqueUsernames = [
+    ...new Set(rawMatches.map((name) => name.toLowerCase())),
+  ];
 
   // 2. Fetch User IDs from Database
   const { data: mentionedUsers, error } = await supabase
