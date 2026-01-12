@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { AuthProvider, useAuth } from "@/context/authContext";
 import { ChatProvider } from "@/context/ChatContext";
 import { DialogProvider } from "@/context/DialogContext";
@@ -6,31 +7,64 @@ import InstallPWA from "./components/InstallPWA";
 import AppRouter from "@/Routes/AppRouter";
 import { Toaster } from "sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
 import logo from "@/assets/images/PawPal.svg";
 
 // Create a client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1, // Don't retry failed requests too many times
-      staleTime: 5 * 60 * 1000, // Cache data for 5 minutes by default
+      retry: 1,
+      staleTime: 5 * 60 * 1000,
     },
   },
 });
 
-// 1. The "Splash Screen" Component
+// 1. ✨ ENHANCED: The "Splash Screen" Component
 function GlobalLoader() {
+  const [message, setMessage] = useState("Loading your pack...");
+
+  // Cycle through cute messages while loading
+  useEffect(() => {
+    const messages = [
+      "Loading your pack...",
+      "Fetching the treats...",
+      "Waking up the kittens...",
+      "Chasing tails...",
+      "Finding the squeaky toy...",
+      "Preparing the park...",
+    ];
+    let i = 0;
+    const interval = setInterval(() => {
+      i = (i + 1) % messages.length;
+      setMessage(messages[i]);
+    }, 1800); // Change text every 1.8 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <div className="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center animate-in fade-in duration-300">
-      <div className="relative">
-        <div className="absolute inset-0 bg-blue-100 rounded-full animate-ping opacity-20"></div>
-        <img src={logo} alt="PawPal" className="w-24 h-24 mb-4 relative z-10" />
+    <div className="fixed inset-0 bg-gradient-to-b from-white to-blue-50/50 z-50 flex flex-col items-center justify-center animate-in fade-in duration-500">
+      <div className="relative mb-8">
+        {/* Pulsing outer rings for depth */}
+        <div className="absolute inset-0 bg-blue-500 rounded-full animate-ping opacity-10 delay-100 duration-1000"></div>
+        <div className="absolute inset-0 bg-blue-400 rounded-full animate-ping opacity-20 duration-1000"></div>
+
+        {/* Logo Container with gentle bounce */}
+        <div className="relative z-10 bg-white p-6 rounded-3xl shadow-xl shadow-blue-100/50 animate-bounce [animation-duration:3s]">
+          <img
+            src={logo}
+            alt="PawPal"
+            className="w-20 h-20 object-contain drop-shadow-sm"
+          />
+        </div>
       </div>
-      <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-      <p className="text-gray-400 text-sm mt-4 font-medium tracking-wide">
-        Loading your pack...
-      </p>
+
+      {/* Text Only (Spinner Removed) */}
+      <div className="flex flex-col items-center gap-3">
+        <p className="text-gray-400 text-sm font-medium tracking-wide animate-pulse min-h-[20px] text-center">
+          {message}
+        </p>
+      </div>
     </div>
   );
 }
