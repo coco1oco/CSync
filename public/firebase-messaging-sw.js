@@ -21,6 +21,7 @@ const messaging = firebase.messaging();
 
 // Handle background push notifications
 messaging.onBackgroundMessage(function (payload) {
-  const { title, ...options } = payload.notification;
-  self.registration.showNotification(title, options);
+  console.log("Received background message ", payload);
+  // ✅ FIX: Do NOT call showNotification() here.
+  // The browser/OS handles it automatically for you.
 });
