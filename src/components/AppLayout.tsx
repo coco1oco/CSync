@@ -27,14 +27,16 @@ export default function AppLayout() {
     location.pathname.startsWith("/Admin") ||
     location.pathname.startsWith("/admin");
 
+    // ✅ Detect Home/Dashboard route
+const isHomePage = location.pathname === "/" || location.pathname === "/dashboard";
   // --- LAYOUT CONFIGURATION ---
-
+  const isChallengeDetailsPage = location.pathname.startsWith("/challenges/");
   // 1. Fixed Page: Locks window scroll (used for Chat/Messages only)
   const isFixedPage = isMessagesPage;
-
+  
+  const isEventDetails = location.pathname.startsWith("/event/");
   // 2. Wide Page: Uses full width (max-w-full) instead of constrained width
   // 3. Edge-to-Edge: Removes AppLayout padding so the child page can control it
-
 
   const isSettingsPage = location.pathname.startsWith("/settings") || location.pathname.startsWith("/Settings"); 
   const isOfficialEventDetails = location.pathname.startsWith("/official-event");
@@ -44,7 +46,7 @@ export default function AppLayout() {
   const isWidePage = isFixedPage || isAdminPage || isPetDashboard || isSettingsPage || isOfficialEventDetails;
 
   // 3. Edge-to-Edge: Removes AppLayout padding so the child page can control it
-  const isEdgeToEdge = isPetDashboard;
+  const isEdgeToEdge = isPetDashboard || isAdminPage || isHomePage|| isOfficialEventDetails || isChallengeDetailsPage;
 
   if (loading)
     return (
@@ -81,8 +83,8 @@ export default function AppLayout() {
         {/* Mobile Header (Sticky) 
             ✅ HIDDEN ON: Messages Page AND Pet Dashboard (to fix double header issue) 
         */}
-        {!isFixedPage && !isPetDashboard && (
-          <div className="lg:hidden sticky top-0 z-40">
+        {!isFixedPage && !isPetDashboard && !isChallengeDetailsPage && !isChallengeDetailsPage&& !isEventDetails&&(
+          <div className="lg:hidden sticky top-0 z-50">
             <Header showProfile={true} />
           </div>
         )}

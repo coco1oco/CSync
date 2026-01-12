@@ -224,7 +224,7 @@ export function UnifiedDashboard() {
   return (
     <div className="w-full max-w-xl mx-auto pb-24 px-0 md:px-4">
       {/* --- HEADER --- */}
-      <div className="relative z-10 bg-white py-4 px-4 flex items-center justify-between border-b border-gray-200 shadow-sm md:border-none">
+      <div className="relative z-40 bg-white py-4 px-4 flex items-center justify-between border-b border-gray-200 shadow-sm md:border-none">
         {loading ? (
           renderHeaderSkeleton()
         ) : (
@@ -327,12 +327,13 @@ export function UnifiedDashboard() {
 
       {/* --- WIDGET AREA --- */}
       <div className="px-4 mt-4 space-y-4">
-        {loading ? (
-          <>
-            {!isAdmin && renderAlertsSkeleton()}
-            {renderUpcomingEventsSkeleton()}
-          </>
-        ) : (
+          {loading ? (
+              <>
+                {!isAdmin && renderAlertsSkeleton()}
+                {/* ✅ Only show if NOT admin */}
+                {!isAdmin && renderUpcomingEventsSkeleton()}
+              </>
+            ) : (
           <>
             {/* 👑 ADMIN WIDGETS */}
             {isAdmin ? (
@@ -444,7 +445,7 @@ export function UnifiedDashboard() {
             <ChallengeWidget />
 
             {/* Existing Widget */}
-            <UpcomingEventsWidget />
+           {!isAdmin && <UpcomingEventsWidget />}
           </>
         )}
       </div>
