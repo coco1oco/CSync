@@ -20,7 +20,13 @@ export interface Attendee {
 export function useEventDetails(
   eventId: string | undefined,
   userId: string | undefined
+
+  
 ) {
+  console.log("---------------- DEBUGGING ----------------");
+  console.log("1. App thinks Supabase URL is:", import.meta.env.VITE_SUPABASE_URL);
+  console.log("2. Event ID being requested:", eventId);
+  console.log("-------------------------------------------");
   return useQuery({
     queryKey: ["event-details", eventId],
     enabled: !!eventId,
@@ -32,21 +38,32 @@ export function useEventDetails(
         .eq("id", eventId)
         .single();
 
-      if (eventError) throw eventError;
-
+  if (eventError) {
+    console.error("🛑 EVENT FETCH ERROR:", eventError);
+    // If the error is "PGRST116", it means the ID doesn't exist.
+    // If the error is "401", it means RLS is blocking you.
+    throw eventError;
+  }
       // 2. Fetch Attendees (Joined with profiles)
-      const { data: attendeesData, error: attendeeError } = await supabase
-        .from("event_registrations")
-        .select(
-          `
-          id, status, user_id,
-          user:profiles(first_name, last_name, username, avatar_url),
-          pet:pets(name)
-        `
-        )
-        .eq("event_id", eventId);
+     // Inside hooks/useEventDetails.ts -> queryFn
 
-      if (attendeeError) throw attendeeError;
+// Inside useEventDetails.ts
+// Inside useEventDetails.ts (or ManageEventsPage.tsx)
+
+const { data: attendeesData, error: attendeeError } = await supabase
+  .from("event_registrations")
+  .select(`
+    id, 
+    status, 
+    user_id,
+    user:profiles!event_registrations_user_id_fkey(first_name, last_name, username, avatar_url)
+  `)
+  .eq("event_id", eventId);
+
+if (attendeeError) {
+  console.error("🛑 ATTENDEE FETCH ERROR:", attendeeError);
+  throw attendeeError;
+}
 
       const attendees = (attendeesData as any[]) || [];
 

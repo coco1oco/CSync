@@ -128,7 +128,7 @@ export function About() {
 
           {/* --- EMAIL (Updated to ORANGE Hover) --- */}
           <a
-            href="mailto:support@pawpal.com"
+            href="https://mail.google.com/mail/u/0/#inbox?compose=CllgCJlDTckLZKWJFgGMdlxPkdCHMQJvDFnnsqbTbCkfHjmPGDpHsHCVNwZxJBXZqMZHlCSHnwg"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-xl hover:border-orange-300 hover:shadow-sm transition-all group"

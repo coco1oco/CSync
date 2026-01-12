@@ -190,11 +190,15 @@ export default function ManageEventsPage() {
         .from("event_registrations")
         .select(`
           id, status, created_at, user_id,
-          user:profiles(first_name, last_name, username, avatar_url),
-          pet:pets(name, species)
+          user:profiles!event_registrations_user_id_fkey(first_name, last_name, username, avatar_url),
+          pet:pets!event_registrations_pet_id_fkey(name, species)
         `)
         .eq("event_id", eventId)
         .order("created_at", { ascending: true });
+
+      if (data) {
+        console.log("Attendees Data:", data); // Check the console to see if 'pet' is null
+      }
 
       if (error) throw error;
       setAttendees(data as any);
@@ -626,7 +630,12 @@ const handleExportCSV = () => {
                                     <p className="font-bold text-gray-900 text-sm truncate">{a.user.first_name} {a.user.last_name}</p>
                                     <div className="flex items-center gap-2 text-xs text-gray-500">
                                         <span className="truncate">@{a.user.username}</span>
-                                        {a.pet && ( <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[10px] font-bold truncate max-w-[100px]">+ {a.pet.name}</span> )}
+                                  {a.pet && (
+  <span className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-[10px] font-bold border border-blue-100">
+    <span className="uppercase text-blue-400">{a.pet.species}:</span>
+    {a.pet.name}
+  </span>
+)}
                                         {a.status === 'waitlist' && ( <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase">Waitlist</span> )}
                                         {a.status === 'rejected' && ( <span className="bg-red-100 text-red-700 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase">Rejected</span> )}
                                     </div>

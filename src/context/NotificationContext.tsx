@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/authContext";
 import { toast } from "sonner";
 
-// ✅ 1. Match the correct DB Schema (same as NotificationCenter)
+// ✅ 1. Match the correct DB Schema
 type NotificationType =
   | "message"
   | "reaction"
@@ -35,6 +35,7 @@ export interface Notification {
 type NotificationContextType = {
   notifications: Notification[];
   unreadCount: number;
+  hasUnreadNotifications: boolean; // ✅ Added this for the Red Dot logic
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
   loading: boolean;
@@ -53,8 +54,11 @@ export function NotificationProvider({
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Correctly calculate unread count based on 'is_unread'
+  // ✅ Calculate Count
   const unreadCount = notifications.filter((n) => n.is_unread).length;
+  
+  // ✅ Calculate Boolean for Red Dot
+  const hasUnreadNotifications = unreadCount > 0;
 
   useEffect(() => {
     if (!user) return;
@@ -66,7 +70,7 @@ export function NotificationProvider({
       .on(
         "postgres_changes",
         {
-          event: "*", // Listen to ALL events (INSERT and UPDATE)
+          event: "*", 
           schema: "public",
           table: "notifications",
           filter: `user_id=eq.${user.id}`,
@@ -75,10 +79,10 @@ export function NotificationProvider({
           // Handle INSERT (New Notification)
           if (payload.eventType === "INSERT") {
             // Fetch the full object with sender details
+            // ⚠️ NOTE: If you get an error here, check the Foreign Key name below
             const { data } = await supabase
               .from("notifications")
-              // 👇 FIXED: Changed 'from_user_id' to 'profiles'
-              .select("*, sender:profiles(username, avatar_url)")
+              .select("*, sender:profiles(username, avatar_url)") 
               .eq("id", payload.new.id)
               .single();
 
@@ -107,10 +111,9 @@ export function NotificationProvider({
   }, [user]);
 
   const fetchNotifications = async () => {
-    // ✅ Select sender details so the UI can display avatars/names
+    // ⚠️ NOTE: If 'sender:profiles' fails, try 'sender:profiles!notifications_from_user_id_fkey'
     const { data } = await supabase
       .from("notifications")
-      // 👇 FIXED: Changed 'from_user_id' to 'profiles'
       .select("*, sender:profiles(username, avatar_url)")
       .eq("user_id", user?.id)
       .order("created_at", { ascending: false })
@@ -126,7 +129,6 @@ export function NotificationProvider({
       prev.map((n) => (n.id === id ? { ...n, is_unread: false } : n))
     );
 
-    // ✅ Update 'is_unread' to false
     await supabase
       .from("notifications")
       .update({ is_unread: false, read_at: new Date().toISOString() })
@@ -143,7 +145,14 @@ export function NotificationProvider({
 
   return (
     <NotificationContext.Provider
-      value={{ notifications, unreadCount, markAsRead, markAllAsRead, loading }}
+      value={{ 
+        notifications, 
+        unreadCount, 
+        hasUnreadNotifications, // ✅ Passed to Provider
+        markAsRead, 
+        markAllAsRead, 
+        loading 
+      }}
     >
       {children}
     </NotificationContext.Provider>
