@@ -9,25 +9,26 @@ import {
   X,
   Image as ImageIcon,
   MapPin,
-  Globe,
-  User,
   ExternalLink,
+  User,
 } from "lucide-react";
 import { useAuth } from "@/context/authContext";
 import { motion } from "framer-motion";
 import { notifyNewPost } from "@/lib/NotificationService";
+import { useQueryClient } from "@tanstack/react-query"; // ✅ IMPORTED
 
 export default function CreateEvent() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient(); // ✅ INITIALIZED
 
   const [title, setTitle] = useState("");
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
   const [showLocation, setShowLocation] = useState(false);
 
-  // ✅ UPDATED: Multi-image state
+  // Multi-image state
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
 
@@ -37,7 +38,7 @@ export default function CreateEvent() {
   const [avatarError, setAvatarError] = useState(false);
   const avatarUrl = user?.avatar_url || user?.user_metadata?.avatar_url;
 
-  // ✅ HANDLE MULTIPLE FILES
+  // HANDLE MULTIPLE FILES
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const selectedFiles = Array.from(e.target.files);
@@ -52,15 +53,14 @@ export default function CreateEvent() {
       setPreviewUrls((prev) => [...prev, ...selectedPreviews]);
     }
 
-    // Reset input to allow selecting the same file again if needed
+    // Reset input
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // ✅ REMOVE IMAGE FROM LIST
+  // REMOVE IMAGE FROM LIST
   const handleRemoveImage = (indexToRemove: number) => {
     setImageFiles((prev) => prev.filter((_, i) => i !== indexToRemove));
     setPreviewUrls((prev) => {
-      // Optional: Free memory
       URL.revokeObjectURL(prev[indexToRemove]);
       return prev.filter((_, i) => i !== indexToRemove);
     });
@@ -74,7 +74,7 @@ export default function CreateEvent() {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
- const handleSubmit = async () => {
+  const handleSubmit = async () => {
     if (!title.trim() || !description.trim()) return;
 
     setError("");
@@ -89,7 +89,7 @@ export default function CreateEvent() {
       );
       const uploadedImageUrls = await Promise.all(uploadPromises);
 
-      // 2. Insert into Supabase AND Select the result
+      // 2. Insert into Supabase
       const { data: newPost, error: insertError } = await supabase
         .from("outreach_events")
         .insert([
@@ -99,22 +99,27 @@ export default function CreateEvent() {
             location,
             description,
             images: uploadedImageUrls,
-            event_type: "standard", // Ensure this exists or is default
+            event_type: "standard",
           },
         ])
-        .select() // <--- Important: Select the data back
+        .select()
         .single();
 
       if (insertError) throw insertError;
 
-      // 3. ✅ Trigger Notification manually
+      // 3. Trigger Notification
       if (newPost) {
         void notifyNewPost({
           id: newPost.id,
           admin_id: user.id,
-          username: user.username || "Someone", // Fallback if username isn't in user object
+          username: user.username || "Someone",
         });
       }
+
+      // 4. ✅ CRITICAL FIX: Refresh the feed immediately
+      await queryClient.invalidateQueries({ queryKey: ["feed-events"] });
+      // If you have an admin table view, invalidate that too:
+      await queryClient.invalidateQueries({ queryKey: ["admin-events"] });
 
       setTimeout(() => {
         navigate("/");
@@ -125,7 +130,7 @@ export default function CreateEvent() {
       setLoading(false);
     }
   };
-  
+
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center lg:p-4 isolate">
       <motion.div
@@ -180,8 +185,6 @@ export default function CreateEvent() {
             </div>
 
             <div className="flex-1 space-y-3 pt-1">
-            
-
               {error && (
                 <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100">
                   {error}
@@ -234,7 +237,6 @@ export default function CreateEvent() {
                 </div>
               )}
 
-              {/* ✅ UPDATED: Multi-image Grid Preview */}
               {previewUrls.length > 0 && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
                   {previewUrls.map((url, idx) => (
@@ -282,7 +284,6 @@ export default function CreateEvent() {
             <MapPin className="w-5 h-5" />
           </button>
 
-          {/* ✅ ALLOW MULTIPLE SELECTION */}
           <input
             ref={fileInputRef}
             type="file"

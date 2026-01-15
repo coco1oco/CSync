@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/authContext";
 import { supabase } from "@/lib/supabaseClient";
 import { useDialog } from "@/context/DialogContext";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 
 // Components
@@ -40,6 +40,7 @@ export default function PetProfilePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { confirm, alert } = useDialog();
+  const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState("passport");
   const [healthSubTab, setHealthSubTab] = useState("vaccines");
@@ -77,9 +78,9 @@ export default function PetProfilePage() {
     const isConfirmed = await confirm(
       `This action cannot be undone. All data for ${pet.name} will be lost permanently.`,
       {
-        title: `Delete ${pet.name}?`,
+        title: `Remove ${pet.name}?`,
         variant: "danger",
-        confirmText: "Yes, Delete Profile",
+        confirmText: "Yes, Remove Profile",
         cancelText: "Keep Profile",
       }
     );
@@ -88,9 +89,10 @@ export default function PetProfilePage() {
       setIsDeleting(true);
       try {
         await supabase.from("pets").delete().eq("id", pet.id);
+        await queryClient.invalidateQueries({ queryKey: ["pets"] });
         navigate("/PetDashboard");
       } catch (err) {
-        await alert("Failed to delete profile. Please try again.");
+        await alert("Failed to remove profile. Please try again.");
         setIsDeleting(false);
       }
     }
