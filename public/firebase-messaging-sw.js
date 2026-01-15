@@ -25,3 +25,4 @@ messaging.onBackgroundMessage(function (payload) {
   // ✅ FIX: Do NOT call showNotification() here.
   // The browser/OS handles it automatically for you.
 });
+
