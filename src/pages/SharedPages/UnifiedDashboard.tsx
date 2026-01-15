@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/authContext";
 import { FeedPost } from "@/components/FeedPost";
+import { FeedPostSkeleton } from "@/components/FeedPostSkeleton"; // ✅ NEW IMPORT
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChallengeWidget } from "@/components/ChallengeWidget";
@@ -23,7 +24,6 @@ import {
   Trophy,
 } from "lucide-react";
 import { toast } from "sonner";
-// ❌ REMOVED: useAdminChallenges import
 import { useFeedEvents, useEventMutations } from "@/hooks/useFeedEvents";
 
 export function UnifiedDashboard() {
@@ -45,8 +45,6 @@ export function UnifiedDashboard() {
 
   // MUTATIONS
   const { deleteEvent, toggleVisibility } = useEventMutations();
-
-  // ❌ REMOVED: Admin Challenges Data Hook
 
   const loading = isFeedLoading;
 
@@ -88,30 +86,6 @@ export function UnifiedDashboard() {
         <Skeleton className="h-3 w-24 rounded" />
       </div>
       <Skeleton className="h-8 w-24 rounded-full" />
-    </div>
-  );
-
-  const renderFeedSkeleton = () => (
-    <div className="space-y-6">
-      {[1, 2].map((i) => (
-        <div
-          key={i}
-          className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm space-y-4"
-        >
-          <div className="flex items-center gap-3">
-            <Skeleton className="w-10 h-10 rounded-full" />
-            <div className="space-y-1.5">
-              <Skeleton className="w-32 h-4" />
-              <Skeleton className="w-20 h-3" />
-            </div>
-          </div>
-          <Skeleton className="w-full h-48 rounded-2xl" />
-          <div className="flex justify-between">
-            <Skeleton className="w-16 h-4" />
-            <Skeleton className="w-16 h-4" />
-          </div>
-        </div>
-      ))}
     </div>
   );
 
@@ -223,8 +197,6 @@ export function UnifiedDashboard() {
       <div className="px-4 mt-4 space-y-4">
         {!loading && (
           <>
-            {/* ❌ REMOVED: Challenge History List Widget */}
-
             {/* ✅ Challenge Widget (Active Game) */}
             <ChallengeWidget />
           </>
@@ -281,7 +253,12 @@ export function UnifiedDashboard() {
       {/* --- FEED LIST --- */}
       <div className="space-y-6">
         {loading ? (
-          renderFeedSkeleton()
+          // ✅ NEW: Professional Skeleton Loading
+          <>
+            <FeedPostSkeleton />
+            <FeedPostSkeleton />
+            <FeedPostSkeleton />
+          </>
         ) : filteredEvents.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center mx-4">
             <LayoutGrid className="w-12 h-12 text-gray-300 mb-3" />

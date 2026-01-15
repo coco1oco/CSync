@@ -29,10 +29,10 @@ const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/;
 const signUpSchema = z
   .object({
     email: z.string().min(1, "Email is required").email("Invalid email format"),
-    //.regex(
-    //  CVSU_EMAIL_REGEX,
-    //  "Please use your institutional email (@cvsu.edu.ph)"
-    //),
+    .regex(
+      CVSU_EMAIL_REGEX,
+      "Please use your institutional email (@cvsu.edu.ph)"
+    ),
     username: z
       .string()
       .min(1, "Username is required")
