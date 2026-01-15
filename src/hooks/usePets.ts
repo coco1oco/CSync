@@ -34,7 +34,7 @@ export function usePets(
       if (error) throw error;
       return data as Pet[];
     },
-    // Keep data fresh for 5 minutes (User switches tabs instantly)
+    // Keep data fresh for 5 minutes
     staleTime: 1000 * 60 * 5,
   });
 
@@ -63,8 +63,14 @@ export function usePets(
       return data;
     },
     onSuccess: () => {
-      // Refresh the list immediately
-      queryClient.invalidateQueries({ queryKey: ["pets", userId, mode] });
+      // ✅ FIX 1: Broad Invalidation
+      // This forces "pets" list to refresh immediately, ignoring the 5-minute staleTime.
+      queryClient.invalidateQueries({ queryKey: ["pets"] });
+
+      // ✅ FIX 2: Update Dashboard Stats
+      // This ensures the "Total Pets" counter on the dashboard increments instantly.
+      queryClient.invalidateQueries({ queryKey: ["dashboard-personal"] });
+
       toast.success("Pet added successfully!");
     },
     onError: (err: any) => {
@@ -79,8 +85,14 @@ export function usePets(
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["pets", userId, mode] });
-      toast.success("Pet deleted");
+      // ✅ FIX 3: Same invalidations for Delete
+      queryClient.invalidateQueries({ queryKey: ["pets"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-personal"] });
+
+      toast.success("Pet profile deleted");
+    },
+    onError: (err: any) => {
+      toast.error("Failed to delete pet");
     },
   });
 
@@ -90,6 +102,5 @@ export function usePets(
     error: error ? (error as Error).message : null,
     addPet: addPetMutation.mutateAsync,
     deletePet: deletePetMutation.mutateAsync,
-    // You can add updatePet similarly if needed
   };
 }

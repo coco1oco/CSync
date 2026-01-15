@@ -7,6 +7,9 @@ import { formatDistanceToNow, format, parseISO } from "date-fns";
 import {
   Plus,
   Dog,
+  Cat,
+  Bird,
+  Rabbit,
   PawPrint,
   Building2,
   Syringe,
@@ -69,8 +72,31 @@ interface RoutineItem {
   type: "inventory" | "activity";
   times: string[];
   pet_id: string;
-  pets?: { name: string; petimage_url: string | null };
+  pets?: { name: string; petimage_url: string | null; species: string }; // ✅ Added species
 }
+
+// ✅ HELPER: Get Dynamic Icon (Reusable)
+const getSpeciesIcon = (
+  species?: string,
+  size: number = 24,
+  className?: string
+) => {
+  const s = species?.toLowerCase() || "";
+  const props = { size, className: className || "text-blue-300/80" };
+
+  switch (s) {
+    case "dog":
+      return <Dog {...props} />;
+    case "cat":
+      return <Cat {...props} />;
+    case "bird":
+      return <Bird {...props} />;
+    case "rabbit":
+      return <Rabbit {...props} />;
+    default:
+      return <PawPrint {...props} />;
+  }
+};
 
 export default function MainPetProfilePage() {
   const { user } = useAuth();
@@ -82,14 +108,12 @@ export default function MainPetProfilePage() {
   const [isSymptomOpen, setIsSymptomOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Collapsible View State
   const [showAllTasks, setShowAllTasks] = useState(false);
 
-  // Wizard State for "Smart Routine"
   const [newRoutine, setNewRoutine] = useState({
     name: "",
-    type: "inventory", // inventory, activity
-    subType: "pill", // pill, liquid, food
+    type: "inventory",
+    subType: "pill",
     pet_id: "",
     current_stock_input: "",
     unit: "pills",
@@ -151,7 +175,8 @@ export default function MainPetProfilePage() {
           .maybeSingle(),
         supabase
           .from("medications")
-          .select("*, pets(name, petimage_url)")
+          // ✅ UPDATED: Fetch species for tiny icons
+          .select("*, pets(name, petimage_url, species)")
           .eq("owner_id", user.id)
           .order("created_at", { ascending: false }),
         supabase
@@ -244,7 +269,6 @@ export default function MainPetProfilePage() {
 
   // --- ACTIONS ---
 
-  // 1. Routine Toggle (with Time-Specific Backdating)
   const toggleRoutineCheck = async (
     routine: RoutineItem,
     period: "morning" | "afternoon" | "evening"
@@ -252,7 +276,6 @@ export default function MainPetProfilePage() {
     const uniqueKey = `${routine.id}-${period}`;
     const isChecking = !completedInstances.has(uniqueKey);
 
-    // Calculate correct timestamp based on the period (fixing the evening bug)
     const now = new Date();
     let targetTime = new Date();
     if (period === "morning") targetTime.setHours(9, 0, 0, 0);
@@ -264,7 +287,6 @@ export default function MainPetProfilePage() {
 
     const logTimestamp = targetTime.toISOString();
 
-    // Optimistic Update
     queryClient.setQueryData(["dashboard-personal", user?.id], (old: any) => {
       if (!old) return old;
       const newLogs = isChecking
@@ -288,7 +310,6 @@ export default function MainPetProfilePage() {
 
     try {
       if (isChecking) {
-        // Add Log
         const payload = {
           medication_id: routine.id,
           pet_id: routine.pet_id,
@@ -298,7 +319,6 @@ export default function MainPetProfilePage() {
         };
         await supabase.from("medication_logs").insert(payload);
 
-        // Update Stock
         if (routine.type === "inventory") {
           const newStock = routine.current_stock - routine.dosage_per_use;
           await supabase
@@ -308,7 +328,6 @@ export default function MainPetProfilePage() {
         }
         toast.success(`Completed ${routine.name}`);
       } else {
-        // Remove Log
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
         const { data: logs } = await supabase
@@ -348,7 +367,6 @@ export default function MainPetProfilePage() {
     }
   };
 
-  // 2. Log Symptom (This was missing)
   const handleLogSymptom = async (
     petId: string,
     symptom: string,
@@ -371,7 +389,6 @@ export default function MainPetProfilePage() {
     }
   };
 
-  // 3. Add Routine (Wizard Logic)
   const handleAddRoutine = async () => {
     if (!user || !newRoutine.pet_id || !newRoutine.name) return;
     setIsSubmitting(true);
@@ -418,7 +435,6 @@ export default function MainPetProfilePage() {
     }
   };
 
-  // 4. Presets & Toggles
   const applyPreset = (type: string) => {
     const defaultPet = pets.length > 0 ? pets[0].id : "";
     if (type === "food")
@@ -525,7 +541,6 @@ export default function MainPetProfilePage() {
           </div>
         </div>
 
-        {/* ✅ EMPTY STATE: No Pets Added Yet */}
         {pets.length === 0 ? (
           <div className="mt-4 p-8 bg-white border border-dashed border-gray-300 rounded-3xl flex flex-col items-center text-center animate-in fade-in slide-in-from-bottom-4">
             <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-4 text-blue-500 shadow-sm relative">
@@ -547,7 +562,6 @@ export default function MainPetProfilePage() {
             </Button>
           </div>
         ) : (
-          /* ✅ NORMAL DASHBOARD */
           <>
             {dashboard && (
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 animate-in fade-in slide-in-from-top-2">
@@ -788,7 +802,7 @@ export default function MainPetProfilePage() {
         )}
       </div>
 
-      {/* 5. PET PROFILES GRID (Preserved) */}
+      {/* 5. PET PROFILES GRID */}
       {pets.length > 0 && (
         <div className="flex-1 overflow-y-auto px-4 lg:px-8 pb-24 lg:pb-8">
           <div className="flex items-center justify-between mb-4 mt-2">
@@ -810,11 +824,18 @@ export default function MainPetProfilePage() {
                 className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer group flex flex-col"
               >
                 <div className="aspect-[4/3] rounded-xl bg-gray-100 overflow-hidden relative mb-3">
-                  <img
-                    src={pet.petimage_url || "https://placehold.co/400"}
-                    alt={pet.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
+                  {/* ✅ FIXED: Dynamic Grid Icon */}
+                  {pet.petimage_url ? (
+                    <img
+                      src={pet.petimage_url}
+                      alt={pet.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-blue-50/50 group-hover:scale-105 transition-transform duration-500">
+                      {getSpeciesIcon(pet.species, 48)}
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center justify-between px-1">
                   <h3 className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
@@ -830,7 +851,7 @@ export default function MainPetProfilePage() {
         </div>
       )}
 
-      {/* RESTORED: "Smart Routine" Modal Wizard */}
+      {/* Routine Modal */}
       {isAddRoutineOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white w-full max-w-2xl rounded-3xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
@@ -928,12 +949,17 @@ export default function MainPetProfilePage() {
                             : "border-transparent bg-gray-50 text-gray-500 hover:bg-gray-100"
                         )}
                       >
-                        <div className="w-6 h-6 rounded-full bg-white overflow-hidden shadow-sm">
-                          <img
-                            src={pet.petimage_url || "https://placehold.co/100"}
-                            alt={pet.name}
-                            className="w-full h-full object-cover"
-                          />
+                        <div className="w-6 h-6 rounded-full bg-white overflow-hidden shadow-sm flex items-center justify-center bg-blue-50/50">
+                          {/* ✅ FIXED: Dynamic Wizard Icon */}
+                          {pet.petimage_url ? (
+                            <img
+                              src={pet.petimage_url}
+                              alt={pet.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            getSpeciesIcon(pet.species, 14)
+                          )}
                         </div>
                         <span className="text-xs">{pet.name}</span>
                       </button>
@@ -1211,10 +1237,15 @@ function DashboardTaskGroup({
                 </p>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-gray-400 font-medium flex items-center gap-1">
-                    <img
-                      src={task.pets?.petimage_url || "https://placehold.co/20"}
-                      className="w-3 h-3 rounded-full object-cover"
-                    />{" "}
+                    {/* ✅ FIXED: Dynamic Task Icon */}
+                    {task.pets?.petimage_url ? (
+                      <img
+                        src={task.pets?.petimage_url}
+                        className="w-3 h-3 rounded-full object-cover"
+                      />
+                    ) : (
+                      getSpeciesIcon(task.pets?.species, 12, "text-gray-400")
+                    )}{" "}
                     {task.pets?.name}
                   </span>
                 </div>
