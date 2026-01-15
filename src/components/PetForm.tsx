@@ -6,12 +6,16 @@ import {
   Camera,
   Info,
   Scissors,
-  Activity,
   AlertTriangle,
-} from "lucide-react"; // Added icons
-import { Switch } from "@/components/ui/switch"; // Ensure you have this or use a checkbox
+  Dog,
+  Cat,
+  Bird,
+  Rabbit,
+  PawPrint,
+} from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
-// Shared Breed Data (Kept the same)
+// Shared Breed Data
 const BREED_DATA: Record<string, string[]> = {
   Dog: [
     "Aspin (Askal)",
@@ -65,17 +69,16 @@ export interface PetFormData {
   microchip_id: string;
   imageFile?: File | null;
   petimage_url?: string;
-  // ✅ Added these for Campus Pets
   spayed_neutered?: boolean;
   status?: string;
 }
 
 interface PetFormProps {
   initialData?: Partial<PetFormData>;
-  onSubmit: (data: PetFormData) => Promise<void>;
+  onSubmit: (data: PetFormData) => void | Promise<void>;
   isSubmitting: boolean;
   submitLabel: string;
-  isCampusMode?: boolean; // ✅ Added prop
+  isCampusMode?: boolean;
 }
 
 export default function PetForm({
@@ -146,10 +149,29 @@ export default function PetForm({
     onSubmit(formData);
   };
 
+  const getPlaceholderIcon = () => {
+    const props = { size: 48, className: "text-blue-500" };
+    switch (formData.species) {
+      case "Dog":
+        return <Dog {...props} />;
+      case "Cat":
+        return <Cat {...props} />;
+      case "Bird":
+        return <Bird {...props} />;
+      case "Rabbit":
+        return <Rabbit {...props} />;
+      default:
+        return <PawPrint {...props} />;
+    }
+  };
+
+  // ✅ Use local date to safely prevent "tomorrow" in user's timezone
+  const today = new Date().toLocaleDateString("en-CA");
+
   return (
     <form onSubmit={handleSubmit} className="w-full">
       <div className="flex flex-col lg:flex-row gap-8 items-start">
-        {/* === LEFT COLUMN: PHOTO UPLOAD (Sticky on Desktop) === */}
+        {/* === LEFT COLUMN: PHOTO UPLOAD === */}
         <div className="w-full lg:w-1/3 space-y-6 lg:sticky lg:top-24">
           <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
             <h3 className="font-bold text-gray-900 mb-4">Pet Photo</h3>
@@ -183,10 +205,10 @@ export default function PetForm({
               ) : (
                 <label className="flex flex-col items-center justify-center w-full h-full cursor-pointer hover:bg-blue-50/50 transition-colors">
                   <div className="p-4 bg-blue-50 text-blue-500 rounded-full mb-3">
-                    <Upload size={32} />
+                    {getPlaceholderIcon()}
                   </div>
                   <span className="font-semibold text-gray-500">
-                    Upload Photo
+                    {formData.imageFile ? "Change Photo" : "Upload Photo"}
                   </span>
                   <span className="text-xs text-gray-400 mt-1">
                     Supports JPG, PNG
@@ -217,12 +239,10 @@ export default function PetForm({
         {/* === RIGHT COLUMN: FORM FIELDS === */}
         <div className="w-full lg:w-2/3">
           <div className="bg-white p-6 lg:p-8 rounded-3xl border border-gray-100 shadow-sm space-y-8">
-            {/* Section: Identity */}
             <div className="space-y-6">
               <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 pb-2 border-b border-gray-100">
                 1. Basic Identity
               </h3>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
@@ -238,7 +258,6 @@ export default function PetForm({
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium transition-all"
                   />
                 </div>
-
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
                     Species
@@ -257,7 +276,6 @@ export default function PetForm({
                     <option value="Other">Other</option>
                   </select>
                 </div>
-
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
                     Breed
@@ -280,23 +298,22 @@ export default function PetForm({
               </div>
             </div>
 
-            {/* Section: Physical Details */}
             <div className="space-y-6">
               <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 pb-2 border-b border-gray-100 pt-4">
                 2. Physical Details
               </h3>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
                     Date of Birth
                   </label>
+                  {/* ✅ Added max attribute to prevent future dates */}
                   <input
                     type="date"
                     name="dob"
                     value={formData.dob}
+                    max={today}
                     onChange={handleChange}
-                    max={new Date().toISOString().split("T")[0]}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium transition-all"
                   />
                 </div>
@@ -315,7 +332,6 @@ export default function PetForm({
                     <option value="Female">Female</option>
                   </select>
                 </div>
-
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
                     Color / Markings
@@ -330,7 +346,6 @@ export default function PetForm({
                   />
                 </div>
 
-                {/* 🚨 CAMPUS MODE: Show CNVR Toggle instead of Microchip */}
                 {isCampusMode ? (
                   <div className="md:col-span-2 bg-blue-50 p-4 rounded-xl flex items-center justify-between border border-blue-100">
                     <div className="flex items-center gap-3">
@@ -370,7 +385,6 @@ export default function PetForm({
                   </div>
                 )}
 
-                {/* 🚨 CAMPUS MODE: Show Status Dropdown */}
                 {isCampusMode && (
                   <div className="md:col-span-2">
                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
@@ -399,7 +413,6 @@ export default function PetForm({
               </div>
             </div>
 
-            {/* Section: Location (Full Width) */}
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
                 Location / Address
