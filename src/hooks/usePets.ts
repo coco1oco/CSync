@@ -34,7 +34,7 @@ export function usePets(
       if (error) throw error;
       return data as Pet[];
     },
-    // Keep data fresh for 5 minutes (User switches tabs instantly)
+    // Keep data fresh for 5 minutes
     staleTime: 1000 * 60 * 5,
   });
 
@@ -63,9 +63,14 @@ export function usePets(
       return data;
     },
     onSuccess: () => {
-      // ✅ FIX: Invalidate ALL pet queries (including menus and dashboards)
-      // This forces React Query to re-fetch any list starting with "pets"
+      // ✅ FIX 1: Broad Invalidation
+      // This forces "pets" list to refresh immediately, ignoring the 5-minute staleTime.
       queryClient.invalidateQueries({ queryKey: ["pets"] });
+
+      // ✅ FIX 2: Update Dashboard Stats
+      // This ensures the "Total Pets" counter on the dashboard increments instantly.
+      queryClient.invalidateQueries({ queryKey: ["dashboard-personal"] });
+
       toast.success("Pet added successfully!");
     },
     onError: (err: any) => {
@@ -80,9 +85,14 @@ export function usePets(
       if (error) throw error;
     },
     onSuccess: () => {
-      // ✅ FIX: Also invalidate all pet lists on delete
+      // ✅ FIX 3: Same invalidations for Delete
       queryClient.invalidateQueries({ queryKey: ["pets"] });
-      toast.success("Pet deleted");
+      queryClient.invalidateQueries({ queryKey: ["dashboard-personal"] });
+
+      toast.success("Pet profile deleted");
+    },
+    onError: (err: any) => {
+      toast.error("Failed to delete pet");
     },
   });
 
