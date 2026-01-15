@@ -520,7 +520,7 @@ export default function MainPetProfilePage() {
               onClick={() => navigate("/campus-pets")}
               className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold text-gray-500 hover:bg-gray-50 hover:text-blue-600 transition-all"
             >
-              <Building2 size={16} /> Campus Dogs
+              <Building2 size={16} /> Campus Pets
             </button>
           </div>
         </div>
