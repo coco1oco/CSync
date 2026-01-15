@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { MoreHorizontal, Edit, Trash2, MapPin, X } from "lucide-react";
@@ -72,6 +72,8 @@ export function EventCard({
   const [[page, direction], setPage] = useState([0, 0]);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const lastDragRef = useRef(0);
 
   // ✅ FIX: Check 'admin' first (from Dashboard fetch), then 'profiles' (standard join)
   const displayName =
@@ -93,6 +95,11 @@ export function EventCard({
   const paginate = (newDirection: number) => {
     setPage([page + newDirection, newDirection]);
   };
+
+  const swipeConfidenceThreshold = 10000;
+  const swipeOffsetThreshold = 120;
+  const swipePower = (offset: number, velocity: number) =>
+    Math.abs(offset) * velocity;
 
   const dateStr = formatRelativeTime(created_at);
 
@@ -222,7 +229,11 @@ export function EventCard({
         <div className="px-0 md:px-4 pb-3">
           <div
             className="relative w-full aspect-square bg-gray-100 md:rounded-2xl overflow-hidden cursor-pointer border-y md:border border-gray-100 shadow-sm"
-            onClick={() => setIsLightboxOpen(true)}
+            onClick={() => {
+              if (!isDragging && Date.now() - lastDragRef.current > 200) {
+                setIsLightboxOpen(true);
+              }
+            }}
           >
             <AnimatePresence initial={false} custom={direction}>
               <motion.img
@@ -237,13 +248,24 @@ export function EventCard({
                   x: { type: "spring", stiffness: 300, damping: 30 },
                   opacity: { duration: 0.2 },
                 }}
-                drag="x"
+                drag={images.length > 1 ? "x" : false}
                 dragConstraints={{ left: 0, right: 0 }}
-                dragElastic={1}
+                dragElastic={0.15}
+                onDragStart={() => {
+                  setIsDragging(true);
+                  lastDragRef.current = Date.now();
+                }}
                 onDragEnd={(e, { offset, velocity }) => {
                   void e;
-                  if (Math.abs(offset.x * velocity.x) > 10000)
+                  lastDragRef.current = Date.now();
+                  const swipe = swipePower(offset.x, velocity.x);
+                  if (
+                    Math.abs(offset.x) > swipeOffsetThreshold ||
+                    Math.abs(swipe) > swipeConfidenceThreshold
+                  ) {
                     paginate(offset.x > 0 ? -1 : 1);
+                  }
+                  setIsDragging(false);
                 }}
                 alt="Post"
                 className="absolute w-full h-full object-cover"
