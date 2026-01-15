@@ -77,9 +77,9 @@ export default function PetProfilePage() {
     const isConfirmed = await confirm(
       `This action cannot be undone. All data for ${pet.name} will be lost permanently.`,
       {
-        title: `Delete ${pet.name}?`,
+        title: `Remove ${pet.name}?`,
         variant: "danger",
-        confirmText: "Yes, Delete Profile",
+        confirmText: "Yes, Remove Profile",
         cancelText: "Keep Profile",
       }
     );
@@ -90,7 +90,7 @@ export default function PetProfilePage() {
         await supabase.from("pets").delete().eq("id", pet.id);
         navigate("/PetDashboard");
       } catch (err) {
-        await alert("Failed to delete profile. Please try again.");
+        await alert("Failed to remove profile. Please try again.");
         setIsDeleting(false);
       }
     }

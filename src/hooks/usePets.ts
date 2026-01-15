@@ -63,8 +63,9 @@ export function usePets(
       return data;
     },
     onSuccess: () => {
-      // Refresh the list immediately
-      queryClient.invalidateQueries({ queryKey: ["pets", userId, mode] });
+      // ✅ FIX: Invalidate ALL pet queries (including menus and dashboards)
+      // This forces React Query to re-fetch any list starting with "pets"
+      queryClient.invalidateQueries({ queryKey: ["pets"] });
       toast.success("Pet added successfully!");
     },
     onError: (err: any) => {
@@ -79,7 +80,8 @@ export function usePets(
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["pets", userId, mode] });
+      // ✅ FIX: Also invalidate all pet lists on delete
+      queryClient.invalidateQueries({ queryKey: ["pets"] });
       toast.success("Pet deleted");
     },
   });
@@ -90,6 +92,5 @@ export function usePets(
     error: error ? (error as Error).message : null,
     addPet: addPetMutation.mutateAsync,
     deletePet: deletePetMutation.mutateAsync,
-    // You can add updatePet similarly if needed
   };
 }
