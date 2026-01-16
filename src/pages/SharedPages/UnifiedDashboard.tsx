@@ -184,7 +184,7 @@ export function UnifiedDashboard() {
                     <div className="p-1 bg-gray-100 text-gray-600 rounded-md">
                       <Settings className="w-4 h-4" />
                     </div>
-                    <span className="font-bold text-xs">Manage Guests</span>
+                    <span className="font-bold text-xs">Manage</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
