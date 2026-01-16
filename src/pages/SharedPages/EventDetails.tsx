@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
   ArrowLeft, Loader2, Heart, MessageCircle, MoreHorizontal, 
-  Trash2, Edit, Send, Reply, X, ChevronLeft, ChevronRight 
+  Trash2, Send, Reply, X, ChevronLeft, ChevronRight 
 } from "lucide-react";
 import { FeedPost } from "@/components/FeedPost"; 
 import {
@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import FailedImageIcon from "@/assets/FailedImage.svg";
-import { LikesListModal } from "@/components/LikesListModal"; // ✅ Added
+import { LikesListModal } from "@/components/LikesListModal";
 
 // --- Notification Imports ---
 import {
@@ -90,7 +90,7 @@ export default function EventDetails() {
   const [isPostLiked, setIsPostLiked] = useState(false);
   const [isLikingPost, setIsLikingPost] = useState(false);
 
-  // ✅ New: Likes Modal State (For the Post)
+  // Likes Modal State (For the Post)
   const [showPostLikesModal, setShowPostLikesModal] = useState(false);
 
   // --- ANIMATION STATES ---
@@ -283,7 +283,8 @@ export default function EventDetails() {
     } catch (err) { alert("Error deleting"); }
   };
 
-  const handleEditPost = () => { navigate(`/edit-event/${id}`); };
+  // No handleEditPost needed if you removed it, but keeping it for the post itself is fine.
+  // The user asked to remove edits in comments.
 
   const handlePostComment = async (e?: React.FormEvent) => {
     if(e) e.preventDefault();
@@ -349,10 +350,7 @@ export default function EventDetails() {
       await supabase.from("comments").delete().eq("id", commentId);
   };
 
-  const handleEditComment = async (commentId: string, newContent: string) => {
-      setComments(prev => prev.map(c => c.id === commentId ? { ...c, content: newContent, updated_at: new Date().toISOString() } : c));
-      await supabase.from("comments").update({ content: newContent, updated_at: new Date().toISOString() }).eq("id", commentId);
-  };
+  // ✅ REMOVED: handleEditComment function
 
   const handleReplyClick = (comment: CommentWithExtras) => {
       setNewComment(`@${comment.user.username} `);
@@ -422,7 +420,7 @@ export default function EventDetails() {
          event={event!}
          user={currentUser}
          onDelete={handleDeleteComment}
-         onEdit={handleEditComment}
+         // ✅ REMOVED: onEdit prop
          onReply={handleReplyClick}
          isReply={isReply}
          isHighlighted={highlightedCommentId === comment.id} 
@@ -455,13 +453,13 @@ export default function EventDetails() {
             <div className="relative bg-white w-full max-w-[1000px] h-[85vh] rounded-xl shadow-2xl border border-gray-200 flex overflow-hidden z-10">
             <div className="w-[60%] h-full flex flex-col border-r border-gray-200 bg-white relative">
                <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className={`absolute top-4 left-4 z-20 rounded-full border ${hasImages ? "bg-black/50 hover:bg-black/70 text-white border-white/10" : "bg-white hover:bg-gray-100 text-gray-700 border-gray-200"}`}
-                    onClick={() => navigate(-1)}
-                >
-                    <ArrowLeft className="w-5 h-5" />
-                </Button>
+                   variant="ghost" 
+                   size="icon" 
+                   className={`absolute top-4 left-4 z-20 rounded-full border ${hasImages ? "bg-black/50 hover:bg-black/70 text-white border-white/10" : "bg-white hover:bg-gray-100 text-gray-700 border-gray-200"}`}
+                   onClick={() => navigate(-1)}
+               >
+                   <ArrowLeft className="w-5 h-5" />
+               </Button>
 
              {hasImages ? (
               <>
@@ -521,7 +519,6 @@ export default function EventDetails() {
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="w-4 h-4" /></Button></DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={handleEditPost}><Edit className="w-3 h-3 mr-2"/>Edit</DropdownMenuItem>
                                 <DropdownMenuItem onClick={handleDeletePost} className="text-red-600"><Trash2 className="w-3 h-3 mr-2"/>Delete</DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -565,8 +562,8 @@ export default function EventDetails() {
                              <div className="flex items-center gap-1.5">
                                 <button onClick={togglePostLike} className="group flex items-center hover:opacity-80 transition-opacity focus:outline-none">
                                     <Heart className={`w-6 h-6 transition-transform duration-300 ${isPostLiked ? "fill-red-500 text-red-500" : "text-gray-900 group-hover:text-gray-600"}`}
-                                        style={{ transform: heartBump ? "scale(1.5)" : "scale(1)", transition: "transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)" }} 
-                                        strokeWidth={isPostLiked || heartBump ? 0 : 1.5}
+                                            style={{ transform: heartBump ? "scale(1.5)" : "scale(1)", transition: "transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)" }} 
+                                            strokeWidth={isPostLiked || heartBump ? 0 : 1.5}
                                     />
                                 </button>
                                 {postLikesCount > 0 && (
@@ -579,7 +576,7 @@ export default function EventDetails() {
                                  <MessageCircle className="w-6 h-6 text-gray-900 group-hover:text-gray-600" strokeWidth={1.5}/>
                                  <span className="text-sm font-semibold text-gray-900">{comments.length > 0 ? comments.length : ""}</span>
                              </button>
-                         </div>
+                          </div>
                     </div>
                     <div className="relative">
                         {activeReplyId && (
@@ -619,19 +616,18 @@ interface CommentItemProps {
   user: any;
   onDelete: (id: string) => void;
   onReply: (comment: CommentWithExtras) => void;
-  onEdit: (id: string, newContent: string) => void;
+  // ✅ REMOVED: onEdit prop definition
   isReply?: boolean;
   isHighlighted?: boolean;
 }
 
-function CommentItem({ event, comment, user, onDelete, onReply, onEdit, isReply = false, isHighlighted = false }: CommentItemProps) {
+function CommentItem({ event, comment, user, onDelete, onReply, isReply = false, isHighlighted = false }: CommentItemProps) {
     const [likesCount, setLikesCount] = useState(comment.likes_count || 0);
     const [isLiked, setIsLiked] = useState(comment.is_liked_by_user || false);
     const [isLiking, setIsLiking] = useState(false);
-    const [isEditing, setIsEditing] = useState(false);
-    const [editContent, setEditContent] = useState(comment.content);
     
-    // ✅ New: Local state for comment likes modal
+    // ✅ REMOVED: isEditing, editContent state
+
     const [showCommentLikesModal, setShowCommentLikesModal] = useState(false);
 
     const isEdited = comment.updated_at && comment.updated_at !== comment.created_at;
@@ -652,12 +648,7 @@ function CommentItem({ event, comment, user, onDelete, onReply, onEdit, isReply 
         finally { setIsLiking(false); }
     };
 
-    const handleSave = () => {
-        if(editContent.trim()) {
-            onEdit(comment.id, editContent);
-            setIsEditing(false);
-        }
-    };
+    // ✅ REMOVED: handleSave function
 
     const renderContentWithTags = (text: string) => {
         if (!text) return "";
@@ -677,28 +668,18 @@ function CommentItem({ event, comment, user, onDelete, onReply, onEdit, isReply 
                  <div className="flex flex-col">
                      <div className="flex items-baseline gap-2">
                          <span className="font-bold text-xs text-gray-900">{comment.user?.username || "Unknown"}</span>
-                         {isEditing ? (
-                             <div className="flex-1">
-                                 <Input value={editContent} onChange={e => setEditContent(e.target.value)} className="h-7 text-xs" autoFocus />
-                                 <div className="flex gap-2 mt-1">
-                                     <span onClick={handleSave} className="text-[10px] font-bold text-blue-600 cursor-pointer hover:underline">Save</span>
-                                     <span onClick={() => { setIsEditing(false); setEditContent(comment.content); }} className="text-[10px] text-gray-500 cursor-pointer hover:underline">Cancel</span>
-                                 </div>
-                             </div>
-                         ) : (
-                             <span className="text-xs text-gray-700 break-words whitespace-pre-wrap">{renderContentWithTags(comment.content)}</span>
-                         )}
+                         {/* ✅ REMOVED: isEditing check, just showing content */}
+                         <span className="text-xs text-gray-700 break-words whitespace-pre-wrap">{renderContentWithTags(comment.content)}</span>
                      </div>
                  </div>
-                 {!isEditing && (
-                    <div className="flex items-center gap-3 px-0.5 mt-0.5">
+                 
+                 <div className="flex items-center gap-3 px-0.5 mt-0.5">
                         <span className="text-[10px] text-gray-400 font-medium">{formatRelativeTime(comment.created_at)}{isEdited && <span className="ml-1 italic"> (edited)</span>}</span>
                         
                         <div className="flex items-center gap-1 group/like">
                             <button onClick={toggleLike} disabled={isLiking} className="flex items-center disabled:opacity-50">
                                 <Heart size={10} className={`transition-colors ${isLiked ? "fill-red-500 text-red-500" : "text-gray-400 group-hover/like:text-red-500"}`} />
                             </button>
-                            {/* ✅ Clickable Comment Likes */}
                             <button onClick={() => likesCount > 0 && setShowCommentLikesModal(true)} disabled={likesCount === 0} className={`text-[10px] font-semibold ${likesCount > 0 ? "text-gray-500 hover:text-gray-900 hover:underline cursor-pointer" : "text-gray-400 cursor-default"}`}>
                                 {likesCount > 0 ? likesCount : ""}
                             </button>
@@ -710,16 +691,14 @@ function CommentItem({ event, comment, user, onDelete, onReply, onEdit, isReply 
                             <DropdownMenu>
                                 <DropdownMenuTrigger className="focus:outline-none opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity"><MoreHorizontal size={12} className="text-gray-400 hover:text-gray-700" /></DropdownMenuTrigger>
                                 <DropdownMenuContent align="start" className="w-28 bg-white">
-                                    {user?.id === comment.user_id && <DropdownMenuItem onClick={() => setIsEditing(true)}><Edit size={10} className="mr-2" /><span className="text-[10px]">Edit</span></DropdownMenuItem>}
+                                    {/* ✅ REMOVED: Edit option */}
                                     <DropdownMenuItem onClick={() => onDelete(comment.id)} className="text-red-600"><Trash2 size={10} className="mr-2" /><span className="text-[10px]">Delete</span></DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         )}
                     </div>
-                 )}
              </div>
 
-             {/* ✅ Render the Modal for THIS Comment */}
              <LikesListModal 
                 isOpen={showCommentLikesModal}
                 onClose={() => setShowCommentLikesModal(false)}
