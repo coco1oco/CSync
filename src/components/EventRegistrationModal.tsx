@@ -2,7 +2,15 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/authContext";
-import { X, Loader2, MapPin, Calendar, CheckCircle2, User, Hourglass } from "lucide-react";
+import {
+  X,
+  Loader2,
+  MapPin,
+  Calendar,
+  CheckCircle2,
+  User,
+  Hourglass,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import FailedImageIcon from "@/assets/FailedImage.svg";
@@ -40,9 +48,11 @@ export function EventRegistrationModal({
   const [selectedPetId, setSelectedPetId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchingPets, setFetchingPets] = useState(true);
-  
+
   // ✅ Track the resulting status for UI feedback (Approved vs Waitlist)
-  const [resultStatus, setResultStatus] = useState<"approved" | "waitlist" | null>(null);
+  const [resultStatus, setResultStatus] = useState<
+    "approved" | "waitlist" | null
+  >(null);
 
   const isPetEvent = eventType === "pet";
 
@@ -126,7 +136,7 @@ export function EventRegistrationModal({
 
       // E. Success UI
       setResultStatus(statusToSave);
-      
+
       // Trigger parent update immediately
       onSuccess();
 
@@ -134,7 +144,6 @@ export function EventRegistrationModal({
       setTimeout(() => {
         onClose();
       }, 2500);
-
     } catch (err) {
       console.error(err);
       toast.error("Failed to register");
@@ -150,27 +159,32 @@ export function EventRegistrationModal({
       />
 
       <div className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-        
         {/* ✅ SUCCESS OVERLAY (Dynamic based on status) */}
         {resultStatus && (
-          <div className={`absolute inset-0 z-10 flex flex-col items-center justify-center text-white p-6 text-center animate-in fade-in ${
-            resultStatus === 'waitlist' ? 'bg-amber-500' : 'bg-green-500'
-          }`}>
-            <div className={`w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-lg ${
-               resultStatus === 'waitlist' ? 'text-amber-600' : 'text-green-600'
-            }`}>
-              {resultStatus === 'waitlist' ? (
+          <div
+            className={`absolute inset-0 z-10 flex flex-col items-center justify-center text-white p-6 text-center animate-in fade-in ${
+              resultStatus === "waitlist" ? "bg-amber-500" : "bg-green-500"
+            }`}
+          >
+            <div
+              className={`w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-lg ${
+                resultStatus === "waitlist"
+                  ? "text-amber-600"
+                  : "text-green-600"
+              }`}
+            >
+              {resultStatus === "waitlist" ? (
                 <Hourglass size={32} strokeWidth={3} />
               ) : (
                 <CheckCircle2 size={32} strokeWidth={3} />
               )}
             </div>
             <h2 className="text-2xl font-black mb-1">
-              {resultStatus === 'waitlist' ? "Added to Waitlist" : "You're In!"}
+              {resultStatus === "waitlist" ? "Added to Waitlist" : "You're In!"}
             </h2>
             <p className="font-medium opacity-90">
-              {resultStatus === 'waitlist' 
-                ? "The event is full, but we'll notify you if a spot opens!" 
+              {resultStatus === "waitlist"
+                ? "The event is full, but we'll notify you if a spot opens!"
                 : "See you there!"}
             </p>
           </div>

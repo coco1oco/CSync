@@ -262,7 +262,11 @@ export default function CampusPetsPage() {
               disabled
               className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold bg-blue-600 text-white shadow-md cursor-default"
             >
+<<<<<<< HEAD
               <Building2 size={16} /> Campus Pets
+=======
+              <Building2 size={16} /> Campus Resident
+>>>>>>> origin/defense
             </button>
           </div>
         </div>

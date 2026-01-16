@@ -64,11 +64,13 @@ export function usePets(
     },
     onSuccess: () => {
       // ✅ FIX 1: Broad Invalidation
-      // This forces "pets" list to refresh immediately, ignoring the 5-minute staleTime.
       queryClient.invalidateQueries({ queryKey: ["pets"] });
 
-      // ✅ FIX 2: Update Dashboard Stats
-      // This ensures the "Total Pets" counter on the dashboard increments instantly.
+      // ✅ FIX 2: Invalidate Campus Pets specifically
+      // This is the missing link that CampusPetsPage.tsx needs to see!
+      queryClient.invalidateQueries({ queryKey: ["campus-pets"] });
+
+      // ✅ FIX 3: Update Dashboard Stats
       queryClient.invalidateQueries({ queryKey: ["dashboard-personal"] });
 
       toast.success("Pet added successfully!");
@@ -85,8 +87,8 @@ export function usePets(
       if (error) throw error;
     },
     onSuccess: () => {
-      // ✅ FIX 3: Same invalidations for Delete
       queryClient.invalidateQueries({ queryKey: ["pets"] });
+      queryClient.invalidateQueries({ queryKey: ["campus-pets"] }); // Added here too for consistency
       queryClient.invalidateQueries({ queryKey: ["dashboard-personal"] });
 
       toast.success("Pet profile deleted");

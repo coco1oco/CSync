@@ -55,7 +55,7 @@ export default function CreateOfficialEvent() {
     }
   };
 
- const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // 1. Basic Validation
@@ -98,7 +98,9 @@ export default function CreateOfficialEvent() {
         max_attendees: maxAttendees ? parseInt(maxAttendees) : null,
         requires_registration: requiresRegistration,
         images: imageUrls,
-        registration_deadline: deadline ? new Date(deadline).toISOString() : null,
+        registration_deadline: deadline
+          ? new Date(deadline).toISOString()
+          : null,
         event_type: eventType,
       };
 
@@ -130,7 +132,7 @@ export default function CreateOfficialEvent() {
       setLoading(false);
     }
   };
-  
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* Header */}
@@ -339,39 +341,48 @@ export default function CreateOfficialEvent() {
               />
             </div>
 
-           {requiresRegistration && (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
-                  Capacity Limit
-                </label>
-                <Input
-                  type="number"
-                  value={maxAttendees}
-                  onChange={(e) => setMaxAttendees(e.target.value)}
-                  placeholder="e.g. 50"
-                  className="bg-white"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
-                  Registration Deadline
-                </label>
-              <Input
-                  type="datetime-local"
-                  value={deadline}
-                  onChange={(e) => setDeadline(e.target.value)}
-                  className={`bg-white ${deadline && new Date(deadline) > new Date(`${eventDate}T${startTime || "00:00"}`) ? "border-red-500 focus:ring-red-200" 
-                  : ""
+            {requiresRegistration && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                    Capacity Limit
+                  </label>
+                  <Input
+                    type="number"
+                    value={maxAttendees}
+                    onChange={(e) => setMaxAttendees(e.target.value)}
+                    placeholder="e.g. 50"
+                    className="bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                    Registration Deadline
+                  </label>
+                  <Input
+                    type="datetime-local"
+                    value={deadline}
+                    onChange={(e) => setDeadline(e.target.value)}
+                    className={`bg-white ${
+                      deadline &&
+                      new Date(deadline) >
+                        new Date(`${eventDate}T${startTime || "00:00"}`)
+                        ? "border-red-500 focus:ring-red-200"
+                        : ""
                     }`}
                   />
-                  {deadline && new Date(deadline) > new Date(`${eventDate}T${startTime || "00:00"}`) && (
-                  <p className="text-[10px] text-red-600 mt-1 font-bold"> Error: Deadline cannot be after the event starts.</p>
-                  )}
+                  {deadline &&
+                    new Date(deadline) >
+                      new Date(`${eventDate}T${startTime || "00:00"}`) && (
+                      <p className="text-[10px] text-red-600 mt-1 font-bold">
+                        {" "}
+                        Error: Deadline cannot be after the event starts.
+                      </p>
+                    )}
+                </div>
               </div>
-            </div>
-        )}
-        </div>
+            )}
+          </div>
 
           <Button
             type="submit"

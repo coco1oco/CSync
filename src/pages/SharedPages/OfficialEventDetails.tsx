@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/authContext";
 import { format, isPast, isSameDay } from "date-fns";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query"; // ✅ Import QueryClient
 import {
   ArrowLeft,
   Calendar,
@@ -23,25 +24,29 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { notifyRegistrationUpdate } from "@/lib/NotificationService";
 import { cn } from "@/lib/utils";
 
 // ✅ Import Hook
 import { useEventDetails, useEventRegistration } from "@/hooks/useEventDetails";
+// ✅ Import Modal
+import { EventRegistrationModal } from "@/components/EventRegistrationModal";
 
 export default function OfficialEventDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient(); // ✅ Initialize QueryClient
 
-  // ✅ Replace manual state with Hook
   const { data, isLoading } = useEventDetails(id, user?.id);
-  const { register, unregister } = useEventRegistration();
+  const { unregister } = useEventRegistration(); // Removed 'register' since we use the modal
 
   const [registering, setRegistering] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"going" | "waitlist">("going");
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  // ✅ Modal State
+  const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -70,41 +75,10 @@ export default function OfficialEventDetailsPage() {
     waitlistCount,
   } = data;
 
-  const handleRegister = async () => {
+  // ✅ UPDATED: Open Modal instead of direct registration
+  const handleRegisterClick = () => {
     if (!user || !event) return;
-    setRegistering(true);
-
-    // Safety check for max_attendees
-    const limit = event.max_attendees ?? 0;
-    const isWaitlist = limit > 0 && approvedCount >= limit;
-    const dbStatus = isWaitlist ? "waitlist" : "approved";
-
-    try {
-      await register.mutateAsync({
-        eventId: event.id,
-        userId: user.id,
-        status: dbStatus,
-      });
-
-      const notificationStatus = isWaitlist ? "joined_waitlist" : "approved";
-      await notifyRegistrationUpdate(
-        user.id,
-        event.id,
-        event.title,
-        notificationStatus,
-        event.admin_id
-      );
-
-      toast.success(
-        isWaitlist ? "Joined Waitlist" : "Registered successfully!"
-      );
-    } catch (err: any) {
-      // Check for unique violation (already registered)
-      if (err.code === "23505") toast.info("You are already registered.");
-      else toast.error("Registration failed");
-    } finally {
-      setRegistering(false);
-    }
+    setIsRegistrationModalOpen(true);
   };
 
   const handleUnregister = async () => {
@@ -114,6 +88,8 @@ export default function OfficialEventDetailsPage() {
     try {
       await unregister.mutateAsync({ eventId: event.id, userId: user.id });
       toast.success("You have left the event.");
+      // Invalidate to refresh data
+      queryClient.invalidateQueries({ queryKey: ["event-details", id] });
     } catch (err) {
       toast.error("Failed to leave event");
     } finally {
@@ -134,7 +110,6 @@ export default function OfficialEventDetailsPage() {
     }
   };
 
-  // ✅ FIX: Provide strict string fallback for new Date()
   const eventDateStr = event.event_date || new Date().toISOString();
   const eventDateObj = new Date(eventDateStr);
 
@@ -164,7 +139,6 @@ export default function OfficialEventDetailsPage() {
         icon: Timer,
       };
 
-    // ✅ FIX: Ensure strict type for date-fns format
     if (deadlineDate && !isNaN(deadlineDate.getTime())) {
       return {
         label: `Register by ${format(deadlineDate, "MMM d")}`,
@@ -184,7 +158,6 @@ export default function OfficialEventDetailsPage() {
     const now = currentTime;
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-    // Parse time strings strictly
     const [startH, startM] = (event.start_time || "00:00")
       .split(":")
       .map(Number);
@@ -238,7 +211,6 @@ export default function OfficialEventDetailsPage() {
                   <Radio size={14} /> Happening Now
                 </div>
               )}
-              {/* ✅ FIX: Handle undefined event_type */}
               <div className="bg-blue-600 text-white px-3 py-1.5 rounded-lg shadow-lg flex items-center gap-1.5 text-xs md:text-sm font-bold uppercase tracking-widest border border-blue-500/50">
                 {getBadgeIcon(event.event_type || "")}
                 {event.event_type} Event
@@ -256,7 +228,6 @@ export default function OfficialEventDetailsPage() {
               {event.title}
             </h1>
             <div className="flex flex-wrap items-center gap-4 md:gap-8 text-white/90 font-medium">
-              {/* ✅ FIX: Handle undefined location */}
               <span className="flex items-center gap-2 bg-black/20 backdrop-blur-sm px-3 py-1.5 rounded-lg">
                 <MapPin size={18} className="text-blue-400" />{" "}
                 {event.location || "TBD"}
@@ -507,7 +478,8 @@ export default function OfficialEventDetailsPage() {
                         ? "bg-amber-500 hover:bg-amber-600 shadow-amber-200"
                         : "bg-blue-600 hover:bg-blue-700 shadow-blue-200"
                     )}
-                    onClick={handleRegister}
+                    // ✅ FIXED: Use handleRegisterClick to open modal
+                    onClick={handleRegisterClick}
                     disabled={isClosed || registering}
                   >
                     {registering ? (
@@ -550,6 +522,22 @@ export default function OfficialEventDetailsPage() {
           </div>
         </div>
       </div>
+
+      {/* ✅ RENDER MODAL */}
+      {isRegistrationModalOpen && event && (
+        <EventRegistrationModal
+          eventId={event.id}
+          eventTitle={event.title}
+          eventLocation={event.location}
+          eventDate={format(eventDateObj, "MMMM d, yyyy")}
+          eventType={event.event_type}
+          onClose={() => setIsRegistrationModalOpen(false)}
+          onSuccess={() => {
+            // Refresh data after successful registration
+            queryClient.invalidateQueries({ queryKey: ["event-details", id] });
+          }}
+        />
+      )}
     </div>
   );
 }
