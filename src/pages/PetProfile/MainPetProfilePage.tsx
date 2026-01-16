@@ -18,6 +18,7 @@ import {
   Pill,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle, // ✅ Added AlertTriangle
   X,
   Sparkles,
   Lightbulb,
@@ -36,8 +37,8 @@ import {
   CloudSun,
   Loader2,
   Heart,
-  Scale, // Added Scale icon
-  Box, // Added Box icon
+  Scale,
+  Box,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -47,7 +48,7 @@ import { toast } from "sonner";
 import SymptomModal from "./components/SymptomModal";
 import { cn } from "@/lib/utils";
 
-// ... (KEEP EXISTING CONSTANTS & SMART_FACTS & HELPER FUNCTIONS) ...
+// --- TYPES & CONSTANTS ---
 
 const SMART_FACTS = {
   general: [
@@ -77,6 +78,7 @@ interface RoutineItem {
   pets?: { name: string; petimage_url: string | null; species: string };
 }
 
+// ✅ HELPER: Get Dynamic Icon (Reusable)
 const getSpeciesIcon = (
   species?: string,
   size: number = 24,
@@ -126,7 +128,7 @@ export default function MainPetProfilePage() {
     selected_times: [] as string[],
   });
 
-  // ... (KEEP EXISTING DATA FETCHING HOOKS: useQuery for pets and dashboard) ...
+  // --- DATA FETCHING ---
   const { data: pets = [], isLoading: petsLoading } = useQuery({
     queryKey: ["pets", "personal", user?.id],
     queryFn: async () => {
@@ -152,7 +154,8 @@ export default function MainPetProfilePage() {
       todayStart.setHours(0, 0, 0, 0);
       const todayIso = todayStart.toISOString();
 
-      const [nextVax, activeMeds, nextVisit, meds, logs] = await Promise.all([
+      // We removed the separate 'activeMeds' count query and will derive it from 'meds' below
+      const [nextVax, nextVisit, meds, logs] = await Promise.all([
         supabase
           .from("vaccinations")
           .select("vaccine_name, next_due_date")
@@ -162,11 +165,6 @@ export default function MainPetProfilePage() {
           .order("next_due_date", { ascending: true })
           .limit(1)
           .maybeSingle(),
-        supabase
-          .from("medications")
-          .select("id", { count: "exact", head: true })
-          .eq("owner_id", user.id)
-          .gt("current_stock", 0),
         supabase
           .from("schedules")
           .select("*")
@@ -196,9 +194,24 @@ export default function MainPetProfilePage() {
             : [m.time_of_day || "morning"],
         })) || [];
 
+      // ✅ FIXED: Calculate Active Meds Count (Pills/Liqs only, excluding Food)
+      const medicalUnits = [
+        "pill",
+        "pills",
+        "ml",
+        "mg",
+        "drops",
+        "tablet",
+        "capsule",
+      ];
+      const activeMedsCount = (meds.data || []).filter((m) => {
+        const isMedUnit = medicalUnits.includes(m.unit?.toLowerCase());
+        return m.current_stock > 0 && isMedUnit;
+      }).length;
+
       return {
         nextVaccine: nextVax.data,
-        activeMedsCount: activeMeds.count || 0,
+        activeMedsCount: activeMedsCount, // Use the calculated filtered count
         nextVisit: nextVisit.data,
         routines,
         logs: logs.data || [],
@@ -207,7 +220,7 @@ export default function MainPetProfilePage() {
     enabled: !!user,
   });
 
-  // ... (KEEP EXISTING COMPUTED VALUES & HELPERS) ...
+  // --- COMPUTED VALUES ---
   const currentPeriod = useMemo(() => {
     const hour = new Date().getHours();
     if (hour < 12) return "morning";
@@ -254,6 +267,14 @@ export default function MainPetProfilePage() {
     return set;
   }, [dashboard?.logs]);
 
+  // ✅ NEW: Calculate Low Stock Items for Persistent Alert
+  const lowStockItems = useMemo(() => {
+    if (!dashboard?.routines) return [];
+    return dashboard.routines.filter(
+      (r) => r.type === "inventory" && r.current_stock <= r.low_stock_threshold
+    );
+  }, [dashboard?.routines]);
+
   const groupedTasks = useMemo(() => {
     if (!dashboard?.routines)
       return { morning: [], afternoon: [], evening: [] };
@@ -269,7 +290,8 @@ export default function MainPetProfilePage() {
     return { morning, afternoon, evening };
   }, [dashboard]);
 
-  // ... (KEEP toggleRoutineCheck, handleLogSymptom) ...
+  // --- ACTIONS ---
+
   const toggleRoutineCheck = async (
     routine: RoutineItem,
     period: "morning" | "afternoon" | "evening"
@@ -326,8 +348,19 @@ export default function MainPetProfilePage() {
             .from("medications")
             .update({ current_stock: newStock })
             .eq("id", routine.id);
+
+          // ✅ NEW: Immediate Low Stock Alert
+          if (newStock <= routine.low_stock_threshold) {
+            toast.error(`Low Stock Warning: ${routine.name}`, {
+              description: `Only ${newStock} ${routine.unit} remaining. Time to refill!`,
+              duration: 5000,
+            });
+          } else {
+            toast.success(`Completed ${routine.name}`);
+          }
+        } else {
+          toast.success(`Completed ${routine.name}`);
         }
-        toast.success(`Completed ${routine.name}`);
       } else {
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
@@ -390,7 +423,6 @@ export default function MainPetProfilePage() {
     }
   };
 
-  // --- MODIFIED: handleAddRoutine ---
   const handleAddRoutine = async () => {
     if (!user || !newRoutine.pet_id || !newRoutine.name) return;
     setIsSubmitting(true);
@@ -404,8 +436,8 @@ export default function MainPetProfilePage() {
           finalStock = finalStock * 1000; // kg -> g
           finalUnit = "g";
         } else {
-          // Volume/Cans: Use exact number, unit defaults to "cans" or whatever is set
-          finalUnit = "cans";
+          // Volume/Cans: Use exact number, unit defaults to "cans" if user didn't change it
+          finalUnit = finalUnit || "cans";
         }
       }
 
@@ -444,11 +476,10 @@ export default function MainPetProfilePage() {
     }
   };
 
-  // --- MODIFIED: applyPreset ---
   const applyPreset = (type: string) => {
     const defaultPet = pets.length > 0 ? pets[0].id : "";
     if (type === "food") {
-      setFoodUnitType("mass"); // Default to mass
+      setFoodUnitType("mass");
       setNewRoutine((prev) => ({
         ...prev,
         pet_id: prev.pet_id || defaultPet,
@@ -498,7 +529,6 @@ export default function MainPetProfilePage() {
       }));
   };
 
-  // ... (KEEP toggleTime and useEffect) ...
   const toggleTime = (time: string) => {
     setNewRoutine((prev) => {
       const exists = prev.selected_times.includes(time);
@@ -524,8 +554,6 @@ export default function MainPetProfilePage() {
 
   return (
     <div className="w-full h-full flex flex-col bg-gray-50 relative">
-      {/* ... (KEEP HEADER, WELCOME, STATS, SMART FACT sections - no changes) ... */}
-
       <div className="shrink-0 px-4 pt-4 lg:pt-8 lg:px-8 pb-4 bg-gray-50 z-10 flex flex-col gap-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-2">
@@ -550,7 +578,7 @@ export default function MainPetProfilePage() {
               onClick={() => navigate("/campus-pets")}
               className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold text-gray-500 hover:bg-gray-50 hover:text-blue-600 transition-all"
             >
-              <Building2 size={16} /> Campus Pets
+              <Building2 size={16} /> Campus Residents
             </button>
           </div>
         </div>
@@ -579,7 +607,6 @@ export default function MainPetProfilePage() {
           <>
             {dashboard && (
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 animate-in fade-in slide-in-from-top-2">
-                {/* ... (Keep Stats Cards) ... */}
                 <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
                     <Dog size={20} />
@@ -668,6 +695,38 @@ export default function MainPetProfilePage() {
               </div>
             )}
 
+            {/* ✅ NEW: Persistent Low Stock Alert Card */}
+            {lowStockItems.length > 0 && (
+              <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex gap-4 items-start shadow-sm mb-2 animate-in fade-in slide-in-from-top-2">
+                <div className="bg-white p-2 rounded-full text-red-600 shadow-sm shrink-0">
+                  <AlertTriangle size={18} />
+                </div>
+                <div className="flex-1">
+                  <div className="flex justify-between items-start">
+                    <h4 className="font-bold text-red-900 text-sm">
+                      Restock Needed
+                    </h4>
+                    <span className="text-[10px] font-bold bg-red-100 text-red-600 px-2 py-0.5 rounded-full">
+                      {lowStockItems.length} items
+                    </span>
+                  </div>
+                  <div className="mt-2 space-y-1">
+                    {lowStockItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex justify-between text-xs text-red-700 bg-red-100/50 p-1.5 rounded-md"
+                      >
+                        <span className="font-bold">{item.name}</span>
+                        <span>
+                          {item.current_stock} {item.unit} left
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-100 rounded-2xl p-4 flex gap-4 items-start shadow-sm">
               <div className="bg-white p-2 rounded-full text-violet-600 shadow-sm shrink-0">
                 <Lightbulb size={18} className="fill-violet-100" />
@@ -685,7 +744,7 @@ export default function MainPetProfilePage() {
               </div>
             </div>
 
-            {/* ... (Keep Action Plan) ... */}
+            {/* ACTION PLAN */}
             {dashboard && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between px-1">
@@ -719,7 +778,6 @@ export default function MainPetProfilePage() {
                 </div>
 
                 <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-xl shadow-gray-100/50">
-                  {/* ... (Keep Progress Bar) ... */}
                   <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-50">
                     <div>
                       <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">
@@ -818,7 +876,7 @@ export default function MainPetProfilePage() {
         )}
       </div>
 
-      {/* ... (Keep Pet Grid) ... */}
+      {/* 5. PET PROFILES GRID */}
       {pets.length > 0 && (
         <div className="flex-1 overflow-y-auto px-4 lg:px-8 pb-24 lg:pb-8">
           <div className="flex items-center justify-between mb-4 mt-2">
@@ -1030,7 +1088,6 @@ export default function MainPetProfilePage() {
                         <Label className="text-xs font-bold text-gray-400 uppercase">
                           Unit
                         </Label>
-                        {/* If Food & Volume, let user type unit (cans, pouches etc). If Mass, default g */}
                         <Input
                           className="bg-gray-50"
                           value={
