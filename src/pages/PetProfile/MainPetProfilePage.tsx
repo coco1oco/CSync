@@ -714,7 +714,8 @@ export default function MainPetProfilePage() {
                     {lowStockItems.map((item) => (
                       <div
                         key={item.id}
-                        className="flex justify-between text-xs text-red-700 bg-red-100/50 p-1.5 rounded-md"
+                        onClick={() => navigate(`/PetDashboard/${item.pet_id}`)} // Go to pet profile
+                        className="flex justify-between text-xs text-red-700 bg-red-100/50 p-1.5 rounded-md cursor-pointer hover:bg-red-100 transition-colors" // Added cursor & hover
                       >
                         <span className="font-bold">{item.name}</span>
                         <span>
