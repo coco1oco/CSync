@@ -81,7 +81,7 @@ export default function AddPetPage() {
           </button>
           <div>
             <h1 className="text-xl font-black text-gray-900">
-              {isCampusMode ? "Register Campus Dog" : "Add New Pet"}
+              {isCampusMode ? "Register Campus Resident" : "Add New Pet"}
             </h1>
             {isCampusMode && (
               <span className="flex items-center gap-1.5 text-[11px] font-bold text-blue-600 uppercase tracking-wide">
@@ -97,7 +97,7 @@ export default function AddPetPage() {
         <PetForm
           onSubmit={handleAddPet}
           isSubmitting={loading}
-          submitLabel={isCampusMode ? "Register Dog" : "Add Pet"}
+          submitLabel={isCampusMode ? "Register Pet" : "Add Pet"}
         />
       </div>
     </div>
