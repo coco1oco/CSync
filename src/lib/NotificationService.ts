@@ -235,6 +235,7 @@ export async function notifyAttendees(
   }
 }
 
+
 export async function requestNotificationPermission(): Promise<string | null> {
   // ✅ FIX: This check MUST be at the very top to prevent crashes on iOS Safari
   if (!("Notification" in window)) {
@@ -358,6 +359,43 @@ export async function createNotification(params: {
   if (error) throw error;
 
   // ❌ REMOVED: Pruning logic deleted to fix P0001 Unauthorized error
+}
+// src/lib/NotificationService.ts
+
+export async function notifyScheduleCreation(
+  userId: string,
+  petId: string,
+  scheduleTitle: string,
+  date: string,
+  type: string // This receives "vaccine", "grooming", "checkup", etc.
+) {
+  try {
+    const { data: pet } = await supabase
+      .from("pets")
+      .select("name")
+      .eq("id", petId)
+      .single();
+
+    const petName = pet?.name || "your pet";
+
+    const { error } = await supabase.from("notifications").insert({
+      user_id: userId,
+      from_user_id: userId,
+      type: "schedule", // ✅ Keeps DB clean: Always "schedule"
+      title: "Appointment Scheduled",
+      body: `You scheduled "${scheduleTitle}" (${type}) for ${petName} on ${date}.`,
+      data: { 
+        link: `/pet-profile/${petId}`, 
+        pet_id: petId,
+        subtype: type // ✅ Stores "vaccine", "grooming", etc. here
+      },
+      is_unread: true,
+    });
+
+    if (error) throw error;
+  } catch (err) {
+    console.error("Failed to notify:", err);
+  }
 }
 
 export async function notifyLike(event: SimpleEvent, actor: SimpleActor) {
