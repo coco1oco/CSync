@@ -1,10 +1,18 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, MessageCircle, Bell, PawPrint, User, Users, Ticket } from "lucide-react";
+import {
+  Home,
+  MessageCircle,
+  Bell,
+  PawPrint,
+  User,
+  Users,
+  Ticket,
+} from "lucide-react";
 import { useAuth } from "@/context/authContext";
 import { useChat } from "@/context/ChatContext";
 import { useNotifications } from "@/context/NotificationContext"; // ✅ 1. Import Hook
-import logo from "@/assets/images/Pawpal.svg";
+import logo from "@/assets/images/PawPal.svg";
 import type { UserRole } from "@/types";
 import { NotificationCenter } from "./NotificationCenter";
 import { MoreMenu } from "./MoreMenu";
@@ -17,10 +25,10 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
   const location = useLocation();
   const { user } = useAuth();
   const { unreadCount } = useChat();
-  
+
   // ✅ 2. Get the notification boolean
-  const { hasUnreadNotifications } = useNotifications(); 
-  
+  const { hasUnreadNotifications } = useNotifications();
+
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
@@ -67,21 +75,30 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
             isButton: true,
             hasBadge: hasUnreadNotifications, // <--- Dynamic Badge
           },
-            { path: "/PetDashboard", icon: PawPrint, label: "Pet Dashboard" },
-            { path: "/my-tickets", icon: Ticket, label: "Tickets" },
-            { path: "/ProfilePage", icon: User, label: "Profile" },
-
+          { path: "/PetDashboard", icon: PawPrint, label: "Pet Dashboard" },
+          { path: "/my-tickets", icon: Ticket, label: "Tickets" },
+          { path: "/ProfilePage", icon: User, label: "Profile" },
         ]),
   ];
 
   return (
     <>
-      <aside 
+      <aside
         className={`hidden lg:flex flex-col h-screen fixed left-0 top-0 border-r border-gray-200 bg-white z-[60] transition-all duration-300 ease-in-out ${sidebarWidthClass}`}
       >
-        <div className={`h-16 flex items-center ${justifyClass} ${isCollapsed ? '' : 'px-6 gap-3'}`}>
-          <img src={logo} alt="PawPal" className="h-8 w-8 transition-transform hover:scale-105" />
-          <span className={`font-bold text-xl text-blue-950 transition-opacity duration-200 ${hideTextClass}`}>
+        <div
+          className={`h-16 flex items-center ${justifyClass} ${
+            isCollapsed ? "" : "px-6 gap-3"
+          }`}
+        >
+          <img
+            src={logo}
+            alt="PawPal"
+            className="h-8 w-8 transition-transform hover:scale-105"
+          />
+          <span
+            className={`font-bold text-xl text-blue-950 transition-opacity duration-200 ${hideTextClass}`}
+          >
             PawPal
           </span>
         </div>
@@ -89,13 +106,21 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
         <nav className={`flex-1 space-y-2 py-4 ${pxClass}`}>
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isNotifActive = item.label === "Notifications" && isNotificationPanelOpen;
-            const active = isActive(item.path) || isNotifActive || (item.label === "Messages" && isMessagesPage);
+            const isNotifActive =
+              item.label === "Notifications" && isNotificationPanelOpen;
+            const active =
+              isActive(item.path) ||
+              isNotifActive ||
+              (item.label === "Messages" && isMessagesPage);
 
             const buttonClasses = `
               w-full flex items-center ${justifyClass} py-3 rounded-full transition-all font-medium relative group
-              ${active ? "bg-blue-50 text-blue-600" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"}
-              ${isCollapsed ? 'px-0' : 'px-4 gap-3'}
+              ${
+                active
+                  ? "bg-blue-50 text-blue-600"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              }
+              ${isCollapsed ? "px-0" : "px-4 gap-3"}
             `;
 
             const content = (
@@ -128,22 +153,36 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
                   )}
                 </div>
 
-                <span className={`whitespace-nowrap transition-opacity duration-200 ${hideTextClass}`}>
+                <span
+                  className={`whitespace-nowrap transition-opacity duration-200 ${hideTextClass}`}
+                >
                   {item.label}
                 </span>
-                
+
                 {isCollapsed && (
-                    <div className="absolute left-14 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                      {item.label}
-                    </div>
+                  <div className="absolute left-14 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                    {item.label}
+                  </div>
                 )}
               </>
             );
 
             if (item.isButton) {
-              return <button key={item.path} onClick={handleNotificationClick} className={buttonClasses}>{content}</button>;
+              return (
+                <button
+                  key={item.path}
+                  onClick={handleNotificationClick}
+                  className={buttonClasses}
+                >
+                  {content}
+                </button>
+              );
             }
-            return <Link key={item.path} to={item.path} className={buttonClasses}>{content}</Link>;
+            return (
+              <Link key={item.path} to={item.path} className={buttonClasses}>
+                {content}
+              </Link>
+            );
           })}
         </nav>
 
@@ -158,10 +197,18 @@ export function Sidebar({ userRole }: Readonly<SidebarProps>) {
               isCollapsed ? "justify-center" : "gap-3 px-2"
             }`}
           >
-            <img src="/Paws2.jpg" alt="PAWS Logo" className="w-8 h-8 grayscale flex-shrink-0" />
+            <img
+              src="/Paws2.jpg"
+              alt="PAWS Logo"
+              className="w-8 h-8 grayscale flex-shrink-0"
+            />
             <div className={hideTextClass}>
-              <p className="text-[10px] uppercase font-bold text-gray-400">Affiliated with</p>
-              <p className="text-xs font-bold text-gray-700">PAWS Philippines</p>
+              <p className="text-[10px] uppercase font-bold text-gray-400">
+                Affiliated with
+              </p>
+              <p className="text-xs font-bold text-gray-700">
+                PAWS Philippines
+              </p>
             </div>
           </div>
         </div>
