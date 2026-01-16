@@ -12,7 +12,6 @@ import {
   MessageCircle,
   Trash2,
   MoreHorizontal,
-  Edit,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -41,7 +40,7 @@ interface CommentsModalProps {
   event: OutreachEvent;
   user: any;
   onClose: () => void;
-  onCommentChange: () => void; // Combined refresh trigger
+  onCommentChange: () => void;
   highlightId?: string | null;
   customUsername?: string;
   customAvatar?: string;
@@ -67,13 +66,9 @@ export function CommentsModal({
   const [comments, setComments] = useState<CommentWithExtras[]>([]);
   const [newComment, setNewComment] = useState("");
   const [activeReplyId, setActiveReplyId] = useState<string | null>(null);
-  const [replyTarget, setReplyTarget] = useState<CommentWithExtras | null>(
-    null
-  );
+  const [replyTarget, setReplyTarget] = useState<CommentWithExtras | null>(null);
   const [loading, setLoading] = useState(true);
-  const [expandedComments, setExpandedComments] = useState<Set<string>>(
-    new Set()
-  );
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
   const [fetchedAuthor, setFetchedAuthor] = useState<any>(null);
@@ -91,19 +86,10 @@ export function CommentsModal({
   };
 
   const embeddedProfile = getEmbeddedProfile();
-  const displayName =
-    customUsername ||
-    embeddedProfile?.username ||
-    fetchedAuthor?.username ||
-    null;
-  const displayAvatar =
-    customAvatar ||
-    embeddedProfile?.avatar_url ||
-    fetchedAuthor?.avatar_url ||
-    null;
+  const displayName = customUsername || embeddedProfile?.username || fetchedAuthor?.username || null;
+  const displayAvatar = customAvatar || embeddedProfile?.avatar_url || fetchedAuthor?.avatar_url || null;
 
-  const images =
-    event.images && event.images.length > 0
+  const images = event.images && event.images.length > 0
       ? event.images
       : (event as any).image_url
       ? [(event as any).image_url]
@@ -127,14 +113,11 @@ export function CommentsModal({
 
       const { data, error } = await supabase
         .from("comments")
-        .select(
-          "*, user:profiles!comments_user_profile_fkey(id, username, avatar_url)"
-        )
+        .select("*, user:profiles!comments_user_profile_fkey(id, username, avatar_url)")
         .eq("event_id", event.id)
         .order("created_at", { ascending: true });
 
       if (error) {
-        // Fallback for implicit join
         const { data: retryData, error: retryError } = await supabase
           .from("comments")
           .select("*, user:profiles(id, username, avatar_url)")
@@ -229,19 +212,9 @@ export function CommentsModal({
               );
             }
             element.scrollIntoView({ behavior: "smooth", block: "center" });
-            element.classList.add(
-              "bg-blue-50",
-              "ring-2",
-              "ring-blue-100",
-              "rounded-lg"
-            );
+            element.classList.add("bg-blue-50", "ring-2", "ring-blue-100", "rounded-lg");
             setTimeout(() => {
-              element.classList.remove(
-                "bg-blue-50",
-                "ring-2",
-                "ring-blue-100",
-                "rounded-lg"
-              );
+              element.classList.remove("bg-blue-50", "ring-2", "ring-blue-100", "rounded-lg");
               element.classList.add("transition-all", "duration-1000");
             }, 3000);
           }
@@ -249,10 +222,7 @@ export function CommentsModal({
       } else {
         setTimeout(() => {
           if (commentsTopRef.current) {
-            commentsTopRef.current.scrollIntoView({
-              behavior: "smooth",
-              block: "start",
-            });
+            commentsTopRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
           }
         }, 300);
       }
@@ -288,9 +258,7 @@ export function CommentsModal({
     const content = newComment.trim();
     setNewComment("");
 
-    const tempId = `temp-${Date.now()}-${Math.random()
-      .toString(36)
-      .substr(2, 9)}`;
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     const optimisticComment: any = {
       id: tempId,
@@ -319,10 +287,7 @@ export function CommentsModal({
       });
     }
 
-    setTimeout(
-      () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
-      100
-    );
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
 
     const { data: insertedData, error } = await supabase
       .from("comments")
@@ -376,22 +341,6 @@ export function CommentsModal({
     }
   };
 
-  const handleEditComment = async (commentId: string, newContent: string) => {
-    const newTime = new Date().toISOString();
-    setComments((prev) =>
-      prev.map((c) =>
-        c.id === commentId
-          ? { ...c, content: newContent, updated_at: newTime }
-          : c
-      )
-    );
-
-    await supabase
-      .from("comments")
-      .update({ content: newContent, updated_at: newTime })
-      .eq("id", commentId);
-  };
-
   const requestDelete = (commentId: string) => {
     setCommentToDelete(commentId);
   };
@@ -430,7 +379,6 @@ export function CommentsModal({
       comment={comment}
       user={user}
       onDelete={requestDelete}
-      onEdit={handleEditComment}
       onReply={handleReplyClick}
       isReply={isReply}
     />
@@ -446,12 +394,10 @@ export function CommentsModal({
       if (diffInSeconds < 60) return `${diffInSeconds}s`;
       if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
       if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
-      if (diffInSeconds < 604800)
-        return `${Math.floor(diffInSeconds / 86400)}d`;
+      if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d`;
       return `${Math.floor(diffInSeconds / 604800)}w`;
     }
-    if (diffInSeconds >= 31556952)
-      return `${Math.floor(diffInSeconds / 31556952)}y`;
+    if (diffInSeconds >= 31556952) return `${Math.floor(diffInSeconds / 31556952)}y`;
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
@@ -469,10 +415,7 @@ export function CommentsModal({
           ) : (
             <div className="h-6 w-32 bg-gray-200 animate-pulse rounded" />
           )}
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
@@ -495,17 +438,13 @@ export function CommentsModal({
                 ) : (
                   <div className="h-4 w-24 bg-gray-200 animate-pulse rounded mb-1" />
                 )}
-                <span className="text-xs text-gray-500">
-                  {formatRelativeTime(event.created_at)}
-                </span>
+                <span className="text-xs text-gray-500">{formatRelativeTime(event.created_at)}</span>
               </div>
             </div>
 
             {event.description && (
               <div className="mb-4 text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
-                {event.title && (
-                  <h4 className="font-bold text-lg mb-2">{event.title}</h4>
-                )}
+                {event.title && <h4 className="font-bold text-lg mb-2">{event.title}</h4>}
                 {event.description}
               </div>
             )}
@@ -540,9 +479,7 @@ export function CommentsModal({
                         <div
                           key={idx}
                           className={`w-1.5 h-1.5 rounded-full shadow-sm transition-all ${
-                            idx === currentImageIndex
-                              ? "bg-white scale-125"
-                              : "bg-white/50"
+                            idx === currentImageIndex ? "bg-white scale-125" : "bg-white/50"
                           }`}
                         />
                       ))}
@@ -554,23 +491,16 @@ export function CommentsModal({
 
             <div className="flex items-center gap-6 pt-2 border-t border-gray-50">
               <div className="flex items-center gap-1.5">
-                <button
-                  onClick={onToggleLike}
-                  className="flex items-center group transition-all"
-                >
+                <button onClick={onToggleLike} className="flex items-center group transition-all">
                   <Heart
                     className={`w-6 h-6 transition-transform group-active:scale-90 ${
-                      isLiked
-                        ? "fill-red-500 text-red-500"
-                        : "text-gray-900 hover:text-gray-600"
+                      isLiked ? "fill-red-500 text-red-500" : "text-gray-900 hover:text-gray-600"
                     }`}
                     strokeWidth={isLiked ? 0 : 2}
                   />
                 </button>
                 {likesCount && likesCount > 0 ? (
-                  <span className="text-sm font-bold text-gray-900">
-                    {likesCount}
-                  </span>
+                  <span className="text-sm font-bold text-gray-900">{likesCount}</span>
                 ) : (
                   <span className="text-sm font-bold text-gray-900">Like</span>
                 )}
@@ -597,9 +527,7 @@ export function CommentsModal({
               </div>
             ) : comments.length === 0 ? (
               <div className="text-center py-10 text-gray-400">
-                <p className="text-sm">
-                  No comments yet. Be the first to say something!
-                </p>
+                <p className="text-sm">No comments yet. Be the first to say something!</p>
               </div>
             ) : (
               rootComments.map((comment) => {
@@ -617,9 +545,7 @@ export function CommentsModal({
                           onClick={() => toggleReplies(comment.id)}
                           className="text-[11px] font-semibold text-gray-500 hover:text-gray-800"
                         >
-                          {isExpanded
-                            ? "Hide replies"
-                            : `View replies (${replies.length})`}
+                          {isExpanded ? "Hide replies" : `View replies (${replies.length})`}
                         </button>
                       </div>
                     )}
@@ -639,21 +565,13 @@ export function CommentsModal({
         <div className="p-4 border-t border-gray-100 bg-white md:rounded-b-2xl shrink-0 z-10">
           {activeReplyId && (
             <div className="text-xs text-gray-400 mb-2 ml-4 flex justify-between items-center">
-              <span>
-                Replying to {replyTarget?.user?.username || "comment"}...
-              </span>
-              <button
-                onClick={() => setActiveReplyId(null)}
-                className="mr-2 hover:text-gray-600"
-              >
+              <span>Replying to {replyTarget?.user?.username || "comment"}...</span>
+              <button onClick={() => setActiveReplyId(null)} className="mr-2 hover:text-gray-600">
                 <X size={12} />
               </button>
             </div>
           )}
-          <form
-            onSubmit={handlePostComment}
-            className="flex gap-2 items-center"
-          >
+          <form onSubmit={handlePostComment} className="flex gap-2 items-center">
             <img
               src={user?.avatar_url || FailedImageIcon}
               alt="Me"
@@ -689,12 +607,9 @@ export function CommentsModal({
           />
           <div className="relative bg-white rounded-lg shadow-xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-200">
             <div className="flex flex-col gap-2 mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Delete Comment?
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-900">Delete Comment?</h3>
               <p className="text-sm text-gray-500">
-                Are you sure you want to delete this comment? This cannot be
-                undone.
+                Are you sure you want to delete this comment? This cannot be undone.
               </p>
             </div>
             <div className="flex justify-end gap-3">
@@ -721,7 +636,7 @@ export function CommentsModal({
   );
 }
 
-// --- Individual Comment Component (Restored) ---
+// --- Individual Comment Component (Updated: Removed Edit) ---
 
 interface CommentItemProps {
   event: OutreachEvent;
@@ -729,7 +644,6 @@ interface CommentItemProps {
   user: any;
   onDelete: (id: string) => void;
   onReply: (comment: CommentWithExtras) => void;
-  onEdit: (id: string, newContent: string) => void;
   isReply?: boolean;
 }
 
@@ -739,18 +653,15 @@ function CommentItem({
   user,
   onDelete,
   onReply,
-  onEdit,
   isReply = false,
 }: CommentItemProps) {
   const [likesCount, setLikesCount] = useState(comment.likes_count || 0);
   const [isLiked, setIsLiked] = useState(comment.is_liked_by_user || false);
   const [isLiking, setIsLiking] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editContent, setEditContent] = useState(comment.content);
   const [showLikesModal, setShowLikesModal] = useState(false);
 
-  const isEdited =
-    comment.updated_at && comment.updated_at !== comment.created_at;
+  // Keep 'isEdited' just for display purposes if backend sends it
+  const isEdited = comment.updated_at && comment.updated_at !== comment.created_at;
 
   useEffect(() => {
     fetchCommentLikes();
@@ -804,13 +715,6 @@ function CommentItem({
       setLikesCount(previousCount);
     } finally {
       setIsLiking(false);
-    }
-  };
-
-  const handleSaveEdit = () => {
-    if (editContent.trim() !== "") {
-      onEdit(comment.id, editContent);
-      setIsEditing(false);
     }
   };
 
@@ -871,112 +775,73 @@ function CommentItem({
               <span className="font-bold text-sm text-gray-900">
                 {comment.user?.username || "Unknown"}
               </span>
-              {isEditing ? (
-                <div className="flex-1">
-                  <Input
-                    value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
-                    className="h-8 text-sm"
-                    autoFocus
-                  />
-                  <div className="flex gap-2 mt-1">
-                    <span
-                      onClick={handleSaveEdit}
-                      className="text-[10px] font-bold text-blue-600 cursor-pointer hover:underline"
-                    >
-                      Save
-                    </span>
-                    <span
-                      onClick={() => {
-                        setIsEditing(false);
-                        setEditContent(comment.content);
-                      }}
-                      className="text-[10px] text-gray-500 cursor-pointer hover:underline"
-                    >
-                      Cancel
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <span className="text-sm text-gray-700 break-words whitespace-pre-wrap">
-                  {renderContentWithTags(comment.content)}
-                </span>
-              )}
+              <span className="text-sm text-gray-700 break-words whitespace-pre-wrap">
+                {renderContentWithTags(comment.content)}
+              </span>
             </div>
           </div>
 
-          {!isEditing && (
-            <div className="flex items-center gap-4 px-1 mt-1">
-              <span className="text-[10px] text-gray-400 font-medium">
-                {formatRelativeTime(comment.created_at)}
-                {isEdited && <span className="ml-1 italic"> (edited)</span>}
-              </span>
+          <div className="flex items-center gap-4 px-1 mt-1">
+            <span className="text-[10px] text-gray-400 font-medium">
+              {formatRelativeTime(comment.created_at)}
+              {isEdited && <span className="ml-1 italic"> (edited)</span>}
+            </span>
 
-              <div className="flex items-center gap-1 group/like">
-                <button
-                  onClick={toggleCommentLike}
-                  disabled={isLiking}
-                  className="flex items-center disabled:opacity-50"
-                >
-                  <Heart
-                    size={12}
-                    className={`transition-colors ${
-                      isLiked
-                        ? "fill-red-500 text-red-500"
-                        : "text-gray-400 group-hover/like:text-red-500"
-                    }`}
-                  />
-                </button>
-                <button
-                  onClick={() => likesCount > 0 && setShowLikesModal(true)}
-                  disabled={likesCount === 0}
-                  className={`text-[10px] font-semibold ${
-                    likesCount > 0
-                      ? "text-gray-500 hover:text-gray-900 hover:underline cursor-pointer"
-                      : "text-gray-400 cursor-default"
-                  }`}
-                >
-                  {likesCount}
-                </button>
-              </div>
-
+            <div className="flex items-center gap-1 group/like">
               <button
-                onClick={() => onReply(comment)}
-                className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-blue-600 font-semibold transition-colors"
+                onClick={toggleCommentLike}
+                disabled={isLiking}
+                className="flex items-center disabled:opacity-50"
               >
-                <Reply size={10} /> Reply
+                <Heart
+                  size={12}
+                  className={`transition-colors ${
+                    isLiked
+                      ? "fill-red-500 text-red-500"
+                      : "text-gray-400 group-hover/like:text-red-500"
+                  }`}
+                />
               </button>
-
-              {(user?.id === comment.user_id || user?.role === "admin") && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger className="focus:outline-none opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity">
-                    <MoreHorizontal
-                      size={14}
-                      className="text-gray-400 hover:text-gray-700 transition-colors"
-                    />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="start"
-                    className="w-32 z-[100] bg-white"
-                  >
-                    {user?.id === comment.user_id && (
-                      <DropdownMenuItem onClick={() => setIsEditing(true)}>
-                        <Edit size={12} className="mr-2" />
-                        <span className="text-xs">Edit</span>
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem
-                      onClick={() => onDelete(comment.id)}
-                      className="text-red-600 focus:text-red-600"
-                    >
-                      <Trash2 size={12} className="mr-2" />
-                      <span className="text-xs">Delete</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+              <button
+                onClick={() => likesCount > 0 && setShowLikesModal(true)}
+                disabled={likesCount === 0}
+                className={`text-[10px] font-semibold ${
+                  likesCount > 0
+                    ? "text-gray-500 hover:text-gray-900 hover:underline cursor-pointer"
+                    : "text-gray-400 cursor-default"
+                }`}
+              >
+                {likesCount}
+              </button>
             </div>
-          )}
+
+            <button
+              onClick={() => onReply(comment)}
+              className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-blue-600 font-semibold transition-colors"
+            >
+              <Reply size={10} /> Reply
+            </button>
+
+            {(user?.id === comment.user_id || user?.role === "admin") && (
+              <DropdownMenu>
+                <DropdownMenuTrigger className="focus:outline-none opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity">
+                  <MoreHorizontal
+                    size={14}
+                    className="text-gray-400 hover:text-gray-700 transition-colors"
+                  />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-32 z-[100] bg-white">
+                  <DropdownMenuItem
+                    onClick={() => onDelete(comment.id)}
+                    className="text-red-600 focus:text-red-600"
+                  >
+                    <Trash2 size={12} className="mr-2" />
+                    <span className="text-xs">Delete</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </div>
       </div>
       <LikesListModal
