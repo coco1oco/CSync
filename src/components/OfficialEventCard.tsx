@@ -31,6 +31,11 @@ interface OfficialEventCardProps {
   onEdit: () => void;
   isAdmin: boolean;
   currentCount?: number;
+  onDelete?: () => void;
+  onSuccess?: () => void;
+  onHide?: () => void;
+  onRefresh?: () => void;
+  isHidden?: boolean;
 }
 
 export function OfficialEventCard({
@@ -78,13 +83,33 @@ export function OfficialEventCard({
   const getTheme = (type?: string) => {
     switch (type) {
       case "pet":
-        return { icon: PawPrint, label: "Pet Service", gradient: "from-orange-400 to-red-400", text: "text-orange-700" };
+        return {
+          icon: PawPrint,
+          label: "Pet Service",
+          gradient: "from-orange-400 to-red-400",
+          text: "text-orange-700",
+        };
       case "member":
-        return { icon: Briefcase, label: "Members Only", gradient: "from-blue-400 to-indigo-400", text: "text-blue-700" };
+        return {
+          icon: Briefcase,
+          label: "Members Only",
+          gradient: "from-blue-400 to-indigo-400",
+          text: "text-blue-700",
+        };
       case "campus":
-        return { icon: Tent, label: "Campus Event", gradient: "from-emerald-400 to-teal-400", text: "text-emerald-700" };
+        return {
+          icon: Tent,
+          label: "Campus Event",
+          gradient: "from-emerald-400 to-teal-400",
+          text: "text-emerald-700",
+        };
       default:
-        return { icon: CalendarCheck, label: "Official Event", gradient: "from-purple-400 to-pink-400", text: "text-purple-700" };
+        return {
+          icon: CalendarCheck,
+          label: "Official Event",
+          gradient: "from-purple-400 to-pink-400",
+          text: "text-purple-700",
+        };
     }
   };
 
@@ -100,14 +125,22 @@ export function OfficialEventCard({
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
     const [startH, startM] = event.start_time.split(":").map(Number);
     const [endH, endM] = event.end_time.split(":").map(Number);
-    return currentMinutes >= (startH * 60 + startM) && currentMinutes <= (endH * 60 + endM);
+    return (
+      currentMinutes >= startH * 60 + startM &&
+      currentMinutes <= endH * 60 + endM
+    );
   })();
 
   // Deadline Logic
-  const deadlineDate = event.registration_deadline ? new Date(event.registration_deadline) : null;
+  const deadlineDate = event.registration_deadline
+    ? new Date(event.registration_deadline)
+    : null;
   const isDeadlinePassed = deadlineDate ? isPast(deadlineDate) : false;
   const isClosed = event.registration_closed_manually || isDeadlinePassed;
-  const isUrgent = deadlineDate && !isClosed ? deadlineDate.getTime() - Date.now() < 48 * 60 * 60 * 1000 : false;
+  const isUrgent =
+    deadlineDate && !isClosed
+      ? deadlineDate.getTime() - Date.now() < 48 * 60 * 60 * 1000
+      : false;
 
   // Waitlist Logic
   const limit = event.max_attendees || 0;
@@ -115,30 +148,43 @@ export function OfficialEventCard({
 
   return (
     // ✅ Added onClick and cursor-pointer to main container
-    <div 
+    <div
       onClick={handleCardClick}
       className="group relative bg-white rounded-[1.5rem] border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col h-full cursor-pointer"
     >
-
       {/* Hero Image Section */}
       <div className="relative h-48 w-full shrink-0 overflow-hidden">
         {event.images && event.images.length > 0 ? (
-          <img src={event.images[0]} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt={event.title} />
+          <img
+            src={event.images[0]}
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            alt={event.title}
+          />
         ) : (
-          <div className={`w-full h-full bg-gradient-to-br ${theme.gradient} relative`}>
+          <div
+            className={`w-full h-full bg-gradient-to-br ${theme.gradient} relative`}
+          >
             <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
-            <div className="absolute inset-0 flex items-center justify-center text-white/20"><BadgeIcon size={64} /></div>
+            <div className="absolute inset-0 flex items-center justify-center text-white/20">
+              <BadgeIcon size={64} />
+            </div>
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-60" />
 
         <div className="absolute top-4 left-4 flex flex-col items-center justify-center w-12 h-14 rounded-xl bg-white/90 backdrop-blur-md shadow-lg text-center border border-white/50">
-          <span className="text-[10px] font-bold text-gray-500 uppercase leading-none mt-1">{format(eventDate, "MMM")}</span>
-          <span className="text-xl font-black text-gray-900 leading-none">{format(eventDate, "d")}</span>
+          <span className="text-[10px] font-bold text-gray-500 uppercase leading-none mt-1">
+            {format(eventDate, "MMM")}
+          </span>
+          <span className="text-xl font-black text-gray-900 leading-none">
+            {format(eventDate, "d")}
+          </span>
         </div>
 
         <div className="absolute top-4 right-4 flex flex-col gap-2 items-end">
-          <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wide flex items-center gap-1.5 shadow-sm backdrop-blur-md bg-white/90 ${theme.text}`}>
+          <div
+            className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wide flex items-center gap-1.5 shadow-sm backdrop-blur-md bg-white/90 ${theme.text}`}
+          >
             <BadgeIcon size={12} /> {theme.label}
           </div>
           {isHappeningNow && (
@@ -156,30 +202,70 @@ export function OfficialEventCard({
         </h3>
 
         <div className="space-y-2 mt-1 mb-4">
-          <div className={`flex items-center gap-2 text-sm font-medium ${isHappeningNow ? "text-red-600" : "text-gray-500"}`}>
-            <Clock className={`w-4 h-4 ${isHappeningNow ? "text-red-600" : "text-blue-500/70"}`} />
+          <div
+            className={`flex items-center gap-2 text-sm font-medium ${
+              isHappeningNow ? "text-red-600" : "text-gray-500"
+            }`}
+          >
+            <Clock
+              className={`w-4 h-4 ${
+                isHappeningNow ? "text-red-600" : "text-blue-500/70"
+              }`}
+            />
             <span>
-              {event.start_time ? format(new Date(`2000-01-01T${event.start_time}`), "h:mm a") : "TBD"}
-              {event.end_time && ` - ${format(new Date(`2000-01-01T${event.end_time}`), "h:mm a")}`}
+              {event.start_time
+                ? format(new Date(`2000-01-01T${event.start_time}`), "h:mm a")
+                : "TBD"}
+              {event.end_time &&
+                ` - ${format(
+                  new Date(`2000-01-01T${event.end_time}`),
+                  "h:mm a"
+                )}`}
             </span>
           </div>
 
-          <a 
-            href={`http://googleusercontent.com/maps.google.com/search?q=${encodeURIComponent(event.location)}`} 
-            target="_blank" 
-            rel="noopener noreferrer" 
+          <a
+            href={`http://googleusercontent.com/maps.google.com/search?q=${encodeURIComponent(
+              event.location
+            )}`}
+            target="_blank"
+            rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()} // ✅ Stop propagation
             className="flex items-start gap-2 text-sm text-gray-500 hover:text-blue-600 hover:bg-blue-50 p-1 -ml-1 rounded-lg transition-colors group/loc"
           >
             <MapPin className="w-4 h-4 text-red-500/70 mt-0.5 group-hover/loc:text-red-600" />
-            <span className="truncate underline decoration-dotted decoration-gray-300 underline-offset-4">{event.location}</span>
+            <span className="truncate underline decoration-dotted decoration-gray-300 underline-offset-4">
+              {event.location}
+            </span>
           </a>
 
           {(deadlineDate || event.registration_closed_manually) && (
-            <div className={`flex items-center gap-2 text-[12px] font-bold pt-1 transition-all ${isClosed ? "text-gray-400" : isUrgent ? "text-red-600 animate-pulse" : "text-amber-600"}`}>
-              {isClosed ? <XCircle className="w-4 h-4 text-gray-300" /> : <CalendarCheck className={`w-4 h-4 ${isUrgent ? "text-red-500" : "text-amber-500"}`} />}
+            <div
+              className={`flex items-center gap-2 text-[12px] font-bold pt-1 transition-all ${
+                isClosed
+                  ? "text-gray-400"
+                  : isUrgent
+                  ? "text-red-600 animate-pulse"
+                  : "text-amber-600"
+              }`}
+            >
+              {isClosed ? (
+                <XCircle className="w-4 h-4 text-gray-300" />
+              ) : (
+                <CalendarCheck
+                  className={`w-4 h-4 ${
+                    isUrgent ? "text-red-500" : "text-amber-500"
+                  }`}
+                />
+              )}
               <span>
-                {event.registration_closed_manually ? "Registration Closed" : isDeadlinePassed ? `Deadline Passed (${format(deadlineDate!, "MMM d")})` : isUrgent ? `Ends Soon: ${format(deadlineDate!, "MMM d @ h:mm a")}` : `Deadline: ${format(deadlineDate!, "MMM d")}`}
+                {event.registration_closed_manually
+                  ? "Registration Closed"
+                  : isDeadlinePassed
+                  ? `Deadline Passed (${format(deadlineDate!, "MMM d")})`
+                  : isUrgent
+                  ? `Ends Soon: ${format(deadlineDate!, "MMM d @ h:mm a")}`
+                  : `Deadline: ${format(deadlineDate!, "MMM d")}`}
               </span>
             </div>
           )}
@@ -198,7 +284,9 @@ export function OfficialEventCard({
                   <span className="text-gray-400 mx-1">/</span>
                   {event.max_attendees}
                 </>
-              ) : <>{currentCount} Going</>}
+              ) : (
+                <>{currentCount} Going</>
+              )}
             </span>
           </div>
 
@@ -225,17 +313,29 @@ export function OfficialEventCard({
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold cursor-pointer transition-opacity hover:opacity-80 ${
                   isLoading ? "opacity-50 pointer-events-none" : ""
                 } ${
-                  registrationStatus === "waitlist" ? "text-amber-600 bg-amber-50"
-                  : registrationStatus === "checked_in" ? "text-blue-600 bg-blue-50"
-                  : "text-green-600 bg-green-50"
+                  registrationStatus === "waitlist"
+                    ? "text-amber-600 bg-amber-50"
+                    : registrationStatus === "checked_in"
+                    ? "text-blue-600 bg-blue-50"
+                    : "text-green-600 bg-green-50"
                 }`}
                 onClick={handleUnregisterClick} // ✅ Already has stopPropagation
               >
-                {isLoading ? <Loader2 size={14} className="animate-spin" /> :
-                  registrationStatus === "waitlist" ? <><Hourglass size={14} /> Waitlist</>
-                  : registrationStatus === "checked_in" ? <><UserCheck size={14} /> Checked In</>
-                  : <><CheckCircle2 size={14} /> Going</>
-                }
+                {isLoading ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : registrationStatus === "waitlist" ? (
+                  <>
+                    <Hourglass size={14} /> Waitlist
+                  </>
+                ) : registrationStatus === "checked_in" ? (
+                  <>
+                    <UserCheck size={14} /> Checked In
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={14} /> Going
+                  </>
+                )}
               </div>
             )
           ) : (
@@ -243,9 +343,11 @@ export function OfficialEventCard({
               disabled={isClosed || isLoading}
               onClick={handleRegisterClick} // ✅ Already has stopPropagation
               className={`rounded-full font-bold text-xs h-9 px-5 shadow-lg transition-all active:scale-95 ${
-                isClosed ? "bg-gray-100 text-gray-400 cursor-not-allowed shadow-none"
-                : isWaitlistMode ? "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-200"
-                : "bg-gray-900 text-white shadow-gray-200 hover:bg-blue-600 hover:shadow-blue-200"
+                isClosed
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed shadow-none"
+                  : isWaitlistMode
+                  ? "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-200"
+                  : "bg-gray-900 text-white shadow-gray-200 hover:bg-blue-600 hover:shadow-blue-200"
               }`}
             >
               {isLoading ? (
@@ -257,7 +359,9 @@ export function OfficialEventCard({
               ) : (
                 "Register"
               )}
-              {!isClosed && !isLoading && <ArrowRight size={14} className="ml-1 opacity-70" />}
+              {!isClosed && !isLoading && (
+                <ArrowRight size={14} className="ml-1 opacity-70" />
+              )}
             </Button>
           )}
         </div>
