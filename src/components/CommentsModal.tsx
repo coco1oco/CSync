@@ -402,12 +402,12 @@ export function CommentsModal({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-60 flex items-end justify-center md:items-center">
+    <div className="fixed inset-0 z-[60] flex items-end justify-center md:items-center">
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
         onClick={onClose}
       />
-      <div className="relative w-full md:w-650px bg-white rounded-t-2xl md:rounded-2xl shadow-2xl flex flex-col max-h-[85vh] md:max-h-[90vh] animate-in slide-in-from-bottom-10 fade-in duration-300">
+      <div className="relative w-full md:w-[650px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl flex flex-col max-h-[85vh] md:max-h-[90vh] animate-in slide-in-from-bottom-10 fade-in duration-300">
         <div className="flex items-center justify-between p-4 border-b border-gray-100 shrink-0">
           <div className="w-8" />
           {displayName ? (
