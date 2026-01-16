@@ -2,7 +2,7 @@
   "name": "PawPal",
   "short_name": "PawPal",
   "gcm_sender_id": "103953800507",
-  "start_url": ".",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#4f46e5",
