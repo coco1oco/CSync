@@ -10,7 +10,7 @@ import {
   Bone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import logo from "@/assets/images/Pawpal.svg"; // Ensure this path matches your project
+import logo from "@/assets/images/PawPal.svg";
 
 // Type Definition
 type PublicPet = {
