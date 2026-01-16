@@ -19,6 +19,10 @@ import {
   Clock,
   XCircle,
   PartyPopper,
+  Calendar,
+  Syringe,
+  Scissors,
+  Stethoscope,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -146,98 +150,61 @@ export function NotificationCenter({
   }
 
   // --- Icon Logic ---
-  const getIcon = (type: NotificationType) => {
-    const base =
-      "absolute -bottom-0.5 -right-0.5 rounded-full p-0.5 border-2 border-white flex items-center justify-center";
+  // Change this line:
+// const getIcon = (type: NotificationType) => { 
+
+// To this:
+
+const getIcon = (n: any) => {
+    const type = n.type;
+    const subtype = n.data?.subtype; // We grab the specific type here
+    const base = "absolute -bottom-0.5 -right-0.5 rounded-full p-0.5 border-2 border-white flex items-center justify-center";
+
+    // 1. Handle Schedule Subtypes First
+    if (type === "schedule") {
+      switch (subtype) {
+        case "vaccine":
+          return <div className={`${base} bg-orange-500`}><Syringe size={10} className="text-white" /></div>;
+        case "grooming":
+          return <div className={`${base} bg-pink-500`}><Scissors size={10} className="text-white" /></div>;
+        case "checkup":
+          return <div className={`${base} bg-blue-600`}><Stethoscope size={10} className="text-white" /></div>;
+        default:
+          return <div className={`${base} bg-purple-500`}><Calendar size={10} className="text-white" /></div>;
+      }
+    }
+
+    // 2. Handle Other Types
     switch (type) {
       case "reaction":
-        return (
-          <div className={`${base} bg-red-500`}>
-            <Heart size={10} className="text-white fill-white" />
-          </div>
-        );
-      case "comment":
-        return (
-          <div className={`${base} bg-blue-500`}>
-            <MessageCircle size={10} className="text-white fill-white" />
-          </div>
-        );
-      case "reply":
-        return (
-          <div className={`${base} bg-green-500`}>
-            <MessageCircle size={10} className="text-white fill-white" />
-          </div>
-        );
-      case "mention":
-        return (
-          <div className={`${base} bg-orange-500`}>
-            <AtSign size={10} className="text-white" />
-          </div>
-        );
       case "comment_like":
-        return (
-          <div className={`${base} bg-red-500`}>
-            <Heart size={10} className="text-white fill-white" />
-          </div>
-        );
+        return <div className={`${base} bg-red-500`}><Heart size={10} className="text-white fill-white" /></div>;
+      case "comment":
+      case "reply":
+        return <div className={`${base} bg-blue-500`}><MessageCircle size={10} className="text-white fill-white" /></div>;
+      case "mention":
+        return <div className={`${base} bg-orange-500`}><AtSign size={10} className="text-white" /></div>;
       case "new_post":
-        return (
-          <div className={`${base} bg-purple-500`}>
-            <Globe size={10} className="text-white" />
-          </div>
-        );
+        return <div className={`${base} bg-purple-500`}><Globe size={10} className="text-white" /></div>;
       case "system":
-        return (
-          <div className={`${base} bg-blue-600`}>
-            <ShieldAlert size={10} className="text-white" />
-          </div>
-        );
+        return <div className={`${base} bg-blue-600`}><ShieldAlert size={10} className="text-white" /></div>;
       case "official_event":
-        return (
-          <div className={`${base} bg-purple-600`}>
-            <CalendarCheck size={10} className="text-white" />
-          </div>
-        );
+        return <div className={`${base} bg-purple-600`}><CalendarCheck size={10} className="text-white" /></div>;
       case "event_reminder":
-        return (
-          <div className={`${base} bg-amber-500`}>
-            <BellRing size={10} className="text-white" />
-          </div>
-        );
+        return <div className={`${base} bg-amber-500`}><BellRing size={10} className="text-white" /></div>;
       case "registration_approved":
-        return (
-          <div className={`${base} bg-green-500`}>
-            <CheckCircle2 size={10} className="text-white" />
-          </div>
-        );
+        return <div className={`${base} bg-green-500`}><CheckCircle2 size={10} className="text-white" /></div>;
       case "registration_waitlist":
-        return (
-          <div className={`${base} bg-amber-500`}>
-            <Clock size={10} className="text-white" />
-          </div>
-        );
+        return <div className={`${base} bg-amber-500`}><Clock size={10} className="text-white" /></div>;
       case "registration_rejected":
       case "registration_removed":
-        return (
-          <div className={`${base} bg-red-500`}>
-            <XCircle size={10} className="text-white" />
-          </div>
-        );
+        return <div className={`${base} bg-red-500`}><XCircle size={10} className="text-white" /></div>;
       case "event_checkin":
-        return (
-          <div className={`${base} bg-teal-500`}>
-            <PartyPopper size={10} className="text-white" />
-          </div>
-        );
+        return <div className={`${base} bg-teal-500`}><PartyPopper size={10} className="text-white" /></div>;
       default:
-        return (
-          <div className={`${base} bg-gray-500`}>
-            <Bell size={10} className="text-white" />
-          </div>
-        );
+        return <div className={`${base} bg-gray-500`}><Bell size={10} className="text-white" /></div>;
     }
   };
-
   // --- Content Logic ---
   const renderNotificationContent = (n: any) => {
     const actors = n.data?.actors;
@@ -421,7 +388,7 @@ export function NotificationCenter({
                         className="w-10 h-10 rounded-full object-cover border border-gray-100"
                         alt="User"
                       />
-                      {getIcon(n.type as NotificationType)}
+                     {getIcon(n)}
                     </div>
 
                     <div className="flex-1 min-w-0 text-sm leading-snug">

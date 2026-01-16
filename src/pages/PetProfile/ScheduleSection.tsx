@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO, addYears } from "date-fns";
-
+import { notifyScheduleCreation } from "@/lib/NotificationService";
 interface ScheduleSectionProps {
   petId: string;
 }
@@ -199,6 +199,7 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
       type: formData.type,
       recurrence: formData.recurrence,
     };
+    
 
     try {
       if (editingId) {
@@ -214,6 +215,17 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
         } else {
           closeForm();
         }
+        if (user?.id) {
+    // This fires the notification immediately
+    notifyScheduleCreation(
+      user.id,
+      petId,
+      formData.title,
+      formData.scheduled_date,
+      formData.type // "vaccine", "grooming", etc.
+    );
+  }
+  toast.success("Appointment scheduled");
       }
     } catch (err) {
       toast.error("Failed to save schedule");

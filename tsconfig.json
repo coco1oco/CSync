@@ -10,6 +10,10 @@
       "@/*": ["./src/*"]
     },
     "forceConsistentCasingInFileNames": true,
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "supabase"  // Exclude the entire supabase directory
+  ]
  
 }
