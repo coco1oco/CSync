@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Loader2, Eye, EyeOff, CheckCircle2 } from "lucide-react";
-import logo from "@/assets/images/Pawpal.svg";
+import logo from "@/assets/images/PawPal.svg";
 import heroBg from "@/assets/images/hero_4.jpg";
 
 export default function UpdatePassword() {
