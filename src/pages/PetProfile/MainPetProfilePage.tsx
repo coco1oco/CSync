@@ -36,6 +36,8 @@ import {
   CloudSun,
   Loader2,
   Heart,
+  Scale, // Added Scale icon
+  Box, // Added Box icon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -45,7 +47,7 @@ import { toast } from "sonner";
 import SymptomModal from "./components/SymptomModal";
 import { cn } from "@/lib/utils";
 
-// --- TYPES & CONSTANTS ---
+// ... (KEEP EXISTING CONSTANTS & SMART_FACTS & HELPER FUNCTIONS) ...
 
 const SMART_FACTS = {
   general: [
@@ -72,10 +74,9 @@ interface RoutineItem {
   type: "inventory" | "activity";
   times: string[];
   pet_id: string;
-  pets?: { name: string; petimage_url: string | null; species: string }; // ✅ Added species
+  pets?: { name: string; petimage_url: string | null; species: string };
 }
 
-// ✅ HELPER: Get Dynamic Icon (Reusable)
 const getSpeciesIcon = (
   species?: string,
   size: number = 24,
@@ -107,8 +108,10 @@ export default function MainPetProfilePage() {
   const [isAddRoutineOpen, setIsAddRoutineOpen] = useState(false);
   const [isSymptomOpen, setIsSymptomOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   const [showAllTasks, setShowAllTasks] = useState(false);
+
+  // --- NEW: FOOD UNIT STATE ---
+  const [foodUnitType, setFoodUnitType] = useState<"mass" | "volume">("mass");
 
   const [newRoutine, setNewRoutine] = useState({
     name: "",
@@ -123,7 +126,7 @@ export default function MainPetProfilePage() {
     selected_times: [] as string[],
   });
 
-  // --- DATA FETCHING ---
+  // ... (KEEP EXISTING DATA FETCHING HOOKS: useQuery for pets and dashboard) ...
   const { data: pets = [], isLoading: petsLoading } = useQuery({
     queryKey: ["pets", "personal", user?.id],
     queryFn: async () => {
@@ -175,7 +178,6 @@ export default function MainPetProfilePage() {
           .maybeSingle(),
         supabase
           .from("medications")
-          // ✅ UPDATED: Fetch species for tiny icons
           .select("*, pets(name, petimage_url, species)")
           .eq("owner_id", user.id)
           .order("created_at", { ascending: false }),
@@ -205,7 +207,7 @@ export default function MainPetProfilePage() {
     enabled: !!user,
   });
 
-  // --- COMPUTED VALUES ---
+  // ... (KEEP EXISTING COMPUTED VALUES & HELPERS) ...
   const currentPeriod = useMemo(() => {
     const hour = new Date().getHours();
     if (hour < 12) return "morning";
@@ -267,8 +269,7 @@ export default function MainPetProfilePage() {
     return { morning, afternoon, evening };
   }, [dashboard]);
 
-  // --- ACTIONS ---
-
+  // ... (KEEP toggleRoutineCheck, handleLogSymptom) ...
   const toggleRoutineCheck = async (
     routine: RoutineItem,
     period: "morning" | "afternoon" | "evening"
@@ -389,15 +390,23 @@ export default function MainPetProfilePage() {
     }
   };
 
+  // --- MODIFIED: handleAddRoutine ---
   const handleAddRoutine = async () => {
     if (!user || !newRoutine.pet_id || !newRoutine.name) return;
     setIsSubmitting(true);
     try {
       let finalStock = parseInt(newRoutine.current_stock_input) || 0;
       let finalUnit = newRoutine.unit;
+
+      // Logic: Only convert kg->g if it's Food AND Mass
       if (newRoutine.subType === "food") {
-        finalStock = finalStock * 1000;
-        finalUnit = "g";
+        if (foodUnitType === "mass") {
+          finalStock = finalStock * 1000; // kg -> g
+          finalUnit = "g";
+        } else {
+          // Volume/Cans: Use exact number, unit defaults to "cans" or whatever is set
+          finalUnit = "cans";
+        }
       }
 
       const payload = {
@@ -435,9 +444,11 @@ export default function MainPetProfilePage() {
     }
   };
 
+  // --- MODIFIED: applyPreset ---
   const applyPreset = (type: string) => {
     const defaultPet = pets.length > 0 ? pets[0].id : "";
-    if (type === "food")
+    if (type === "food") {
+      setFoodUnitType("mass"); // Default to mass
       setNewRoutine((prev) => ({
         ...prev,
         pet_id: prev.pet_id || defaultPet,
@@ -446,10 +457,10 @@ export default function MainPetProfilePage() {
         subType: "food",
         unit: "g",
         dosage_per_use: 150,
-        current_stock_input: "3",
+        current_stock_input: "3", // Default 3kg
         selected_times: ["morning"],
       }));
-    else if (type === "walk")
+    } else if (type === "walk")
       setNewRoutine((prev) => ({
         ...prev,
         pet_id: prev.pet_id || defaultPet,
@@ -487,6 +498,7 @@ export default function MainPetProfilePage() {
       }));
   };
 
+  // ... (KEEP toggleTime and useEffect) ...
   const toggleTime = (time: string) => {
     setNewRoutine((prev) => {
       const exists = prev.selected_times.includes(time);
@@ -512,6 +524,8 @@ export default function MainPetProfilePage() {
 
   return (
     <div className="w-full h-full flex flex-col bg-gray-50 relative">
+      {/* ... (KEEP HEADER, WELCOME, STATS, SMART FACT sections - no changes) ... */}
+
       <div className="shrink-0 px-4 pt-4 lg:pt-8 lg:px-8 pb-4 bg-gray-50 z-10 flex flex-col gap-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-2">
@@ -536,7 +550,7 @@ export default function MainPetProfilePage() {
               onClick={() => navigate("/campus-pets")}
               className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold text-gray-500 hover:bg-gray-50 hover:text-blue-600 transition-all"
             >
-              <Building2 size={16} /> Campus Dogs
+              <Building2 size={16} /> Campus Pets
             </button>
           </div>
         </div>
@@ -565,6 +579,7 @@ export default function MainPetProfilePage() {
           <>
             {dashboard && (
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 animate-in fade-in slide-in-from-top-2">
+                {/* ... (Keep Stats Cards) ... */}
                 <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
                     <Dog size={20} />
@@ -670,7 +685,7 @@ export default function MainPetProfilePage() {
               </div>
             </div>
 
-            {/* ACTION PLAN */}
+            {/* ... (Keep Action Plan) ... */}
             {dashboard && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between px-1">
@@ -704,6 +719,7 @@ export default function MainPetProfilePage() {
                 </div>
 
                 <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-xl shadow-gray-100/50">
+                  {/* ... (Keep Progress Bar) ... */}
                   <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-50">
                     <div>
                       <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">
@@ -802,7 +818,7 @@ export default function MainPetProfilePage() {
         )}
       </div>
 
-      {/* 5. PET PROFILES GRID */}
+      {/* ... (Keep Pet Grid) ... */}
       {pets.length > 0 && (
         <div className="flex-1 overflow-y-auto px-4 lg:px-8 pb-24 lg:pb-8">
           <div className="flex items-center justify-between mb-4 mt-2">
@@ -931,6 +947,34 @@ export default function MainPetProfilePage() {
                   </div>
                 </div>
 
+                {/* --- NEW: FOOD UNIT TOGGLE --- */}
+                {newRoutine.subType === "food" && (
+                  <div className="bg-gray-50 p-1 rounded-xl flex">
+                    <button
+                      onClick={() => setFoodUnitType("mass")}
+                      className={cn(
+                        "flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all",
+                        foodUnitType === "mass"
+                          ? "bg-white text-blue-600 shadow-sm"
+                          : "text-gray-500 hover:text-gray-600"
+                      )}
+                    >
+                      <Scale size={14} /> Bag by Weight
+                    </button>
+                    <button
+                      onClick={() => setFoodUnitType("volume")}
+                      className={cn(
+                        "flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all",
+                        foodUnitType === "volume"
+                          ? "bg-white text-blue-600 shadow-sm"
+                          : "text-gray-500 hover:text-gray-600"
+                      )}
+                    >
+                      <Box size={14} /> Cans / Pouches
+                    </button>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label className="text-xs font-bold text-gray-400 uppercase">
                     For
@@ -950,7 +994,6 @@ export default function MainPetProfilePage() {
                         )}
                       >
                         <div className="w-6 h-6 rounded-full bg-white overflow-hidden shadow-sm flex items-center justify-center bg-blue-50/50">
-                          {/* ✅ FIXED: Dynamic Wizard Icon */}
                           {pet.petimage_url ? (
                             <img
                               src={pet.petimage_url}
@@ -987,9 +1030,19 @@ export default function MainPetProfilePage() {
                         <Label className="text-xs font-bold text-gray-400 uppercase">
                           Unit
                         </Label>
+                        {/* If Food & Volume, let user type unit (cans, pouches etc). If Mass, default g */}
                         <Input
                           className="bg-gray-50"
-                          value={newRoutine.unit}
+                          value={
+                            newRoutine.subType === "food" &&
+                            foodUnitType === "mass"
+                              ? "g"
+                              : newRoutine.unit
+                          }
+                          disabled={
+                            newRoutine.subType === "food" &&
+                            foodUnitType === "mass"
+                          }
                           onChange={(e) =>
                             setNewRoutine({
                               ...newRoutine,
@@ -1001,7 +1054,7 @@ export default function MainPetProfilePage() {
                       <div className="space-y-1.5">
                         <Label className="text-xs font-bold text-gray-400 uppercase">
                           {newRoutine.subType === "food"
-                            ? "Serving (g)"
+                            ? "Serving"
                             : newRoutine.subType === "liquid"
                             ? "Dose (ml)"
                             : "Count"}
@@ -1112,7 +1165,9 @@ export default function MainPetProfilePage() {
                       <div className="space-y-1.5">
                         <Label className="text-xs font-bold text-gray-500">
                           {newRoutine.subType === "food"
-                            ? "Bag Weight (kg)"
+                            ? foodUnitType === "mass"
+                              ? "Bag Weight (kg)"
+                              : "Total Cans/Pouches"
                             : newRoutine.subType === "liquid"
                             ? "Tube/Bottle Size (ml/g)"
                             : "Current Count"}
@@ -1183,7 +1238,7 @@ export default function MainPetProfilePage() {
   );
 }
 
-// ✅ SUB-COMPONENT: Modern Task Group
+// ... (KEEP DashboardTaskGroup & MainDashboardSkeleton) ...
 function DashboardTaskGroup({
   period,
   title,
@@ -1259,7 +1314,7 @@ function DashboardTaskGroup({
                       : "bg-gray-50 text-gray-400"
                   )}
                 >
-                  {task.current_stock} left
+                  {task.current_stock} {task.unit} left
                 </span>
               )}
             </div>
