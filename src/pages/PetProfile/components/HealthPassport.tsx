@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useVaccinations } from "@/hooks/useVaccinations";
-import { format, isAfter, isBefore } from "date-fns";
+import { format, isAfter, isBefore, differenceInYears, differenceInMonths } from "date-fns"; // ✅ Updated imports
 import {
   ShieldCheck,
   AlertTriangle,
@@ -49,6 +49,21 @@ export default function HealthPassport({ pet, userId }: HealthPassportProps) {
       v.status === "overdue" ||
       (v.next_due_date && isBefore(new Date(v.next_due_date), new Date()))
   );
+
+  // ✅ NEW: Accurate Age Logic Helper
+  const getAgeDisplay = (dobString: string | null) => {
+    if (!dobString) return { value: "-", unit: "" };
+    const dob = new Date(dobString);
+    const today = new Date();
+    const years = differenceInYears(today, dob);
+    
+    if (years > 0) return { value: years, unit: "yrs" };
+    
+    const months = differenceInMonths(today, dob);
+    return { value: months, unit: "mos" };
+  };
+
+  const { value: ageValue, unit: ageUnit } = getAgeDisplay(pet.dob);
 
   if (vaxLoading) return <PassportSkeleton />;
 
@@ -199,13 +214,11 @@ export default function HealthPassport({ pet, userId }: HealthPassportProps) {
                 <div className="p-3 bg-gray-50 rounded-lg flex flex-col justify-between">
                   <Calendar className="w-4 h-4 text-gray-400 mb-2" />
                   <div>
+                    {/* ✅ FIXED: Logic calculates Years or Months properly */}
                     <span className="text-xl font-black text-gray-900">
-                      {pet.dob
-                        ? new Date().getFullYear() -
-                          new Date(pet.dob).getFullYear()
-                        : "-"}
+                      {ageValue}
                     </span>
-                    <span className="text-xs text-gray-500 ml-1">yrs</span>
+                    <span className="text-xs text-gray-500 ml-1">{ageUnit}</span>
                   </div>
                   <span className="text-[10px] text-gray-400 font-bold uppercase mt-1">
                     Age
