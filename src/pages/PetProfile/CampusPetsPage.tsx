@@ -262,7 +262,7 @@ export default function CampusPetsPage() {
               disabled
               className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold bg-blue-600 text-white shadow-md cursor-default"
             >
-              <Building2 size={16} /> Campus Dogs
+              <Building2 size={16} /> Campus Pets
             </button>
           </div>
         </div>
@@ -364,7 +364,7 @@ export default function CampusPetsPage() {
                       onClick={() => navigate("/PetDashboard/new?mode=campus")}
                       className="bg-gray-900 hover:bg-gray-800 text-white rounded-xl shadow-sm"
                     >
-                      <Plus className="w-4 h-4 mr-2" /> Add Dog
+                      <Plus className="w-4 h-4 mr-2" /> Add Pet
                     </Button>
                     <Button
                       className="bg-orange-500 hover:bg-orange-600 text-white rounded-xl shadow-md"
