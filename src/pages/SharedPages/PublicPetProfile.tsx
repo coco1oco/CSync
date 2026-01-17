@@ -8,11 +8,11 @@ import {
   ShieldCheck,
   AlertTriangle,
   Bone,
+  Building2, // Added icon for Campus/Admin
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import logo from "@/assets/images/PawPal.svg"; // Ensure Capital P is correct
+import logo from "@/assets/images/PawPal.svg"; // Checked: Capital P is correct based on your file list
 
-// ✅ Fix 1: Update type to allow owner to be null
 type PublicPet = {
   id: string;
   name: string;
@@ -26,7 +26,7 @@ type PublicPet = {
     last_name: string;
     email: string;
     contact_number?: string;
-  } | null; // <--- Added | null
+  } | null;
   vaccinations: { vaccine_name: string; status: string }[];
 };
 
@@ -147,15 +147,16 @@ export default function PublicPetProfile() {
             </div>
           </div>
 
-          {/* Owner Card (Safely Handled) */}
+          {/* Owner Card (Logic Updated) */}
           <div className="bg-slate-50 rounded-3xl p-5 border border-slate-100">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">
-              {/* ✅ Fix 2: Handle missing owner name */}
-              Owned by {pet.owner?.first_name || "Unknown Owner"}
+              {pet.owner
+                ? `Owned by ${pet.owner.first_name}`
+                : "Campus / Organization Pet"}
             </p>
 
             <div className="space-y-3">
-              {/* ✅ Fix 3: Only show buttons if owner data exists */}
+              {/* IF OWNER EXISTS: Show Call/Email Buttons */}
               {pet.owner ? (
                 <>
                   {pet.owner.contact_number ? (
@@ -186,9 +187,17 @@ export default function PublicPetProfile() {
                   </Button>
                 </>
               ) : (
-                <div className="p-3 bg-gray-100 rounded-xl text-xs text-gray-500 font-medium">
-                  Owner contact details are private or unavailable.
-                </div>
+                /* IF NO OWNER: Show "Contact Admin" Fallback */
+                <Button
+                  asChild
+                  className="w-full h-14 rounded-2xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-lg shadow-lg transition-all active:scale-[0.98]"
+                >
+                  {/* Replace this email with your actual Org/Admin email */}
+                  <a href="mailto:admin@pawpal.com">
+                    <Building2 className="mr-2 h-5 w-5" />
+                    Contact Campus Admin
+                  </a>
+                </Button>
               )}
             </div>
           </div>
