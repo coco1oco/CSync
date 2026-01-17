@@ -3,7 +3,7 @@ import type { JSX } from "react";
 import { Menu, Ticket } from "lucide-react";
 import { useAuth } from "@/context/authContext";
 
-const LOGO_PATH = "/PawPal.svg";
+const LOGO_PATH = "@/assets/images/PawPal.svg";
 
 interface HeaderProps {
   title?: string;
