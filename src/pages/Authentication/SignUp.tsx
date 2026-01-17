@@ -34,21 +34,21 @@ const signUpSchema = z
       .email("Invalid email format")
       .regex(
         CVSU_EMAIL_REGEX,
-        "Please use your institutional email (@cvsu.edu.ph)"
+        "Please use your institutional email (@cvsu.edu.ph)",
       ),
     username: z
       .string()
       .min(1, "Username is required")
       .regex(
         USERNAME_REGEX,
-        "3–16 chars, letters, numbers, and _ only. Must start with a letter."
+        "3–16 chars, letters, numbers, and _ only. Must start with a letter.",
       ),
     password: z
       .string()
       .min(1, "Password is required")
       .regex(
         PASSWORD_REGEX,
-        "Min 8 chars: Upper, lower, number, and special symbol."
+        "Min 8 chars: Upper, lower, number, and special symbol.",
       ),
     confirmPassword: z.string().min(1, "Please confirm your password"),
   })
