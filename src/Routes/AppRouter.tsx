@@ -7,9 +7,9 @@ import {
 import { ProtectedRoute } from "./ProtectedRoute";
 import { PublicRoute } from "./PublicRoute";
 import AppLayout from "@/components/AppLayout";
-import RootBoundary from "@/components/RootBoundary"; // Import the new file
 import AuthLayout from "@/components/AuthLayout";
 import { Loader2 } from "lucide-react";
+import RootBoundary from "@/components/RootBoundary"; // 👈 IMPORT THIS
 
 // --- LAZY IMPORTS ---
 const UnifiedDashboard = lazy(() =>
@@ -61,12 +61,12 @@ const SettingsPage = lazy(() => import("@/pages/MenuPage/SettingsPage"));
 const OfficialEventDetails = lazy(
   () => import("@/pages/SharedPages/OfficialEventDetails"),
 );
-
-// ✅ NEW: Import Challenge Page
 const ChallengeDetailsPage = lazy(
   () => import("@/pages/SharedPages/ChallengeDetailsPage"),
 );
 const MyTicketsPage = lazy(() => import("@/pages/SharedPages/MyTicketsPage"));
+const CreateChallenge = lazy(() => import("@/pages/admin/CreateChallenge"));
+
 // Loading Spinner
 const PageLoader = () => (
   <div className="flex h-screen w-full items-center justify-center bg-gray-50">
@@ -74,12 +74,11 @@ const PageLoader = () => (
   </div>
 );
 
-const CreateChallenge = lazy(() => import("@/pages/admin/CreateChallenge"));
-
 const router = createBrowserRouter([
   // 1. PUBLIC (QR CODES)
   {
     path: "/lost-and-found/:petId",
+    errorElement: <RootBoundary />, // 👈 ADD HERE
     element: (
       <Suspense fallback={<PageLoader />}>
         <PublicPetProfile />
@@ -88,23 +87,16 @@ const router = createBrowserRouter([
   },
   {
     path: "/unauthorized",
+    errorElement: <RootBoundary />, // 👈 ADD HERE
     element: (
       <Suspense fallback={<PageLoader />}>
         <Unauthorized />
       </Suspense>
     ),
   },
-  {
-    path: "/",
-    element: <AppLayout />,
-    errorElement: <RootBoundary />, // <--- ADD THIS LINE HERE
-    children: [
-      // ... your other routes
-    ],
-  },
-
   // 2. GUEST ONLY
   {
+    errorElement: <RootBoundary />, // 👈 ADD HERE (Covers Sign In, etc.)
     element: (
       <PublicRoute>
         <AuthLayout />
@@ -145,8 +137,9 @@ const router = createBrowserRouter([
       },
     ],
   },
-  // 3. PROTECTED
+  // 3. PROTECTED (Where Messages & Profile live)
   {
+    errorElement: <RootBoundary />, // 👈 CRITICAL: ADD HERE for Dashboard/Messages
     element: (
       <ProtectedRoute>
         <AppLayout />
@@ -179,8 +172,6 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-
-      // ✅ NEW: Challenge Route
       {
         path: "/challenges/current",
         element: (
@@ -189,8 +180,6 @@ const router = createBrowserRouter([
           </Suspense>
         ),
       },
-
-      // Admin Events
       {
         path: "/admin/events/new-official",
         element: (
@@ -201,7 +190,6 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-      // ✅ NEW: Challenge Creation Route
       {
         path: "/admin/challenges/create",
         element: (
@@ -278,8 +266,6 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-
-      // Account & Features
       {
         path: "/reset-password",
         element: (
@@ -312,8 +298,6 @@ const router = createBrowserRouter([
           </Suspense>
         ),
       },
-
-      // Shared
       {
         path: "/ProfilePage",
         element: (
@@ -346,8 +330,6 @@ const router = createBrowserRouter([
           </Suspense>
         ),
       },
-
-      // Pets
       {
         path: "/PetDashboard",
         element: (
