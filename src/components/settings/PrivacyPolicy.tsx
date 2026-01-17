@@ -12,7 +12,6 @@ export function PrivacyPolicy() {
       {/* Header Section */}
       <div className="space-y-2 border-b border-gray-100 pb-4">
         <h2 className="text-2xl font-black text-blue-950 flex items-center gap-2">
-          <Shield className="h-6 w-6 text-blue-600" />
           Privacy Policy
         </h2>
         <p className="text-sm text-gray-500 font-medium">
@@ -35,7 +34,6 @@ export function PrivacyPolicy() {
         {/* Section 1: Information Collection */}
         <section className="space-y-3">
           <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <FileText className="h-5 w-5 text-gray-400" />
             1. Information We Collect
           </h3>
           <ul className="list-disc pl-5 space-y-2 marker:text-blue-500">
@@ -60,7 +58,6 @@ export function PrivacyPolicy() {
         {/* Section 2: How We Use Data */}
         <section className="space-y-3">
           <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Eye className="h-5 w-5 text-gray-400" />
             2. How We Use Your Information
           </h3>
           <p>We use your data for the following purposes:</p>
@@ -80,7 +77,6 @@ export function PrivacyPolicy() {
         {/* Section 3: Data Security */}
         <section className="space-y-3">
           <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Lock className="h-5 w-5 text-gray-400" />
             3. Data Security
           </h3>
           <p>
