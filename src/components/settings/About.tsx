@@ -27,7 +27,7 @@ export function About() {
           <div className="relative z-10">
             <div className="w-24 h-24 bg-white rounded-3xl shadow-md border border-gray-100 flex items-center justify-center mb-5 mx-auto">
               <img
-                src="/Logo.svg"
+                src="/PawPal.svg"
                 alt="PawPal Logo"
                 className="w-14 h-14 object-contain"
               />
