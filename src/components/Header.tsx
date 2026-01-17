@@ -1,9 +1,9 @@
 import { Link, useNavigate } from "react-router-dom";
 import type { JSX } from "react";
-import { Menu, Ticket } from "lucide-react"; 
+import { Menu, Ticket } from "lucide-react";
 import { useAuth } from "@/context/authContext";
 
-const LOGO_PATH = "/Logo.svg";
+const LOGO_PATH = "/PawPal.svg";
 
 interface HeaderProps {
   title?: string;
@@ -21,7 +21,10 @@ export function Header({
   return (
     <header className="sticky top-0 z-50 w-full bg-white border-b border-gray-200 header-safe px-4 flex items-center justify-between transition-all">
       {/* Left: Logo & Title */}
-      <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
+      <div
+        className="flex items-center gap-2 cursor-pointer"
+        onClick={() => navigate("/")}
+      >
         <img src={LOGO_PATH} alt="PawPal" className="h-8 w-8 object-contain" />
         <h1 className="text-xl font-bold text-gray-900">{title}</h1>
       </div>
