@@ -95,8 +95,7 @@ export default function SignUp() {
             username: data.username,
           },
           // ✅ UPDATE THIS LINE:
-          emailRedirectTo:
-            "https://stiffledly-bimaculate-candida.ngrok-free.dev/welcome",
+          emailRedirectTo: "https://pawpal-taupe.vercel.app/welcome",
         },
       });
 

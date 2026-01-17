@@ -10,9 +10,9 @@ import {
   Bone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import logo from "@/assets/images/PawPal.svg";
+import logo from "@/assets/images/PawPal.svg"; // Ensure Capital P is correct
 
-// Type Definition
+// ✅ Fix 1: Update type to allow owner to be null
 type PublicPet = {
   id: string;
   name: string;
@@ -26,7 +26,7 @@ type PublicPet = {
     last_name: string;
     email: string;
     contact_number?: string;
-  };
+  } | null; // <--- Added | null
   vaccinations: { vaccine_name: string; status: string }[];
 };
 
@@ -49,7 +49,7 @@ export default function PublicPetProfile() {
           id, name, species, breed, color, sex, petimage_url,
           owner:profiles(first_name, last_name, email, contact_number),
           vaccinations(vaccine_name, status)
-        `
+        `,
         )
         .eq("id", petId)
         .single();
@@ -147,47 +147,55 @@ export default function PublicPetProfile() {
             </div>
           </div>
 
-          {/* Owner Card */}
+          {/* Owner Card (Safely Handled) */}
           <div className="bg-slate-50 rounded-3xl p-5 border border-slate-100">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">
-              Owned by {pet.owner.first_name}
+              {/* ✅ Fix 2: Handle missing owner name */}
+              Owned by {pet.owner?.first_name || "Unknown Owner"}
             </p>
 
             <div className="space-y-3">
-              {/* ✅ Call Button (Primary Action) */}
-              {pet.owner.contact_number ? (
-                <Button
-                  asChild
-                  className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg shadow-lg shadow-blue-200 transition-all active:scale-[0.98]"
-                >
-                  <a href={`tel:${pet.owner.contact_number}`}>
-                    <Phone className="mr-2 h-5 w-5" />
-                    Call Owner
-                  </a>
-                </Button>
+              {/* ✅ Fix 3: Only show buttons if owner data exists */}
+              {pet.owner ? (
+                <>
+                  {pet.owner.contact_number ? (
+                    <Button
+                      asChild
+                      className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg shadow-lg shadow-blue-200 transition-all active:scale-[0.98]"
+                    >
+                      <a href={`tel:${pet.owner.contact_number}`}>
+                        <Phone className="mr-2 h-5 w-5" />
+                        Call Owner
+                      </a>
+                    </Button>
+                  ) : (
+                    <div className="p-3 bg-gray-100 rounded-xl text-xs text-gray-500 font-medium">
+                      No phone number provided.
+                    </div>
+                  )}
+
+                  <Button
+                    asChild
+                    variant="outline"
+                    className="w-full h-14 rounded-2xl border-2 border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-white font-bold transition-all"
+                  >
+                    <a href={`mailto:${pet.owner.email}`}>
+                      <Mail className="mr-2 h-5 w-5" />
+                      Send Email
+                    </a>
+                  </Button>
+                </>
               ) : (
                 <div className="p-3 bg-gray-100 rounded-xl text-xs text-gray-500 font-medium">
-                  No phone number provided.
+                  Owner contact details are private or unavailable.
                 </div>
               )}
-
-              {/* Email Button (Secondary) */}
-              <Button
-                asChild
-                variant="outline"
-                className="w-full h-14 rounded-2xl border-2 border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-white font-bold transition-all"
-              >
-                <a href={`mailto:${pet.owner.email}`}>
-                  <Mail className="mr-2 h-5 w-5" />
-                  Send Email
-                </a>
-              </Button>
             </div>
           </div>
 
           {/* Medical Badge */}
-          {pet.vaccinations.some((v) =>
-            v.vaccine_name.toLowerCase().includes("rabies")
+          {pet.vaccinations?.some((v) =>
+            v.vaccine_name.toLowerCase().includes("rabies"),
           ) && (
             <div className="inline-flex items-center gap-2 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-4 py-2 rounded-full border border-emerald-100">
               <ShieldCheck size={12} />
