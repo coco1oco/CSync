@@ -3,7 +3,7 @@ import type { JSX } from "react";
 import { Menu, Ticket } from "lucide-react";
 import { useAuth } from "@/context/authContext";
 
-const LOGO_PATH = "/Pawpal.svg";
+const logo = "/PawPal.svg";
 
 interface HeaderProps {
   title?: string;
@@ -25,7 +25,7 @@ export function Header({
         className="flex items-center gap-2 cursor-pointer"
         onClick={() => navigate("/")}
       >
-        <img src={LOGO_PATH} alt="PawPal" className="h-8 w-8 object-contain" />
+        <img src={logo} alt="PawPal" className="h-8 w-8 object-contain" />
         <h1 className="text-xl font-bold text-gray-900">{title}</h1>
       </div>
 
