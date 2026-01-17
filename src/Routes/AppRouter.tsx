@@ -7,6 +7,7 @@ import {
 import { ProtectedRoute } from "./ProtectedRoute";
 import { PublicRoute } from "./PublicRoute";
 import AppLayout from "@/components/AppLayout";
+import RootBoundary from "@/components/RootBoundary"; // Import the new file
 import AuthLayout from "@/components/AuthLayout";
 import { Loader2 } from "lucide-react";
 
@@ -14,56 +15,56 @@ import { Loader2 } from "lucide-react";
 const UnifiedDashboard = lazy(() =>
   import("@/pages/SharedPages/UnifiedDashboard").then((m) => ({
     default: m.UnifiedDashboard,
-  }))
+  })),
 );
 const CreateEvent = lazy(() => import("@/pages/admin/CreateEvent"));
 const EditEvent = lazy(() => import("@/pages/admin/EditEvent"));
 const ManageTeam = lazy(() => import("@/pages/admin/ManageTeam"));
 const CreateOfficialEvent = lazy(
-  () => import("@/pages/admin/CreateOfficialEvent")
+  () => import("@/pages/admin/CreateOfficialEvent"),
 );
 const ManageEventsPage = lazy(() => import("@/pages/admin/ManageEventsPage"));
 const EditOfficialEvent = lazy(() => import("@/pages/admin/EditOfficialEvent"));
 const MainPetProfilePage = lazy(
-  () => import("@/pages/PetProfile/MainPetProfilePage")
+  () => import("@/pages/PetProfile/MainPetProfilePage"),
 );
 const AddPetPage = lazy(() => import("@/pages/PetProfile/AddPetPage"));
 const PetProfilePage = lazy(() => import("@/pages/PetProfile/PetProfilePage"));
 const PetEditProfile = lazy(() => import("@/pages/PetProfile/PetEditProfile"));
 const CampusPetsPage = lazy(() => import("@/pages/PetProfile/CampusPetsPage"));
 const PublicPetProfile = lazy(
-  () => import("@/pages/SharedPages/PublicPetProfile")
+  () => import("@/pages/SharedPages/PublicPetProfile"),
 );
 const Welcome = lazy(() => import("@/pages/Authentication/Welcome"));
 const SignIn = lazy(() => import("@/pages/Authentication/SignIn"));
 const SignUp = lazy(() => import("@/pages/Authentication/SignUp"));
 const ForgotPassword = lazy(
-  () => import("@/pages/Authentication/ForgotPassword")
+  () => import("@/pages/Authentication/ForgotPassword"),
 );
 const Unauthorized = lazy(() => import("@/pages/Authentication/Unauthorized"));
 const UpdatePassword = lazy(
-  () => import("@/pages/Authentication/UpdatePassword")
+  () => import("@/pages/Authentication/UpdatePassword"),
 );
 const ProfilePage = lazy(() => import("@/pages/SharedPages/ProfilePage"));
 const MenuPage = lazy(() => import("@/pages/SharedPages/MenuPage"));
 const EditProfilePage = lazy(
-  () => import("@/pages/SharedPages/EditProfilePage")
+  () => import("@/pages/SharedPages/EditProfilePage"),
 );
 const MessagesPage = lazy(() => import("@/pages/SharedPages/MessagesPage"));
 const NotificationsPage = lazy(() =>
   import("@/pages/SharedPages/NotificationsPage").then((m) => ({
     default: m.NotificationsPage,
-  }))
+  })),
 );
 const EventDetails = lazy(() => import("@/pages/SharedPages/EventDetails"));
 const SettingsPage = lazy(() => import("@/pages/MenuPage/SettingsPage"));
 const OfficialEventDetails = lazy(
-  () => import("@/pages/SharedPages/OfficialEventDetails")
+  () => import("@/pages/SharedPages/OfficialEventDetails"),
 );
 
 // ✅ NEW: Import Challenge Page
 const ChallengeDetailsPage = lazy(
-  () => import("@/pages/SharedPages/ChallengeDetailsPage")
+  () => import("@/pages/SharedPages/ChallengeDetailsPage"),
 );
 const MyTicketsPage = lazy(() => import("@/pages/SharedPages/MyTicketsPage"));
 // Loading Spinner
@@ -93,6 +94,15 @@ const router = createBrowserRouter([
       </Suspense>
     ),
   },
+  {
+    path: "/",
+    element: <AppLayout />,
+    errorElement: <RootBoundary />, // <--- ADD THIS LINE HERE
+    children: [
+      // ... your other routes
+    ],
+  },
+
   // 2. GUEST ONLY
   {
     element: (
