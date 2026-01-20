@@ -1,175 +1,133 @@
-<<<<<<< HEAD
-# React + TypeScript + Vite
+# CSync – PawPal
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Digital Pet Care and Community Management System
 
-Currently, two official plugins are available:
+CSync (PawPal) is a full-stack web application developed in collaboration with Youth for Animals (YFA) to support responsible pet ownership, campus animal welfare, and organizational coordination.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-=======
-# 🐾 PawPal: A Digital Pet Care and Records Management System
-
-### 📌 About
-
-PawPal is a digital solution developed by **CSync**, a group of 3rd year Computer Science students from **Cavite State University (CvSU)**.
-This project is made in collaboration with **Youth for Animals (YFA)**, a campus-based organization under **PAWS Philippines**, to help manage pets, track medical records, and support responsible pet ownership in the CvSU community.
+The system consolidates pet records, health tracking, events, and member interaction into a single platform designed to be reliable, maintainable, and usable under real-world constraints.
 
 ---
 
-## 🐶 About PAWS Philippines & YFA
+## Project Overview
 
-The **Philippine Animal Welfare Society (PAWS)** is a non-profit organization dedicated to the protection and humane treatment of animals in the Philippines.
+Animal welfare organizations often rely on fragmented tools for record-keeping, communication, and coordination. PawPal was built to address these challenges by providing a centralized system that improves consistency, accountability, and visibility across daily operations.
 
-* 🐕 They promote adoption, spay/neuter programs, and animal rights awareness.
-* 🐈 Their student arm, **Youth for Animals (YFA)**, empowers young advocates across schools and universities to participate in campaigns, adoption drives, and education efforts on animal welfare.
-* 🐾 PawPal is designed to be YFA’s **digital partner** in Cavite State University to streamline pet care initiatives and member engagement.
+Rather than focusing solely on feature breadth, the project emphasizes:
 
----
+* clarity of user workflows
+* secure and role-based data access
+* performance within free-tier infrastructure limits
+* practical deployment and maintainability
 
-## 🎯 Target Users
-
-* **Youth for Animals (YFA – CvSU Main Campus)**
-* **Pet owners and members affiliated with YFA**
+The application was designed as a production-ready MVP with a clear path for future enhancements.
 
 ---
 
-## ✨ Key Features
+## Key Features
 
-### 🐕 YFA (Organization Side)
+### Pet and Health Management
 
-* Centralized **Pet Database** of CvSU community pets
-* **Event & Vaccine Drive Records** for health monitoring
-* **Lost & Found Support** (QR code for owner details)
-* **Announcements Hub** for events, adoption drives, campaigns
-* **Monitoring & Tracking** of vaccination compliance
+* Individual profiles for owned pets and campus animals
+* Vaccination and medical record tracking
+* Consolidated health passport view
+* Weight and physical attribute logging
 
-### 👩‍👩‍👦 Pet Owners (Member Side)
+### Routines and Inventory
 
-* **Pet Profile Management** (name, breed, age, photo, etc.)
-* **Medical & Vaccination Records** (certificates, treatments)
-* **Health Reminders** (vaccines, deworming, vet visits)
-* **Lost & Found QR Support** (scan shows limited contact info)
-* **Owner Dashboard** with pet health progress
-* **Community Access** to YFA tips, events, and announcements
-* **Gamification & Rewards** (badges for active participation)
+* Configurable care routines for feeding, medication, and activities
+* Inventory-aware routines for consumable supplies
+* Manual restocking and supply tracking
+* Foundations for low-stock awareness and alerts
 
-### 💬 Messaging & Community Engagement
+### Community and Events
 
-* **Direct Messaging** between YFA and members
-* **Group Announcements** for adoption drives, campaigns, and events
-* **Support & Feedback Channel** where pet owners can reach YFA directly
+* Organization announcements and posts
+* Event creation and member registration
+* Member interaction through posts and comments
+* Role-based access for administrative features
 
----
+### Administration and Access Control
 
-## 🛠 Tech Stack
-
-**Frontend:**
-
-* React / Next.js (SEO + SSR)
-* Tailwind CSS + ShadCN UI (modern & responsive)
-* React Native (optional mobile app version)
-
-**Backend:**
-
-* Node.js + Express / NestJS
-* PostgreSQL / MySQL
-* Role-Based Access Control (RBAC) for YFA & Pet Owners
-
-**Hosting & Integrations:**
-
-* Vercel / Netlify for deployment
-* Supabase (database + auth)
-* Cloudinary / AWS S3 (media uploads)
-* Firebase Cloud Messaging (push notifications & messaging)
-* QR Code Generator (qrcode.js / QRCode.react)
-* Progressive Web App (PWA) for mobile-like experience
+* Role-based permissions for members and administrators
+* Account moderation and management tools
+* Secure data access enforced through database-level policies
 
 ---
 
-## 🚀 Deployment
+## Technology Stack
 
-* Hosted on **Vercel/Netlify** for web app
-* PWA support (no need for Google Play publication)
+### Frontend
+
+* React (Vite)
+* TypeScript
+* Tailwind CSS
+* TanStack Query for client-side caching and data synchronization
+
+### Backend and Services
+
+* Supabase (PostgreSQL, Authentication, Storage, Row Level Security)
+* Cloudinary for media handling and optimization
+* Firebase Cloud Messaging for push notifications
+
+### Deployment
+
+* Vercel
 
 ---
 
-## 👨‍💻 Developers – CSync (CvSU 3rd Year Students)
+## Security and Data Handling
 
-This project is built as part of our academic journey and advocacy for animal welfare, in partnership with **Youth for Animals (YFA)** of **PAWS Philippines**.
+* Row Level Security (RLS) is enforced at the database level
+* Access to sensitive data is controlled through role-based policies
+* Credentials and service keys are managed via environment variables
+* Media uploads are handled through managed services to control access and cost
+
+Security decisions were made with the assumption that the system would be used by real users, not only for demonstration purposes.
 
 ---
 
-## 📜 License
+## Deployment and Configuration
 
-This project is for educational and community purposes.
+The application is deployed using Vercel and configured for production use with Supabase, Cloudinary, and Firebase services.
+
+Environment variables are required for authentication, database access, media handling, and notifications. No sensitive credentials are committed to the repository.
 
 ---
 
-👉 Do you also want me to include a **“How to Run the Project” section** (clone, install dependencies, run dev server) so other developers can test it easily?
->>>>>>> 9269a24be348253fbd88ca2e195fca9dd865db64
+## Design and Engineering Considerations
+
+Key considerations during development included:
+
+* working within free-tier infrastructure constraints
+* reducing unnecessary network requests through client-side caching
+* prioritizing system stability over last-minute refactors
+* designing workflows that are understandable to non-technical users
+
+The project intentionally favors clear architecture and predictable behavior over premature optimization.
+
+---
+
+## Planned Improvements
+
+* Improved onboarding and in-app guidance for new users
+* Clearer separation between configuration and operational actions (e.g., restocking)
+* Media link previews and controlled media expansion
+* Administrative audit logs and enhanced moderation safeguards
+* Monitoring and performance visibility improvements
+
+These enhancements are planned to be incremental and driven by real usage feedback.
+
+---
+
+## License
+
+This project is currently intended for educational and organizational use.
+Licensing terms may be updated as the project evolves.
+
+---
+
+## Author
+
+Developed by CSync
+In collaboration with Youth for Animals (YFA)
+Cavite State University
