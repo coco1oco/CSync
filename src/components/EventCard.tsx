@@ -35,6 +35,16 @@ const formatRelativeTime = (dateString: string) => {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 };
 
+const getInitialsFromName = (name: string) => {
+  const parts = (name || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) {
+    const s = parts[0];
+    return (s[0] + (s[1] ?? "")).toUpperCase();
+  }
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+};
+
 interface EventCardProps {
   event: OutreachEvent;
   isAdmin: boolean;
@@ -86,7 +96,9 @@ export function EventCard({
     customAvatar ||
     (event as any).admin?.avatar_url ||
     (event as any).profiles?.avatar_url ||
-    "/PawPal.png";
+    null;
+
+  const initials = getInitialsFromName(displayName);
 
   const { title, location, description, images = [], created_at } = event;
 
@@ -144,15 +156,19 @@ export function EventCard({
       {/* 1. HEADER */}
       <div className="flex items-start justify-between px-4 pt-4 pb-2">
         <div className="flex gap-3">
-          <div className="h-10 w-10 rounded-full bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-100">
-            <img
-              src={displayAvatar}
-              alt={displayName}
-              className="h-full w-full object-cover"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = "/PawPal.png";
-              }}
-            />
+          <div className="h-10 w-10 rounded-full bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-100 flex items-center justify-center font-bold text-sm text-gray-700">
+            {displayAvatar ? (
+              <img
+                src={displayAvatar}
+                alt={displayName}
+                className="h-full w-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "/PawPal.png";
+                }}
+              />
+            ) : (
+              initials
+            )}
           </div>
 
           <div className="flex flex-col">
@@ -165,7 +181,7 @@ export function EventCard({
             {location && (
               <a
                 href={`http://googleusercontent.com/maps.google.com/?q=${encodeURIComponent(
-                  location
+                  location,
                 )}`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -308,7 +324,7 @@ export function EventCard({
               alt="Lightbox"
             />
           </div>,
-          document.body
+          document.body,
         )}
     </article>
   );
