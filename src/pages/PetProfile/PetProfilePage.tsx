@@ -82,14 +82,18 @@ export default function PetProfilePage() {
         variant: "danger",
         confirmText: "Yes, Remove Profile",
         cancelText: "Keep Profile",
-      }
+      },
     );
 
     if (isConfirmed) {
       setIsDeleting(true);
       try {
         await supabase.from("pets").delete().eq("id", pet.id);
-        await queryClient.invalidateQueries({ queryKey: ["pets"] });
+
+        // ✅ FIX: Invalidate BOTH lists so the UI updates instantly
+        await queryClient.invalidateQueries({ queryKey: ["pets"] }); // Refreshes Personal List
+        await queryClient.invalidateQueries({ queryKey: ["campus-pets"] }); // Refreshes Campus List
+
         navigate("/PetDashboard");
       } catch (err) {
         await alert("Failed to remove profile. Please try again.");
@@ -142,7 +146,7 @@ export default function PetProfilePage() {
                       "w-10 h-10 rounded-full flex items-center justify-center",
                       pet.spayed_neutered
                         ? "bg-green-100 text-green-600"
-                        : "bg-orange-100 text-orange-600"
+                        : "bg-orange-100 text-orange-600",
                     )}
                   >
                     <Scissors size={20} />
@@ -156,7 +160,7 @@ export default function PetProfilePage() {
                         "text-sm font-black",
                         pet.spayed_neutered
                           ? "text-green-700"
-                          : "text-orange-600"
+                          : "text-orange-600",
                       )}
                     >
                       {pet.spayed_neutered
@@ -173,8 +177,8 @@ export default function PetProfilePage() {
                       pet.status === "missing"
                         ? "bg-red-100 text-red-600 animate-pulse"
                         : pet.status === "injured"
-                        ? "bg-red-100 text-red-600"
-                        : "bg-blue-100 text-blue-600"
+                          ? "bg-red-100 text-red-600"
+                          : "bg-blue-100 text-blue-600",
                     )}
                   >
                     {pet.status === "missing" ? (
@@ -195,7 +199,7 @@ export default function PetProfilePage() {
                           "px-2 py-0.5 rounded text-[10px] font-black uppercase",
                           pet.status === "healthy"
                             ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
+                            : "bg-red-100 text-red-700",
                         )}
                       >
                         {pet.status || "Healthy"}

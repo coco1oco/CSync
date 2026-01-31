@@ -143,7 +143,7 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
             confirmText: "Yes, Add It",
             cancelText: "No, Skip",
             variant: "default",
-          }
+          },
         );
 
         if (shouldLog) {
@@ -159,7 +159,7 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
               vet_name: schedule.vet_name || "Unknown Vet",
               notes: `Auto-logged from schedule on ${format(
                 today,
-                "MMM d, yyyy"
+                "MMM d, yyyy",
               )}`,
               status: "completed",
             });
@@ -199,7 +199,6 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
       type: formData.type,
       recurrence: formData.recurrence,
     };
-    
 
     try {
       if (editingId) {
@@ -216,16 +215,16 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
           closeForm();
         }
         if (user?.id) {
-    // This fires the notification immediately
-    notifyScheduleCreation(
-      user.id,
-      petId,
-      formData.title,
-      formData.scheduled_date,
-      formData.type // "vaccine", "grooming", etc.
-    );
-  }
-  toast.success("Appointment scheduled");
+          // This fires the notification immediately
+          notifyScheduleCreation(
+            user.id,
+            petId,
+            formData.title,
+            formData.scheduled_date,
+            formData.type, // "vaccine", "grooming", etc.
+          );
+        }
+        toast.success("Appointment scheduled");
       }
     } catch (err) {
       toast.error("Failed to save schedule");
@@ -240,7 +239,7 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
         title: "Delete Event",
         variant: "danger",
         confirmText: "Delete",
-      }
+      },
     );
 
     if (isConfirmed) {
@@ -256,7 +255,7 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
       .toISOString()
       .replace(/-|:|\.\d\d\d/g, "");
     const end = new Date(
-      new Date(`${dateStr}T${timeStr}`).getTime() + 60 * 60 * 1000
+      new Date(`${dateStr}T${timeStr}`).getTime() + 60 * 60 * 1000,
     )
       .toISOString()
       .replace(/-|:|\.\d\d\d/g, "");
@@ -291,7 +290,7 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
             onClick={() => setShowForm(true)}
             className="relative z-10 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800 font-bold shadow-lg rounded-xl h-12 px-6 transition-all active:scale-95"
           >
-            <Plus className="w-5 h-5 mr-2" /> Book Visit
+            <Plus className="w-5 h-5 mr-2" /> Schedule Visit
           </Button>
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
           <CalendarIcon className="absolute -bottom-6 right-20 w-40 h-40 text-white/5 rotate-12 pointer-events-none" />
@@ -449,7 +448,7 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h3 className="text-2xl font-black text-gray-900">
-                  {editingId ? "Edit Appointment" : "Book Appointment"}
+                  {editingId ? "Edit Appointment" : "Schedule Appointment"}
                 </h3>
                 <p className="text-gray-500 text-xs mt-1">
                   Fill in the details below.
@@ -611,7 +610,7 @@ export default function ScheduleSection({ petId }: ScheduleSectionProps) {
                   onClick={(e) => handleSubmit(e, false)}
                   className="flex-1 bg-violet-600 hover:bg-violet-700 text-white rounded-xl h-12 font-bold shadow-lg shadow-violet-200 transition-all active:scale-95"
                 >
-                  {editingId ? "Save Changes" : "Confirm Booking"}
+                  {editingId ? "Save Changes" : "Confirm Schedule"}
                 </Button>
                 {!editingId && (
                   <Button

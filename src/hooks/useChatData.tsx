@@ -70,13 +70,13 @@ export function useChatRooms(user: any) {
           if (["admin", "president"].includes(userRole)) return true;
           if (userCommittee && room.name === userCommittee) return true;
           return false;
-        }
+        },
       );
 
       // 5. Collect IDs
       const visibleGroupIds = visibleOfficialGroups.map((r: any) => r.id);
       const allTargetIds = Array.from(
-        new Set([...visibleGroupIds, ...Array.from(myMemberIds)])
+        new Set([...visibleGroupIds, ...Array.from(myMemberIds)]),
       );
 
       if (allTargetIds.length === 0) return [];
@@ -88,7 +88,7 @@ export function useChatRooms(user: any) {
           `
           id, name, is_group,
           messages(created_at, sender_id)
-        `
+        `,
         )
         .in("id", allTargetIds)
         .order("created_at", { foreignTable: "messages", ascending: false })
@@ -167,7 +167,7 @@ export function useChatMessages(roomId: string | undefined) {
   });
 }
 
-// --- 3. SEND MESSAGE MUTATION ---
+// --- 3. SEND MESSAGE MUTATION (FIXED) ---
 export function useSendMessage() {
   return useMutation({
     mutationFn: async ({
@@ -175,18 +175,33 @@ export function useSendMessage() {
       userId,
       content,
       imageUrl,
+      attachmentUrl,
+      attachmentType = "text",
+      attachmentName,
     }: {
       roomId: string;
       userId: string;
       content: string;
       imageUrl?: string | null;
+      attachmentUrl?: string | null;
+      attachmentType?: "text" | "image" | "file";
+      attachmentName?: string | null;
     }) => {
+      // Logic to set the final type
+      let finalType = attachmentType;
+      if (imageUrl) finalType = "image";
+      if (attachmentUrl) finalType = "file";
+
       const { error } = await supabase.from("messages").insert([
         {
           conversation_id: roomId,
           sender_id: userId,
           content,
           image_url: imageUrl || null,
+          // ✅ FIX: Actually send the data to Supabase!
+          attachment_url: attachmentUrl || null,
+          attachment_type: finalType,
+          attachment_name: attachmentName || null,
         },
       ]);
       if (error) throw error;
@@ -207,8 +222,6 @@ export function useMarkRead() {
       userId: string;
     }) => {
       // ✅ FIX: Use 'upsert' instead of 'update'.
-      // This ensures that if the user is viewing an Official Group (like General)
-      // for the first time, a membership row is created for them.
       const { error } = await supabase.from("conversation_members").upsert(
         {
           conversation_id: roomId,
@@ -216,7 +229,7 @@ export function useMarkRead() {
           last_read_at: new Date().toISOString(),
           role: "member", // Default role
         },
-        { onConflict: "conversation_id,user_id" }
+        { onConflict: "conversation_id,user_id" },
       );
 
       if (error) {
@@ -224,7 +237,6 @@ export function useMarkRead() {
       }
     },
     onSuccess: () => {
-      // Refresh the room list to remove the bold text
       queryClient.invalidateQueries({ queryKey: ["chat-rooms"] });
     },
   });

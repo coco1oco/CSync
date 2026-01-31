@@ -90,6 +90,9 @@ export interface Message {
   content: string;
   created_at: string;
   sender?: UserProfile;
+  attachment_url?: string | null;
+  attachment_type?: "text" | "image" | "file";
+  attachment_name?: string | null;
 }
 
 export interface Conversation {

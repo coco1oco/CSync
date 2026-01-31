@@ -14,6 +14,8 @@ import {
   ArrowLeft,
   Paperclip,
   ShieldCheck,
+  FileText,
+  Download,
   Image as ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -50,13 +52,13 @@ export default function MessagesPage() {
 
   // --- LOCAL STATE ---
   const [newMessage, setNewMessage] = useState("");
-  const [isUploading, setIsUploading] = useState(false);
+  // const [isUploading, setIsUploading] = useState(false); // Unused, removing to clean up
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
   const [revealedMessageId, setRevealedMessageId] = useState<
     number | string | null
   >(null);
 
-  // Image Preview
+  // Image/File Preview
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
@@ -74,6 +76,33 @@ export default function MessagesPage() {
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<any>(null);
   const profileCache = useRef<Record<string, any>>({});
+
+  // --- HELPERS: FILE UPLOAD & DOWNLOAD ---
+  const uploadFileToSupabase = async (file: File) => {
+    // Create a unique path: conversation_id/timestamp_filename
+    const fileExt = file.name.split(".").pop();
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+    const filePath = `${activeRoom?.id}/${fileName}`;
+
+    const { error } = await supabase.storage
+      .from("chat-attachments")
+      .upload(filePath, file);
+
+    if (error) throw error;
+    return filePath; // Return the path to save in DB
+  };
+
+  const handleDownload = async (path: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from("chat-attachments")
+        .createSignedUrl(path, 60); // Link valid for 60 seconds
+      if (error) throw error;
+      window.open(data.signedUrl, "_blank");
+    } catch (err) {
+      toast.error("Could not download file");
+    }
+  };
 
   // --- HISTORY & BACK BUTTON ---
   useEffect(() => {
@@ -93,9 +122,9 @@ export default function MessagesPage() {
       (old: ChatRoom[] | undefined) => {
         if (!old) return [];
         return old.map((c) =>
-          c.id === room.id ? { ...c, hasUnread: false } : c
+          c.id === room.id ? { ...c, hasUnread: false } : c,
         );
-      }
+      },
     );
 
     setActiveRoom(room);
@@ -117,7 +146,7 @@ export default function MessagesPage() {
   const scrollToBottom = () => {
     setTimeout(
       () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }),
-      100
+      100,
     );
   };
 
@@ -135,7 +164,7 @@ export default function MessagesPage() {
             user_id: user.id,
             role: "member",
           },
-          { onConflict: "conversation_id,user_id", ignoreDuplicates: true }
+          { onConflict: "conversation_id,user_id", ignoreDuplicates: true },
         );
       }
     };
@@ -196,7 +225,7 @@ export default function MessagesPage() {
             (oldData: MessageWithSender[] | undefined) => {
               if (oldData?.find((m) => m.id === incomingMsg.id)) return oldData;
               return [...(oldData || []), incomingMsg];
-            }
+            },
           );
 
           setTypingUsers((prev) => {
@@ -204,7 +233,7 @@ export default function MessagesPage() {
             next.delete(senderData?.first_name || "Someone");
             return next;
           });
-        }
+        },
       )
       .on("broadcast", { event: "typing" }, (payload) => {
         if (payload.payload.userId === user.id) return;
@@ -266,7 +295,7 @@ export default function MessagesPage() {
   const startDM = async (targetUser: UserProfile) => {
     if (!user) return;
     const existing = conversations.find(
-      (c) => !c.is_group && c.name === targetUser.username
+      (c) => !c.is_group && c.name === targetUser.username,
     );
     if (existing) {
       openRoom(existing);
@@ -325,8 +354,22 @@ export default function MessagesPage() {
 
     try {
       let finalImageUrl = null;
+      let finalFileUrl = null;
+      let finalFileName = null;
+      let msgType: "text" | "image" | "file" = "text";
+
       if (selectedFile) {
-        finalImageUrl = await uploadImageToCloudinary(selectedFile, "chat");
+        // DETECT FILE TYPE
+        if (selectedFile.type.startsWith("image/")) {
+          // 📷 IMAGE -> CLOUDINARY
+          finalImageUrl = await uploadImageToCloudinary(selectedFile, "chat");
+          msgType = "image";
+        } else {
+          // 📄 DOC -> SUPABASE
+          finalFileUrl = await uploadFileToSupabase(selectedFile);
+          finalFileName = selectedFile.name;
+          msgType = "file";
+        }
       }
 
       await sendMessageMutation.mutateAsync({
@@ -334,6 +377,9 @@ export default function MessagesPage() {
         userId: user.id,
         content,
         imageUrl: finalImageUrl || undefined,
+        attachmentUrl: finalFileUrl || undefined,
+        attachmentType: msgType,
+        attachmentName: finalFileName || undefined,
       });
 
       if (activeRoom.hasUnread) {
@@ -341,15 +387,16 @@ export default function MessagesPage() {
           ["chat-rooms", user.id],
           (old: ChatRoom[] | undefined) => {
             return old?.map((c) =>
-              c.id === activeRoom.id ? { ...c, hasUnread: false } : c
+              c.id === activeRoom.id ? { ...c, hasUnread: false } : c,
             );
-          }
+          },
         );
       }
 
       setNewMessage("");
       clearPreview();
     } catch (err) {
+      console.error(err);
       toast.error("Failed to send message");
     } finally {
       setIsSending(false);
@@ -377,8 +424,6 @@ export default function MessagesPage() {
   if (loadingRooms) return <MessagesSkeleton />;
 
   return (
-    // ✅ CHANGED: lg:h-full (Forces full height on Desktop/Laptop)
-    // Mobile keeps h-[calc(100dvh-4rem)] to account for bottom nav
     <div className="flex flex-col lg:flex-row h-[calc(100dvh-4rem)] lg:h-full w-full bg-white lg:bg-gray-50 lg:rounded-2xl lg:border lg:border-gray-200 overflow-hidden shadow-sm">
       {/* SIDEBAR */}
       <div
@@ -531,6 +576,7 @@ export default function MessagesPage() {
                           onClick={() => toggleMessageTime(msg.id)}
                           className="flex flex-col gap-1 min-w-0"
                         >
+                          {/* 📷 EXISTING IMAGE LOGIC */}
                           {msg.image_url && (
                             <img
                               src={msg.image_url}
@@ -538,6 +584,52 @@ export default function MessagesPage() {
                               className="rounded-xl w-auto max-h-[320px] max-w-full object-cover border border-gray-100 shadow-sm cursor-pointer block"
                             />
                           )}
+
+                          {/* 📄 NEW FILE ATTACHMENT LOGIC */}
+                          {msg.attachment_type === "file" &&
+                            msg.attachment_url && (
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation(); // Prevent message time toggle
+                                  handleDownload(msg.attachment_url!);
+                                }}
+                                className={`
+                                  flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors border
+                                  ${
+                                    isMe
+                                      ? "bg-blue-700 border-blue-600 text-white hover:bg-blue-800"
+                                      : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                                  }
+                                `}
+                              >
+                                <div
+                                  className={`p-2 rounded-lg ${
+                                    isMe ? "bg-white/20" : "bg-blue-50"
+                                  }`}
+                                >
+                                  <FileText
+                                    size={24}
+                                    className={
+                                      isMe ? "text-white" : "text-blue-600"
+                                    }
+                                  />
+                                </div>
+                                <div className="flex flex-col overflow-hidden text-left">
+                                  <span className="text-sm font-bold truncate max-w-[180px]">
+                                    {msg.attachment_name || "Document"}
+                                  </span>
+                                  <span
+                                    className={`text-[10px] flex items-center gap-1 ${
+                                      isMe ? "text-blue-200" : "text-gray-400"
+                                    }`}
+                                  >
+                                    <Download size={10} /> Click to download
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+
+                          {/* 📝 TEXT CONTENT */}
                           {msg.content && (
                             <div
                               className={`
@@ -589,13 +681,25 @@ export default function MessagesPage() {
             </div>
 
             <div className="bg-white border-t border-gray-100 shrink-0 safe-area-bottom">
+              {/* PREVIEW AREA (UPDATED) */}
               {previewUrl && (
                 <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-start justify-between animate-in slide-in-from-bottom-2">
                   <div className="relative group">
-                    <img
-                      src={previewUrl}
-                      className="h-20 w-auto rounded-lg object-cover border border-gray-200 shadow-sm"
-                    />
+                    {selectedFile?.type.startsWith("image/") ? (
+                      <img
+                        src={previewUrl}
+                        className="h-20 w-auto rounded-lg object-cover border border-gray-200 shadow-sm"
+                      />
+                    ) : (
+                      // 📄 PDF/DOC PREVIEW
+                      <div className="h-20 w-32 bg-white rounded-lg border border-gray-200 shadow-sm flex flex-col items-center justify-center p-2 text-center">
+                        <FileText className="text-blue-500 mb-1" size={24} />
+                        <span className="text-[10px] text-gray-600 font-medium truncate w-full">
+                          {selectedFile?.name}
+                        </span>
+                      </div>
+                    )}
+
                     {isSending && (
                       <div className="absolute inset-0 bg-black/30 rounded-lg flex items-center justify-center">
                         <Loader2 className="w-6 h-6 text-white animate-spin" />
@@ -617,7 +721,8 @@ export default function MessagesPage() {
                   type="file"
                   ref={fileInputRef}
                   className="hidden"
-                  accept="image/*"
+                  // ✅ ALLOW IMAGES & DOCUMENTS
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
                   onChange={handleFileSelect}
                 />
                 <form
@@ -637,7 +742,11 @@ export default function MessagesPage() {
                     disabled={isSending}
                   >
                     {previewUrl ? (
-                      <ImageIcon size={20} />
+                      selectedFile?.type.startsWith("image/") ? (
+                        <ImageIcon size={20} />
+                      ) : (
+                        <FileText size={20} />
+                      )
                     ) : (
                       <Paperclip size={20} />
                     )}
@@ -735,7 +844,6 @@ export default function MessagesPage() {
 
 function MessagesSkeleton() {
   return (
-    // ✅ CHANGED: lg:h-full on skeleton too
     <div className="flex flex-col lg:flex-row h-[calc(100dvh-4rem)] lg:h-full w-full bg-white lg:bg-gray-50 lg:rounded-2xl lg:border lg:border-gray-200 overflow-hidden shadow-sm">
       <div className="w-full lg:w-80 bg-white border-r border-gray-200 flex flex-col h-full">
         <div className="h-16 px-4 border-b border-gray-100 flex justify-between items-center">
