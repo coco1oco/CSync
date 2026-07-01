@@ -32,9 +32,9 @@ type AuthContextProps = {
 const AuthContext = createContext<AuthContextProps>({
   user: null,
   loading: true,
-  signOut: async () => {},
-  refreshProfile: async () => {},
-  updatePassword: async (currentPassword: string, newPassword: string) => {},
+  signOut: async () => { },
+  refreshProfile: async () => { },
+  updatePassword: async (currentPassword: string, newPassword: string) => { },
 
   // ...existing code...
 });
@@ -64,7 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const ADMIN_EMAILS = ["kmirafelix@gmail.com", "admin@pawpal.com"];
+  const ADMIN_EMAILS = [];
 
   // Move fetchProfileSafe inside AuthProvider so setUser is in scope
   const fetchProfileSafe = async (
