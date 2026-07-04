@@ -12,6 +12,11 @@ export interface UserProfile {
   bio: string | null;
   pronouns: string | null;
   contact_number?: string | null;
+  created_at?: string;
+  user_metadata?: {
+    avatar_url?: string;
+    [key: string]: any;
+  };
 }
 
 // ✅ UPDATED PET INTERFACE

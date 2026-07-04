@@ -37,7 +37,7 @@ export default function EditEvent() {
   const [error, setError] = useState("");
 
   const [avatarError, setAvatarError] = useState(false);
-  const avatarUrl = user?.avatar_url || user?.user_metadata?.avatar_url;
+  const avatarUrl = user?.avatar_url;
 
   // 1. Fetch Existing Data
   useEffect(() => {

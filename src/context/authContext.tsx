@@ -23,6 +23,7 @@ type UserProfile = {
   contact_number?: string;
   banned_at?: string | null;
   deleted_at?: string | null;
+  created_at?: string;
 };
 
 type AuthContextProps = {
@@ -68,6 +69,7 @@ const getUserFromSession = (sessionUser: any): UserProfile => {
     role: "user",
     banned_at: null,
     deleted_at: null,
+    created_at: sessionUser.created_at || null,
   };
 };
 
@@ -86,7 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         const fetchPromise = supabase
           .from("profiles")
           .select(
-            "id, email, username, avatar_url, role, first_name, last_name, pronouns, bio, contact_number, banned_at, deleted_at"
+            "id, email, username, avatar_url, role, first_name, last_name, pronouns, bio, contact_number, banned_at, deleted_at, created_at"
           )
           .eq("id", userId)
           .maybeSingle();

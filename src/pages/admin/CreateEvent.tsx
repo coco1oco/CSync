@@ -36,7 +36,7 @@ export default function CreateEvent() {
   const [error, setError] = useState("");
 
   const [avatarError, setAvatarError] = useState(false);
-  const avatarUrl = user?.avatar_url || user?.user_metadata?.avatar_url;
+  const avatarUrl = user?.avatar_url;
 
   // HANDLE MULTIPLE FILES
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
