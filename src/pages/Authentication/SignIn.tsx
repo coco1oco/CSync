@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Turnstile } from "@marsidev/react-turnstile";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -34,6 +35,8 @@ export default function SignIn() {
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
   const [cooldownSecs, setCooldownSecs] = useState(0);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const turnstileRef = useRef<any>(null);
 
   const LOCKOUT_AFTER = 5;   // attempts
   const LOCKOUT_SECS  = 30;  // seconds
@@ -74,6 +77,12 @@ export default function SignIn() {
   const onSubmit = async (data: SignInFormValues) => {
     // Prevent concurrent spam submissions
     if (isRequestInFlight.current) return;
+
+    // Require a valid CAPTCHA token before even attempting login
+    if (!captchaToken) {
+      toast.error("Please wait for the security check to complete.");
+      return;
+    }
     
     // Client-side rate limiting
     if (cooldownUntil && Date.now() < cooldownUntil) return;
@@ -86,9 +95,14 @@ export default function SignIn() {
         await supabase.auth.signInWithPassword({
           email: data.email,
           password: data.password,
+          options: { captchaToken },
         });
 
       if (signInError) {
+        // Reset the CAPTCHA widget — each attempt needs a fresh token
+        turnstileRef.current?.reset();
+        setCaptchaToken(null);
+
         // Increment attempt counter safely using functional update
         setFailedAttempts((prev) => {
           const next = prev + 1;
@@ -97,7 +111,7 @@ export default function SignIn() {
           }
           return next;
         });
-        
+
         // Normalize — never expose raw Supabase error text
         toast.error("Invalid email or password.");
         return;
@@ -255,15 +269,27 @@ export default function SignIn() {
               </p>
             )}
 
+            {/* Cloudflare Turnstile — runs silently, blocks bots server-side */}
+            <Turnstile
+              ref={turnstileRef}
+              siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+              onSuccess={(token) => setCaptchaToken(token)}
+              onExpire={() => setCaptchaToken(null)}
+              onError={() => setCaptchaToken(null)}
+              options={{ theme: "light", size: "invisible" }}
+            />
+
             <Button
               type="submit"
-              disabled={isSubmitting || !!cooldownUntil}
+              disabled={isSubmitting || !!cooldownUntil || !captchaToken}
               className="w-full h-12 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold text-md mt-2 shadow-sm transition-all active:scale-[0.98]"
             >
               {isSubmitting ? (
                 <Loader2 className="animate-spin" />
               ) : cooldownUntil ? (
                 `Too many attempts — try again in ${cooldownSecs}s`
+              ) : !captchaToken ? (
+                <span className="flex items-center gap-2"><Loader2 className="animate-spin w-4 h-4" /> Verifying...</span>
               ) : (
                 "Sign In"
               )}

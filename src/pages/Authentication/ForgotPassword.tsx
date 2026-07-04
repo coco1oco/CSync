@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { Turnstile } from "@marsidev/react-turnstile";
 import { supabase } from "@/lib/supabaseClient";
 import { Link } from "react-router-dom";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,8 @@ export default function ForgotPassword() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const turnstileRef = useRef<any>(null);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,17 +34,26 @@ export default function ForgotPassword() {
       return;
     }
 
+    if (!captchaToken) {
+      setError("Security check not complete. Please try again.");
+      return;
+    }
+
     setLoading(true);
 
     try {
       const { error: supabaseError } =
         await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/reset-password`,
+          captchaToken,
         });
 
       if (supabaseError) throw supabaseError;
       setMessage("If an account exists, we sent a reset link to your email.");
     } catch (err: any) {
+      // Reset widget on failure so user can retry
+      turnstileRef.current?.reset();
+      setCaptchaToken(null);
       setError(err?.message ?? "An unexpected error occurred");
     } finally {
       setLoading(false);
@@ -116,13 +128,25 @@ export default function ForgotPassword() {
               </div>
             </div>
 
+            {/* Cloudflare Turnstile */}
+            <Turnstile
+              ref={turnstileRef}
+              siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+              onSuccess={(token) => setCaptchaToken(token)}
+              onExpire={() => setCaptchaToken(null)}
+              onError={() => setCaptchaToken(null)}
+              options={{ theme: "light", size: "invisible" }}
+            />
+
             <Button
               type="submit"
-              disabled={loading}
+              disabled={loading || !captchaToken}
               className="w-full h-12 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-md shadow-sm transition-all"
             >
               {loading ? (
                 <Loader2 className="animate-spin h-5 w-5" />
+              ) : !captchaToken ? (
+                <span className="flex items-center gap-2"><Loader2 className="animate-spin w-4 h-4" /> Verifying...</span>
               ) : (
                 "Send Reset Link"
               )}
