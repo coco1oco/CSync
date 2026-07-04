@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -69,7 +69,7 @@ export default function SignIn() {
     },
   });
 
-  const isRequestInFlight = React.useRef(false);
+  const isRequestInFlight = useRef(false);
 
   const onSubmit = async (data: SignInFormValues) => {
     // Prevent concurrent spam submissions
