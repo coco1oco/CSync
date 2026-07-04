@@ -10,6 +10,7 @@ import logo from "@/assets/images/PawPal.svg";
 import heroBg from "@/assets/images/hero_4.jpg";
 
 export default function ForgotPassword() {
+  const CVSU_EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@cvsu\.edu\.ph$/;
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -22,6 +23,11 @@ export default function ForgotPassword() {
 
     if (!email) {
       setError("Please enter your email address");
+      return;
+    }
+
+    if (!CVSU_EMAIL_REGEX.test(email)) {
+      setError("Please use your institutional email (@cvsu.edu.ph)");
       return;
     }
 

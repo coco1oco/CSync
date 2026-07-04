@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/authContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -8,14 +9,28 @@ import { Loader2, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import logo from "@/assets/images/PawPal.svg";
 import heroBg from "@/assets/images/hero_4.jpg";
 
+// Same complexity requirements as SignUp
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/;
+
 export default function UpdatePassword() {
   const navigate = useNavigate();
+  const { isRecoveryMode } = useAuth();
+
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  // If not in a valid recovery session, redirect to ForgotPassword immediately.
+  // RecoveryRoute also handles this, but this is a defence-in-depth guard.
+  useEffect(() => {
+    if (!isRecoveryMode) {
+      navigate("/ForgotPassword", { replace: true });
+    }
+  }, [isRecoveryMode, navigate]);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,8 +42,10 @@ export default function UpdatePassword() {
       return;
     }
 
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters");
+    if (!PASSWORD_REGEX.test(password)) {
+      setError(
+        "Password must be at least 8 characters and include an uppercase letter, lowercase letter, number, and special symbol (!@#$%^&*)."
+      );
       return;
     }
 
@@ -43,12 +60,11 @@ export default function UpdatePassword() {
 
       setMessage("Password updated successfully!");
 
-      // Redirect to home/feed after a short delay
       setTimeout(() => {
         navigate("/");
       }, 2000);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
@@ -127,6 +143,9 @@ export default function UpdatePassword() {
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
+              <p className="text-[10px] text-gray-400 ml-1">
+                Min 8 chars: uppercase, lowercase, number, and special symbol.
+              </p>
             </div>
 
             {/* Confirm Password */}
@@ -135,13 +154,20 @@ export default function UpdatePassword() {
               <div className="relative">
                 <Input
                   id="confirmPassword"
-                  type={showPassword ? "text" : "password"}
+                  type={showConfirmPassword ? "text" : "password"}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Confirm new password"
                   required
                   className="h-12 rounded-xl bg-white border-gray-200 focus-visible:ring-blue-600 pr-10"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
               </div>
             </div>
 

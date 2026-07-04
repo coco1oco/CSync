@@ -6,6 +6,7 @@ import {
 } from "react-router-dom";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { PublicRoute } from "./PublicRoute";
+import { RecoveryRoute } from "./RecoveryRoute";
 import AppLayout from "@/components/AppLayout";
 import AuthLayout from "@/components/AuthLayout";
 import { Loader2 } from "lucide-react";
@@ -87,11 +88,23 @@ const router = createBrowserRouter([
   },
   {
     path: "/unauthorized",
-    errorElement: <RootBoundary />, // 👈 ADD HERE
+    errorElement: <RootBoundary />,
     element: (
       <Suspense fallback={<PageLoader />}>
         <Unauthorized />
       </Suspense>
+    ),
+  },
+  // PASSWORD RESET — only accessible via a valid reset magic link
+  {
+    path: "/reset-password",
+    errorElement: <RootBoundary />,
+    element: (
+      <RecoveryRoute>
+        <Suspense fallback={<PageLoader />}>
+          <UpdatePassword />
+        </Suspense>
+      </RecoveryRoute>
     ),
   },
   // 2. GUEST ONLY
@@ -266,14 +279,7 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-      {
-        path: "/reset-password",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <UpdatePassword />
-          </Suspense>
-        ),
-      },
+      // /reset-password is now handled by a standalone RecoveryRoute above
       {
         path: "/messages",
         element: (

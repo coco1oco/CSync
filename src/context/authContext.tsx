@@ -4,23 +4,32 @@ import React, {
   useEffect,
   useState,
   useMemo,
+  useCallback,
 } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
+// Explicit, typed profile — no [key: string]: any escape hatch
 type UserProfile = {
   id: string;
   email: string;
   username?: string;
   avatar_url?: string;
+  // Role is ONLY ever populated from the DB profiles row, never from user_metadata
   role?: "user" | "admin";
   first_name?: string;
   last_name?: string;
-  [key: string]: any;
+  pronouns?: string;
+  bio?: string;
+  contact_number?: string;
+  banned_at?: string | null;
+  deleted_at?: string | null;
 };
 
 type AuthContextProps = {
   user: UserProfile | null;
   loading: boolean;
+  /** True only when the session was created via a password-reset magic link */
+  isRecoveryMode: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   updatePassword: (
@@ -32,105 +41,77 @@ type AuthContextProps = {
 const AuthContext = createContext<AuthContextProps>({
   user: null,
   loading: true,
-  signOut: async () => { },
-  refreshProfile: async () => { },
-  updatePassword: async (currentPassword: string, newPassword: string) => { },
-
-  // ...existing code...
+  isRecoveryMode: false,
+  signOut: async () => {},
+  refreshProfile: async () => {},
+  updatePassword: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
 
+// Build a minimal, safe user object from the session token.
+// Role is intentionally omitted here — it will be overwritten from the DB.
 const getUserFromSession = (sessionUser: any): UserProfile => {
   const meta = sessionUser.user_metadata || {};
   return {
-    ...sessionUser,
     id: sessionUser.id,
     email: sessionUser.email,
     avatar_url: meta.avatar_url || null,
     username: meta.username || sessionUser.email?.split("@")[0],
-    // ✅ FIX 1: Prioritize explicit fields over split logic
     first_name: meta.first_name || meta.full_name?.split(" ")[0] || null,
     last_name: meta.last_name || meta.full_name?.split(" ")[1] || null,
-    pronouns: meta.pronouns,
-    role: meta.role || "user",
+    pronouns: meta.pronouns || null,
     bio: meta.bio || null,
     contact_number: meta.contact_number || null,
+    // ⚠️ SECURITY: role defaults to "user" until the DB profile confirms otherwise.
+    // Never trust meta.role — user_metadata is writable by the client.
+    role: "user",
+    banned_at: null,
+    deleted_at: null,
   };
 };
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
 
-  const ADMIN_EMAILS = [];
+  // Fetch the authoritative profile from the DB.
+  // Only explicit columns are selected — avoids leaking future sensitive fields.
+  const fetchProfileSafe = useCallback(
+    async (userId: string, retries = 1): Promise<UserProfile | null> => {
+      try {
+        const fetchPromise = supabase
+          .from("profiles")
+          .select(
+            "id, email, username, avatar_url, role, first_name, last_name, pronouns, bio, contact_number, banned_at, deleted_at"
+          )
+          .eq("id", userId)
+          .maybeSingle();
 
-  // Move fetchProfileSafe inside AuthProvider so setUser is in scope
-  const fetchProfileSafe = async (
-    userId: string,
-    sessionUser: any,
-    retries = 1
-  ) => {
-    try {
-      const fetchPromise = supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .maybeSingle();
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Profile fetch timeout")), 5000)
+        );
 
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Profile fetch timeout")), 5000)
-      );
+        const result: any = await Promise.race([fetchPromise, timeoutPromise]);
 
-      const result: any = await Promise.race([fetchPromise, timeoutPromise]);
-
-      if (result.error) {
-        throw new Error(result.error.message || "Failed to fetch profile");
-      }
-
-      const db = result.data;
-      const meta = sessionUser.user_metadata || {};
-
-      if (db) {
-        const needsSync =
-          db.role !== meta.role ||
-          db.avatar_url !== meta.avatar_url ||
-          db.username !== meta.username ||
-          db.first_name !== meta.first_name ||
-          db.contact_number !== meta.contact_number ||
-          // ✅ ADD THIS LINE:
-          db.bio !== meta.bio ||
-          db.banned_at !== meta.banned_at ||
-          db.deleted_at !== meta.deleted_at;
-        if (needsSync) {
-          console.log("♻️ Syncing full profile to session cache...");
-          await supabase.auth.updateUser({
-            data: {
-              role: db.role,
-              avatar_url: db.avatar_url,
-              username: db.username,
-              first_name: db.first_name,
-              last_name: db.last_name,
-              pronouns: db.pronouns,
-              bio: db.bio,
-              contact_number: db.contact_number,
-              banned_at: db.banned_at,
-              deleted_at: db.deleted_at,
-            },
-          });
+        if (result.error) {
+          throw new Error(result.error.message || "Failed to fetch profile");
         }
-      }
 
-      return result.data || null;
-    } catch (err: any) {
-      if (retries > 0) {
-        console.warn(`Profile fetch failed, retrying... (${retries} left)`);
-        return fetchProfileSafe(userId, sessionUser, retries - 1);
+        return result.data || null;
+      } catch (err: any) {
+        if (retries > 0) {
+          console.warn(`Profile fetch failed, retrying... (${retries} left)`);
+          return fetchProfileSafe(userId, retries - 1);
+        }
+        return null;
       }
-      return null;
-    }
-  };
+    },
+    []
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -145,16 +126,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           const instantUser = getUserFromSession(session.user);
           if (mounted) setUser(instantUser);
 
-          const dbProfile = await fetchProfileSafe(
-            session.user.id,
-            session.user
-          );
+          const dbProfile = await fetchProfileSafe(session.user.id);
 
-          if (mounted) {
-            setUser((prev) => ({
-              ...(prev || instantUser),
-              ...(dbProfile || {}),
-            }));
+          if (mounted && dbProfile) {
+            // DB profile is the source of truth — it overwrites the optimistic user
+            setUser((prev) => ({ ...(prev || instantUser), ...dbProfile }));
           }
         }
       } catch (error) {
@@ -171,52 +147,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
 
+      if (event === "PASSWORD_RECOVERY") {
+        // Flag the context so UpdatePassword can detect the recovery session
+        setIsRecoveryMode(true);
+        setLoading(false);
+        return;
+      }
+
       if (event === "SIGNED_IN" && session?.user) {
         const instantUser = getUserFromSession(session.user);
 
-        // ✅ FIX 2: PREVENT FLICKER / DOWNGRADE
-        // If we already have the full profile for this user, keep it!
-        // Don't overwrite it with the partial 'instantUser' while we wait for the DB.
+        // Don't overwrite an already-loaded profile for the same user
         setUser((prev) => {
-          if (prev && prev.id === instantUser.id) {
-            return prev;
-          }
+          if (prev && prev.id === instantUser.id) return prev;
           return instantUser;
         });
 
-        const dbProfile = await fetchProfileSafe(session.user.id, session.user);
+        const dbProfile = await fetchProfileSafe(session.user.id);
         if (mounted && dbProfile) {
-          setUser((prev) => ({ ...prev, ...instantUser, ...dbProfile }));
+          setUser((prev) => ({ ...(prev || instantUser), ...dbProfile }));
         }
+        // Recovery mode ends once the user completes a normal sign-in
+        setIsRecoveryMode(false);
         setLoading(false);
       } else if (event === "SIGNED_OUT") {
         setUser(null);
+        setIsRecoveryMode(false);
         setLoading(false);
       }
     });
+
     return () => {
       mounted = false;
       subscription?.unsubscribe();
     };
-  }, []);
+  }, [fetchProfileSafe]);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setUser(null);
-  };
+    setIsRecoveryMode(false);
+  }, []);
 
-  // ✅ ADD THIS FUNCTION
-  const updatePassword = async (
-    currentPassword: string,
-    newPassword: string
-  ) => {
-    // First, verify the current password by attempting reauthentication
-    if (!user?.email) {
-      throw new Error("User email not found");
-    }
+  const updatePassword = useCallback(
+    async (currentPassword: string, newPassword: string) => {
+      if (!user?.email) {
+        throw new Error("User email not found");
+      }
 
-    try {
-      // Verify current password by signing in with current credentials
+      // Verify the current password via sign-in.
+      // Note: this fires a SIGNED_IN event; the onAuthStateChange handler guards
+      // against profile reload for the same user ID, so side effects are minimal.
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: user.email,
         password: currentPassword,
@@ -226,7 +207,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         throw new Error("Current password is incorrect");
       }
 
-      // If verification succeeds, update to new password
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword,
       });
@@ -234,29 +214,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (updateError) {
         throw new Error(updateError.message || "Failed to update password");
       }
-    } catch (error: any) {
-      throw new Error(error.message || "Failed to change password");
-    }
-  };
+    },
+    [user?.email]
+  );
 
-  const refreshProfile = async () => {
+  const refreshProfile = useCallback(async () => {
     const {
       data: { session },
     } = await supabase.auth.getSession();
     if (session?.user) {
       const instantUser = getUserFromSession(session.user);
-      const dbProfile = await fetchProfileSafe(session.user.id, session.user);
+      const dbProfile = await fetchProfileSafe(session.user.id);
       if (dbProfile) {
         setUser({ ...instantUser, ...dbProfile });
       } else {
         setUser(instantUser);
       }
     }
-  };
+  }, [fetchProfileSafe]);
 
   const value = useMemo(
-    () => ({ user, loading, signOut, refreshProfile, updatePassword }),
-    [user, loading]
+    () => ({
+      user,
+      loading,
+      isRecoveryMode,
+      signOut,
+      refreshProfile,
+      updatePassword,
+    }),
+    [user, loading, isRecoveryMode, signOut, refreshProfile, updatePassword]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

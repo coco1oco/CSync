@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -31,6 +31,30 @@ type SignInFormValues = z.infer<typeof signInSchema>;
 
 export default function SignIn() {
   const [showPassword, setShowPassword] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
+  const [cooldownSecs, setCooldownSecs] = useState(0);
+
+  const LOCKOUT_AFTER = 5;   // attempts
+  const LOCKOUT_SECS  = 30;  // seconds
+
+  // Live countdown timer
+  useEffect(() => {
+    if (!cooldownUntil) return;
+    const tick = () => {
+      const remaining = Math.ceil((cooldownUntil - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setCooldownUntil(null);
+        setCooldownSecs(0);
+        setFailedAttempts(0);
+      } else {
+        setCooldownSecs(remaining);
+      }
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [cooldownUntil]);
 
   const {
     register,
@@ -46,42 +70,52 @@ export default function SignIn() {
   });
 
   const onSubmit = async (data: SignInFormValues) => {
+    // Client-side rate limiting
+    if (cooldownUntil && Date.now() < cooldownUntil) return;
+
     try {
-      // ✅ 1. SET PREFERENCE
-      // This tells our custom storage adapter where to save the NEW token
       setPersistencePreference(!!data.rememberMe);
 
-      // 2. Attempt Login
       const { data: authData, error: signInError } =
         await supabase.auth.signInWithPassword({
           email: data.email,
           password: data.password,
         });
 
-      if (signInError) throw signInError;
+      if (signInError) {
+        // Increment attempt counter and possibly trigger lockout
+        const next = failedAttempts + 1;
+        setFailedAttempts(next);
+        if (next >= LOCKOUT_AFTER) {
+          setCooldownUntil(Date.now() + LOCKOUT_SECS * 1000);
+        }
+        // Normalize — never expose raw Supabase error text
+        toast.error("Invalid email or password.");
+        return;
+      }
+
+      // Successful login — reset counters
+      setFailedAttempts(0);
+      setCooldownUntil(null);
 
       if (authData.user) {
-        // 3. Silent Status Check
         const { data: profile } = await supabase
           .from("profiles")
           .select("banned_at, deleted_at")
           .eq("id", authData.user.id)
           .maybeSingle();
 
-        // 4. Update Audit Log
         await supabase
           .from("profiles")
           .update({ last_sign_in_at: new Date().toISOString() })
           .eq("id", authData.user.id);
 
-        // 5. Conditional Toast
         if (!profile?.banned_at && !profile?.deleted_at) {
           toast.success("Welcome back! 🐾");
         }
       }
-    } catch (err: any) {
-      console.error("Login error:", err);
-      toast.error(err.message || "Invalid login credentials.");
+    } catch {
+      toast.error("Something went wrong. Please try again.");
     }
   };
 
@@ -203,13 +237,27 @@ export default function SignIn() {
               </label>
             </div>
 
+            {/* Rate-limit warning */}
+            {failedAttempts > 0 && !cooldownUntil && (
+              <p className="text-[11px] text-amber-600 text-center">
+                {LOCKOUT_AFTER - failedAttempts} attempt{LOCKOUT_AFTER - failedAttempts !== 1 ? "s" : ""} remaining before temporary lockout.
+              </p>
+            )}
+
             <Button
               type="submit"
-              disabled={isSubmitting}
-              className="w-full h-12 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-md mt-2 shadow-sm transition-all active:scale-[0.98]"
+              disabled={isSubmitting || !!cooldownUntil}
+              className="w-full h-12 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold text-md mt-2 shadow-sm transition-all active:scale-[0.98]"
             >
-              {isSubmitting ? <Loader2 className="animate-spin" /> : "Sign In"}
+              {isSubmitting ? (
+                <Loader2 className="animate-spin" />
+              ) : cooldownUntil ? (
+                `Too many attempts — try again in ${cooldownSecs}s`
+              ) : (
+                "Sign In"
+              )}
             </Button>
+
           </form>
         </div>
       </div>
