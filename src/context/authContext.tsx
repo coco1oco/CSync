@@ -94,7 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           .maybeSingle();
 
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Profile fetch timeout")), 5000)
+          setTimeout(() => reject(new Error("Profile fetch timeout")), 10000)
         );
 
         const result: any = await Promise.race([fetchPromise, timeoutPromise]);
@@ -106,7 +106,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         return result.data || null;
       } catch (err: any) {
         if (retries > 0) {
-          console.warn(`Profile fetch failed, retrying... (${retries} left)`);
+          console.warn(`Profile fetch failed, retrying... (${retries} left)`, err);
           return fetchProfileSafe(userId, retries - 1);
         }
         return null;
