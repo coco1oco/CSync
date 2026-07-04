@@ -69,10 +69,16 @@ export default function SignIn() {
     },
   });
 
+  const isRequestInFlight = React.useRef(false);
+
   const onSubmit = async (data: SignInFormValues) => {
+    // Prevent concurrent spam submissions
+    if (isRequestInFlight.current) return;
+    
     // Client-side rate limiting
     if (cooldownUntil && Date.now() < cooldownUntil) return;
 
+    isRequestInFlight.current = true;
     try {
       setPersistencePreference(!!data.rememberMe);
 
@@ -83,12 +89,15 @@ export default function SignIn() {
         });
 
       if (signInError) {
-        // Increment attempt counter and possibly trigger lockout
-        const next = failedAttempts + 1;
-        setFailedAttempts(next);
-        if (next >= LOCKOUT_AFTER) {
-          setCooldownUntil(Date.now() + LOCKOUT_SECS * 1000);
-        }
+        // Increment attempt counter safely using functional update
+        setFailedAttempts((prev) => {
+          const next = prev + 1;
+          if (next >= LOCKOUT_AFTER) {
+            setCooldownUntil(Date.now() + LOCKOUT_SECS * 1000);
+          }
+          return next;
+        });
+        
         // Normalize — never expose raw Supabase error text
         toast.error("Invalid email or password.");
         return;
@@ -116,6 +125,8 @@ export default function SignIn() {
       }
     } catch {
       toast.error("Something went wrong. Please try again.");
+    } finally {
+      isRequestInFlight.current = false;
     }
   };
 
